@@ -182,14 +182,14 @@ export function payoffSvg(legs, netCash, opt = {}) {
  * برمی‌گرداند { analysis, reset, destroy }.
  */
 export function mountPayoff(host, legs, netCash, opt = {}) {
-  const { points, analysis } = seriesFor(legs, netCash, opt);
-  const ys = points.map((p) => p.pnl).filter(Number.isFinite);
+  let { points, analysis } = seriesFor(legs, netCash, opt);
+  let ys = points.map((p) => p.pnl).filter(Number.isFinite);
   if (!ys.length) {
     host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
-    return { analysis, reset() {}, destroy() {} };
+    return { analysis, reset() {}, destroy() {}, update: () => false };
   }
 
-  const [homeLo, homeHi] = homeRange(points, analysis, opt);
+  let [homeLo, homeHi] = homeRange(points, analysis, opt);
   let lo = homeLo, hi = homeHi;
   let geo = null;
 
@@ -297,6 +297,20 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
 
   const reset = () => { lo = homeLo; hi = homeHi; render(); };
 
+  // داده تازه بدون از دست دادن زوم و پیمایش کاربر. در اسکن پیوسته هر
+  // مرحله دو همین ترکیب را دوباره می‌آورد؛ ساختن نمودار از نو هر بار
+  // بازه‌ای که کاربر باز کرده بود را می‌پراند. بازه فعلی (lo/hi) دست
+  // نخورده می‌ماند مگر دیگر داخل بازه معنی‌دار داده نو نباشد.
+  function update(nextLegs, nextNetCash, nextOpt) {
+    const s = seriesFor(nextLegs, nextNetCash, nextOpt);
+    const nextYs = s.points.map((p) => p.pnl).filter(Number.isFinite);
+    if (!nextYs.length) return false;
+    points = s.points; analysis = s.analysis; ys = nextYs; opt = nextOpt;
+    [homeLo, homeHi] = homeRange(points, analysis, opt);
+    render();
+    return true;
+  }
+
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointermove', onMove);
@@ -309,8 +323,9 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   host.querySelector('[data-act="out"]').addEventListener('click', () => zoomAt(NaN, 1.3));
 
   return {
-    analysis,
+    get analysis() { return analysis; },
     reset,
+    update,
     destroy() {
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('pointerdown', onDown);
