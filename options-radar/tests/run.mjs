@@ -23,6 +23,7 @@ import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '
 import { resolveSafe } from '../server/safepath.mjs';
 import { isValidIns } from '../server/validate.mjs';
 import { readBody, BodyTooLargeError } from '../server/body.mjs';
+import { nextWatchDelay, WATCH_BACKOFF_MAX_SEC } from '../server/backoff.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -857,6 +858,18 @@ group('۲۰. سقف اندازه بدنه درخواست');
   try { await readBody([Buffer.alloc(100)], 100); }
   catch { notThrown = false; }
   check('بدنه دقیقاً هم‌اندازه سقف پذیرفته شد', notThrown);
+}
+
+// ═══════════════════════════ ۲۱. عقب‌نشینی حلقه دیده‌بان ═══════════════════════════
+group('۲۱. عقب‌نشینی حلقه دیده‌بان');
+{
+  check('بدون خطا، فاصله عادی است', nextWatchDelay(5, 0) === 5);
+  check('فاصله عادی زیر کف ۲ ثانیه نمی‌رود', nextWatchDelay(1, 0) === 2);
+  check('اولین خطا، فاصله دو برابر می‌شود', nextWatchDelay(5, 1) === 10);
+  check('خطای دوم، فاصله چهار برابر می‌شود', nextWatchDelay(5, 2) === 20);
+  check('عقب‌نشینی از سقف بیشتر نمی‌شود',
+    nextWatchDelay(5, 10) === WATCH_BACKOFF_MAX_SEC, `${nextWatchDelay(5, 10)}`);
+  check('سقف عقب‌نشینی قابل تنظیم است', nextWatchDelay(5, 10, 30) === 30);
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

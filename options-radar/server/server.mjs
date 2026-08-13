@@ -21,6 +21,7 @@ import { defaults, sanitize } from '../core/settings.mjs';
 import { resolveSafe } from './safepath.mjs';
 import { isValidIns } from './validate.mjs';
 import { readBody, BodyTooLargeError } from './body.mjs';
+import { nextWatchDelay } from './backoff.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -61,7 +62,7 @@ const stat = {
   requests: 0, cacheHits: 0, errors: 0, rateWaits: 0,
   upstreamMsTotal: 0, upstreamCount: 0,
   lastError: null, lastErrorAt: null,
-  watchTicks: 0, watchRows: 0, lastWatchAt: null, lastWatchMs: 0,
+  watchTicks: 0, watchRows: 0, lastWatchAt: null, lastWatchMs: 0, watchConsecutiveFails: 0,
   queueDepth: 0, inflight: 0, clients: 0, paused: false, pauseReason: '',
 };
 
@@ -239,11 +240,12 @@ function broadcast(event, payload) {
   for (const res of clients) { try { res.write(msg); } catch { clients.delete(res); } }
 }
 
+/** @returns {Promise<boolean>} موفق بود یا نه — حلقه برای عقب‌نشینی لازم دارد */
 async function watchTick() {
   const gate = marketOpen();
   stat.paused = !gate.open;
   stat.pauseReason = gate.why;
-  if (!gate.open) return;
+  if (!gate.open) return true;
 
   const t0 = Date.now();
   try {
@@ -265,15 +267,21 @@ async function watchTick() {
     stat.lastWatchMs = Date.now() - t0;
     // بار اول کل عکس، بعد فقط ردیف‌های تغییرکرده
     broadcast('watch', { at: watch.at, full: first, count: rows.length, rows: first ? rows : changed });
+    return true;
   } catch (e) {
     broadcast('trouble', { at: Date.now(), message: `${e.name}: ${e.message}` });
+    return false;
   }
 }
 
 async function watchLoop() {
+  let consecutiveFails = 0;
   for (;;) {
-    await watchTick();
-    await sleep(Math.max(2, S.watchIntervalSec) * 1000);
+    const ok = await watchTick();
+    consecutiveFails = ok ? 0 : consecutiveFails + 1;
+    const delaySec = nextWatchDelay(S.watchIntervalSec, consecutiveFails);
+    stat.watchConsecutiveFails = consecutiveFails;
+    await sleep(delaySec * 1000);
   }
 }
 
