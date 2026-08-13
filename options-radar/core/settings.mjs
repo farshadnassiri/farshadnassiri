@@ -46,6 +46,10 @@ export const SCHEMA = [
     def: 24, min: 2, max: 200, step: 1, unit: 'نماد',
     label: 'سقف نماد با عمق کامل',
     hint: 'مرحله دو غربال. عمق پنج سطحی فقط برای همین تعداد کاندیدای برتر گرفته می‌شود.' },
+  { key: 'maxCacheEntries', group: 'quota', kind: 'num', scope: 'server',
+    def: 2000, min: 50, max: 50000, step: 50, unit: 'ورودی',
+    label: 'سقف کش سرور',
+    hint: 'کلید کش یک URL بالادست است. بدون سقف، نشست طولانی روی بازار پر از نماد حافظه را بی‌رویه پر می‌کند.' },
 
   // ——— ساعات بازار ———
   { key: 'gateMarketHours', group: 'hours', kind: 'bool', scope: 'server',

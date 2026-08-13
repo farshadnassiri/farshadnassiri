@@ -19,6 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaults, sanitize } from '../core/settings.mjs';
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from './guard.mjs';
+import { evictOldest } from './cache.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -161,6 +162,7 @@ async function get(pathname, ttlSec, priority = 5) {
         stat.requests += 1;
         const data = await schedule(() => fetchUpstream(url), priority);
         cache.set(url, { at: Date.now(), data });
+        evictOldest(cache, S.maxCacheEntries);
         return data;
       } catch (e) {
         lastErr = e;
