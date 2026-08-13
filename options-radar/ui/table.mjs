@@ -28,6 +28,51 @@ const HEAT = {
 
 const NUM_FMT = new Set(['money', 'pct', 'num', 'int']);
 
+/**
+ * جابه‌جایی یک ستون به جای ستون دیگر.
+ *
+ * معنی «انداختن» ساده نگه داشته شده: ستون کشیده‌شده دقیقاً جای ستون مقصد
+ * می‌نشیند و بقیه کنار می‌روند. حالت «قبل یا بعد از مقصد» عمداً نیامد،
+ * چون در صفحه راست‌به‌چپ «قبل» یعنی سمت راست و همین یک کلمه، تصمیم را
+ * مبهم می‌کند.
+ *
+ * تابع خالص است تا بی‌نیاز از مرورگر آزمون شود.
+ */
+export function moveColumn(keys, fromKey, toKey) {
+  const from = keys.indexOf(fromKey);
+  const to = keys.indexOf(toKey);
+  if (from < 0 || to < 0 || from === to) return [...keys];
+  const next = [...keys];
+  next.splice(from, 1);
+  next.splice(to, 0, fromKey);
+  return next;
+}
+
+/**
+ * افزودن یک ستون، بدون خراب کردن چیدمان دستی.
+ *
+ * قبلاً هر بار که ستونی تیک می‌خورد، کل فهرست بر اساس ترتیب قرارداد ستونی
+ * از نو ساخته می‌شد. تا وقتی جابه‌جایی دستی نبود این بهترین کار بود، ولی
+ * حالا یعنی یک تیک، تمام کشیدن‌های کاربر را دور می‌ریزد.
+ *
+ * پس اول نگاه می‌کنیم چیدمان فعلی هنوز به ترتیب قرارداد هست یا نه:
+ *
+ *   هست    یعنی کاربر چیزی جابه‌جا نکرده، ستون تازه سر جای قراردادی‌اش
+ *          می‌نشیند — همان رفتار آشنای قبلی
+ *   نیست   یعنی چیدمان مال کاربر است، پس ستون تازه ته صف اضافه می‌شود و
+ *          به کار او دست زده نمی‌شود
+ */
+export function insertColumn(keys, k, order) {
+  if (keys.includes(k)) return [...keys];
+  const idx = (x) => order.indexOf(x);
+  const byContract = keys.every((x, i) => i === 0 || idx(keys[i - 1]) < idx(x));
+  if (!byContract) return [...keys, k];
+  const at = keys.findIndex((x) => idx(x) > idx(k));
+  const next = [...keys];
+  next.splice(at < 0 ? next.length : at, 0, k);
+  return next;
+}
+
 /** انتخاب ستون هر جدول جدا می‌ماند، تا نمای تب سرمایه نمای تب یونانی را عوض نکند. */
 function loadPick(storeKey) {
   if (!storeKey) return null;
@@ -97,20 +142,65 @@ export function makeTable(host, cols, opts = {}) {
 
   const active = () => keys.map((k) => byKey.get(k)).filter(Boolean);
 
-  // ——— سرستون: چسبان بالای قاب، و روی هر ستون مرتب می‌شود ———
+  // ——— سرستون: چسبان بالای قاب، مرتب‌شونده، و جابه‌جاشونده با کشیدن ———
+  //
+  // یک سرستون دو کار دارد و باید از هم تفکیک شوند: کلیک یعنی مرتب‌سازی،
+  // کشیدن یعنی جابه‌جایی. مرورگر بعد از رها کردن، گاهی کلیک هم می‌فرستد؛
+  // پرچم dragging جلوی مرتب‌سازی ناخواسته را می‌گیرد.
+  let dragKey = null;
+  let dragged = false;
+
   function buildHead() {
     headRow.innerHTML = '';
     for (const c of active()) {
       const th = document.createElement('th');
       th.textContent = c.label;
-      th.title = `مرتب‌سازی بر ${c.label}`;
+      th.title = `کلیک برای مرتب‌سازی بر ${c.label} — کشیدن برای جابه‌جایی`;
       th.dataset.key = c.key;
+      th.draggable = true;
       if (NUM_FMT.has(c.fmt)) th.classList.add('n');
+
       th.addEventListener('click', () => {
+        if (dragged) { dragged = false; return; }
         if (sortKey === c.key) sortDir = -sortDir;
         else { sortKey = c.key; sortDir = -1; }
         apply();
       });
+
+      th.addEventListener('dragstart', (e) => {
+        dragKey = c.key;
+        dragged = false;
+        th.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        // بعضی مرورگرها بدون داده، کشیدن را شروع نمی‌کنند
+        try { e.dataTransfer.setData('text/plain', c.key); } catch { /* بی‌اهمیت */ }
+      });
+
+      th.addEventListener('dragend', () => {
+        dragKey = null;
+        headRow.querySelectorAll('th').forEach((x) => x.classList.remove('dragging', 'drop-into'));
+      });
+
+      th.addEventListener('dragover', (e) => {
+        if (dragKey == null || dragKey === c.key) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        th.classList.add('drop-into');
+      });
+
+      th.addEventListener('dragleave', () => th.classList.remove('drop-into'));
+
+      th.addEventListener('drop', (e) => {
+        e.preventDefault();
+        th.classList.remove('drop-into');
+        if (dragKey == null || dragKey === c.key) return;
+        dragged = true;
+        keys = moveColumn(keys, dragKey, c.key);
+        savePick(opts.storeKey, keys);
+        buildHead();
+        apply();
+      });
+
       headRow.appendChild(th);
     }
     colsN.textContent = `${faDigits(keys.length)}/${faDigits(all.length)}`;
@@ -122,7 +212,7 @@ export function makeTable(host, cols, opts = {}) {
     const groups = [...new Set(all.map((c) => c.group || 'دیگر'))];
     panel.innerHTML = `
       <div class="col-panel-head">
-        <span>هر ستونی را می‌شود اضافه یا کم کرد. انتخاب همین جدول ذخیره می‌ماند.</span>
+        <span>هر ستونی را می‌شود اضافه یا کم کرد، و سرستون‌ها را با کشیدن جابه‌جا کرد. انتخاب و چیدمان همین جدول ذخیره می‌ماند.</span>
         <span class="sp"></span>
         <button type="button" class="ghost" data-act="base">نمای آماده</button>
         <button type="button" class="ghost" data-act="all">همه</button>
@@ -144,8 +234,7 @@ export function makeTable(host, cols, opts = {}) {
       box.addEventListener('change', () => {
         const k = box.dataset.key;
         if (box.checked) {
-          // ترتیب قرارداد ستونی حفظ می‌شود، نه ترتیب کلیک
-          keys = all.map((c) => c.key).filter((x) => x === k || keys.includes(x));
+          keys = insertColumn(keys, k, all.map((c) => c.key));
         } else {
           if (keys.length === 1) { box.checked = true; return; } // جدول بی‌ستون معنی ندارد
           keys = keys.filter((x) => x !== k);

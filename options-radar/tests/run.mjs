@@ -22,6 +22,7 @@ import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
 import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock } from '../ui/fmt.mjs';
+import { moveColumn, insertColumn } from '../ui/table.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -1038,6 +1039,46 @@ group('۲۱. قالب‌بندی عدد فارسی');
   check('فاصله زمانی نامعتبر، خط تیره', faAgo(NaN) === '—' && faAgo(-5) === '—');
   check('ساعت با رقم فارسی و دو رقمی', faClock(new Date(2026, 7, 13, 9, 5, 3)) === '۰۹:۰۵:۰۳',
         faClock(new Date(2026, 7, 13, 9, 5, 3)));
+}
+
+// ═══════════════ ۲۲. چیدمان ستون: جابه‌جایی و افزودن ═══════════════
+group('۲۲. چیدمان ستون');
+{
+  const K = ['a', 'b', 'c', 'd'];
+  const ORDER = ['a', 'b', 'c', 'd', 'e', 'f'];
+
+  check('ستون به جای مقصد می‌نشیند، رو به جلو',
+        moveColumn(K, 'a', 'c').join('') === 'bcad', moveColumn(K, 'a', 'c').join(''));
+  check('و رو به عقب هم همان‌طور',
+        moveColumn(K, 'd', 'b').join('') === 'adbc', moveColumn(K, 'd', 'b').join(''));
+  check('جابه‌جایی با خودش، چیزی را عوض نمی‌کند', moveColumn(K, 'b', 'b').join('') === 'abcd');
+  check('کلید ناموجود، فهرست را دست‌نخورده برمی‌گرداند',
+        moveColumn(K, 'z', 'b').join('') === 'abcd' && moveColumn(K, 'b', 'z').join('') === 'abcd');
+  check('ورودی دست‌کاری نمی‌شود', (moveColumn(K, 'a', 'd'), K.join('') === 'abcd'));
+  check('طول همیشه حفظ می‌شود', moveColumn(K, 'a', 'd').length === 4);
+
+  // افزودن، وقتی کاربر چیزی جابه‌جا نکرده: جای قراردادی
+  check('ستون تازه سر جای قراردادی می‌نشیند',
+        insertColumn(['a', 'c', 'e'], 'b', ORDER).join('') === 'abce',
+        insertColumn(['a', 'c', 'e'], 'b', ORDER).join(''));
+  check('ستونی که از همه بعدتر است، ته صف می‌رود',
+        insertColumn(['a', 'b'], 'f', ORDER).join('') === 'abf');
+  check('ستونی که از همه جلوتر است، سر صف می‌رود',
+        insertColumn(['c', 'd'], 'a', ORDER).join('') === 'acd');
+
+  // افزودن، وقتی چیدمان دستی شده: نباید به کار کاربر دست بزند
+  const manual = ['d', 'a', 'c'];
+  const after = insertColumn(manual, 'b', ORDER);
+  check('چیدمان دستی با افزودن ستون خراب نمی‌شود',
+        after.slice(0, 3).join('') === 'dac' && after[3] === 'b', after.join(''));
+  check('ستون تکراری دوباره اضافه نمی‌شود',
+        insertColumn(['a', 'b'], 'b', ORDER).join('') === 'ab');
+  check('افزودن هم ورودی را دست‌کاری نمی‌کند',
+        (insertColumn(manual, 'b', ORDER), manual.join('') === 'dac'));
+
+  // رفت و برگشت: جابه‌جایی و برگرداندن، به همان نقطه اول می‌رسد
+  const moved = moveColumn(K, 'a', 'c');
+  check('جابه‌جایی برگشت‌پذیر است', moveColumn(moved, 'a', 'a').join('') === moved.join(''));
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

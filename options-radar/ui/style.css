@@ -401,6 +401,16 @@ dl.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nu
 .tbl-body { overflow: auto; height: 56vh; position: relative; }
 
 /* ——— نوار ابزار جدول و انتخابگر ستون ——— */
+/* ——— جابه‌جایی ستون با کشیدن ——— */
+.tbl-body table.data thead th { cursor: grab; user-select: none; }
+.tbl-body table.data thead th:active { cursor: grabbing; }
+.tbl-body table.data thead th.dragging { opacity: .4; }
+/* مقصد انداختن، روی لبه رو به کاربر خط می‌گیرد تا معلوم باشد کجا می‌نشیند */
+.tbl-body table.data thead th.drop-into {
+  background: var(--accent-soft); color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
 .tbl-tools {
   display: flex; align-items: center; gap: 10px; padding: 7px 10px;
   border-bottom: 1px solid var(--line); background: var(--panel-2);
