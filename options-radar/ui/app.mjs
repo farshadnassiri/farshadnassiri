@@ -220,6 +220,16 @@ function dirTone(def) {
 const norm = (s) => String(s || '').replace(/[ي]/g, 'ی').replace(/[ك]/g, 'ک').replace(/‌/g, ' ').trim();
 
 let railQuery = '';
+let railActiveId = null; // آیتم برجسته با صفحه‌کلید، جدا از تب باز (aria-current)
+
+/** برجستگی صفحه‌کلید را روی دکمه‌ی متناظر می‌گذارد و در دید نگه می‌دارد. */
+function setRailActive(id) {
+  railActiveId = id;
+  for (const b of el('rail-list').querySelectorAll('.tab-btn')) {
+    b.setAttribute('data-kbd-active', b.dataset.tab === id ? '1' : '0');
+  }
+  if (id) el('rail-list').querySelector(`.tab-btn[data-tab="${id}"]`)?.scrollIntoView({ block: 'nearest' });
+}
 
 function buildRail() {
   const list = el('rail-list');
@@ -298,6 +308,11 @@ function buildRail() {
   el('rail-count').textContent = q
     ? `${faDigits(shown)} از ${faDigits(TABS.length)}`
     : `${faDigits(TABS.length)} تب`;
+
+  // اگر آیتم برجسته با فیلتر تازه دیگر دیده نیست، برجستگی به اولی برمی‌گردد
+  const visibleIds = [...list.querySelectorAll('.tab-btn')].map((b) => b.dataset.tab);
+  if (!visibleIds.includes(railActiveId)) railActiveId = visibleIds[0] || null;
+  setRailActive(railActiveId);
 }
 
 let current = null;
@@ -346,11 +361,40 @@ el('rail-q').addEventListener('input', (e) => {
   railQuery = e.target.value;
   buildRail();
 });
-// در فهرست فیلترشده، اینتر یعنی «همان یکی که مانده را باز کن»
+
+// میان‌بر صفحه‌کلید: بالا و پایین بین تب‌های فیلترشده، اینتر همان یکی را باز
+// می‌کند. آیتم برجسته با شناسه نگه داشته می‌شود نه اندیس، چون فهرست با هر
+// تایپ از نو ساخته می‌شود.
 el('rail-q').addEventListener('keydown', (e) => {
+  const visible = [...el('rail-list').querySelectorAll('.tab-btn')];
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!visible.length) return;
+    let idx = visible.findIndex((b) => b.dataset.tab === railActiveId);
+    idx = e.key === 'ArrowDown'
+      ? Math.min(idx < 0 ? 0 : idx + 1, visible.length - 1)
+      : Math.max(idx < 0 ? visible.length - 1 : idx - 1, 0);
+    setRailActive(visible[idx].dataset.tab);
+    return;
+  }
   if (e.key !== 'Enter') return;
-  const first = el('rail-list').querySelector('.tab-btn');
-  if (first) open(first.dataset.tab);
+  const target = visible.find((b) => b.dataset.tab === railActiveId) || visible[0];
+  if (target) open(target.dataset.tab);
+});
+
+// `/` یا Ctrl+K نشانگر را داخل جست‌وجوی فهرست می‌برد، هرجای صفحه که باشی —
+// جز وقتی همین حالا داخل یک ورودی دیگر تایپ می‌کنی، وگرنه «/» در آن ورودی
+// نوشته نمی‌شود.
+document.addEventListener('keydown', (e) => {
+  const isCombo = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
+  if (!isCombo && e.key !== '/') return;
+  const t = document.activeElement;
+  const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+  if (e.key === '/' && typing) return;
+  e.preventDefault();
+  const q = el('rail-q');
+  q.focus();
+  q.select();
 });
 
 // ————————————————————————————————— شروع —————————————————————————————————
