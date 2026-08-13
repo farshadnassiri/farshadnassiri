@@ -26,7 +26,7 @@ export async function mount(root, { state, api }) {
       <button class="btn sec" id="reset">بازگشت به پیش‌فرض</button>
       <button class="btn sec" id="clear-cache">خالی کردن کش سرور</button>
       <span class="sp"></span>
-      <span id="msg" class="saved"></span>
+      <span id="msg" class="saved" role="status" aria-live="polite"></span>
     </div>`;
 
   const holder = root.querySelector('#groups');

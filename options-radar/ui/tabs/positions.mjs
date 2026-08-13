@@ -44,7 +44,7 @@ export async function mount(root, { state, api }) {
       <div class="bar" style="margin-top:12px">
         <button class="btn" id="add">افزودن</button>
         <span class="sp"></span>
-        <span id="msg" class="saved"></span>
+        <span id="msg" class="saved" role="status" aria-live="polite"></span>
       </div>
     </section>
 
