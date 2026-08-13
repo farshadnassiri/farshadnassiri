@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { defaults, sanitize } from '../core/settings.mjs';
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from './guard.mjs';
 import { evictOldest } from './cache.mjs';
+import { watchBackoffSec } from './backoff.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -64,7 +65,7 @@ const stat = {
   requests: 0, cacheHits: 0, errors: 0, rateWaits: 0,
   upstreamMsTotal: 0, upstreamCount: 0,
   lastError: null, lastErrorAt: null,
-  watchTicks: 0, watchRows: 0, lastWatchAt: null, lastWatchMs: 0,
+  watchTicks: 0, watchRows: 0, lastWatchAt: null, lastWatchMs: 0, watchConsecutiveFails: 0,
   queueDepth: 0, inflight: 0, clients: 0, paused: false, pauseReason: '',
 };
 
@@ -250,11 +251,12 @@ function broadcast(event, payload) {
   for (const res of clients) { try { res.write(msg); } catch { clients.delete(res); } }
 }
 
+/** @returns {boolean} موفق بود یا نه — بازار بسته هم موفق حساب می‌شود، عقب‌نشینی نمی‌خواهد */
 async function watchTick() {
   const gate = marketOpen();
   stat.paused = !gate.open;
   stat.pauseReason = gate.why;
-  if (!gate.open) return;
+  if (!gate.open) return true;
 
   const t0 = Date.now();
   try {
@@ -276,15 +278,20 @@ async function watchTick() {
     stat.lastWatchMs = Date.now() - t0;
     // بار اول کل عکس، بعد فقط ردیف‌های تغییرکرده
     broadcast('watch', { at: watch.at, full: first, count: rows.length, rows: first ? rows : changed });
+    return true;
   } catch (e) {
     broadcast('trouble', { at: Date.now(), message: `${e.name}: ${e.message}` });
+    return false;
   }
 }
 
 async function watchLoop() {
+  let fails = 0;
   for (;;) {
-    await watchTick();
-    await sleep(Math.max(2, S.watchIntervalSec) * 1000);
+    const ok = await watchTick();
+    fails = ok ? 0 : fails + 1;
+    stat.watchConsecutiveFails = fails;
+    await sleep(watchBackoffSec(Math.max(2, S.watchIntervalSec), fails) * 1000);
   }
 }
 

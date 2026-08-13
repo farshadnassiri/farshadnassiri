@@ -22,6 +22,7 @@ import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
 import { evictOldest } from '../server/cache.mjs';
+import { watchBackoffSec } from '../server/backoff.mjs';
 import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn } from '../ui/table.mjs';
 
@@ -1112,6 +1113,21 @@ group('۲۳. کش سرور، سقف ورودی');
   check('بعد از رشد پیاپی، فقط پنج‌تای آخر می‌ماند',
         growing.has('k19') && growing.has('k15') && !growing.has('k14'),
         [...growing.keys()].join(','));
+}
+
+// ═══════════════ ۲۴. عقب‌نشینی حلقه دیده‌بان ═══════════════
+group('۲۴. عقب‌نشینی حلقه دیده‌بان');
+{
+  check('بدون شکست، فاصله عادی', watchBackoffSec(5, 0) === 5);
+  check('شکست منفی هم مثل صفر رفتار می‌کند', watchBackoffSec(5, -1) === 5);
+  check('یک شکست، دو برابر', watchBackoffSec(5, 1) === 10);
+  check('دو شکست، چهار برابر', watchBackoffSec(5, 2) === 20);
+  check('رشد نمایی ادامه دارد', watchBackoffSec(5, 4) === 80);
+  check('به سقف که رسید، فراتر نمی‌رود', watchBackoffSec(5, 10, 300) === 300,
+        watchBackoffSec(5, 10, 300));
+  check('سقف قابل تنظیم است', watchBackoffSec(5, 10, 60) === 60);
+  check('فاصله عادی هم از سقف رد نمی‌شود', watchBackoffSec(500, 0, 300) === 500,
+        'فاصله پایه دست کاربر است، سقف فقط رشد نمایی را می‌بندد');
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════
