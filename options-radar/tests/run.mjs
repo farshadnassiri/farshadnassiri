@@ -20,6 +20,7 @@ import { buildChain, underlyingList, chainStats } from '../core/chain.mjs';
 import { scan as scanFn, generateCombos } from '../core/scan.mjs';
 import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
+import { resolveSafe } from '../server/safepath.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -788,6 +789,22 @@ group('۱۷. سنجه‌های سربه‌سری');
   // مقدار بی‌معنی در فهرست، دور ریخته می‌شود
   const dirty = breakevenMetrics([NaN, -5, 0, 103000], S);
   check('سربه‌سری بی‌معنی کنار گذاشته شد', dirty.beCount === 1 && dirty.beNear === 103000);
+}
+
+// ═══════════════════════════ ۱۸. مسیر امن سرو فایل ایستا ═══════════════════════════
+group('۱۸. مسیر امن سرو فایل ایستا');
+{
+  const ROOT = '/x/options-radar';
+  check('مسیر عادی زیر ریشه پذیرفته شد',
+    resolveSafe(ROOT, '/ui/index.html') === '/x/options-radar/ui/index.html');
+  check('ریشه به index.html نگاشته شد',
+    resolveSafe(ROOT, '/') === '/x/options-radar/ui/index.html');
+  check('پوشه هم‌نام‌شروع کنار ریشه رد شد',
+    resolveSafe(ROOT, '/../options-radar-private/secret.json') === null);
+  check('صعود چندباره به بیرون ریشه رد شد',
+    resolveSafe(ROOT, '/../../../../etc/passwd') === null);
+  check('صعود درون‌مسیری که هنوز زیر ریشه است پذیرفته شد',
+    resolveSafe(ROOT, '/ui/../data/settings.json') === '/x/options-radar/data/settings.json');
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════
