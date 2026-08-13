@@ -117,6 +117,16 @@ export function kpiTone(label, isGain) {
 }
 
 /**
+ * کلاس رنگ کارت KPI مستقیم از علامت یک عدد — «بهترین/میانه بازده ماهانه»
+ * در تب‌های استراتژی و برترین موقعیت‌ها، جایی که خودِ عدد ماهیتاً سود یا
+ * زیان است، نه یک شمارنده خنثی مثل «ردیف قابل اجرا». عدد نامتناهی (چون
+ * ردیفی موجود نیست) خنثی می‌ماند.
+ */
+export function signTone(value) {
+  return Number.isFinite(value) ? (value >= 0 ? 'gain' : 'loss') : '';
+}
+
+/**
  * پیام خام `stat.lastError` سرور (server/server.mjs) از `${e.name}: ${e.message}`
  * جاوااسکریپت می‌آید — مثل «TypeError: fetch failed» یا «AbortError: The
  * operation was aborted» — که برای کاربر فارسی‌زبان چیزی نمی‌گوید. این تابع

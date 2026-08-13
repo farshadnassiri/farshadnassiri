@@ -16,7 +16,7 @@ import { timeMachine } from '/core/timemachine.mjs';
 import { priceQuantile } from '/core/bs.mjs';
 import { gregorianToJalali } from '/core/jalali.mjs';
 import { makeTable, funnelBar } from '/ui/table.mjs';
-import { fmt, faNum, faDigits, coverageInfo } from '/ui/fmt.mjs';
+import { fmt, faNum, faDigits, coverageInfo, signTone } from '/ui/fmt.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { mountPayoff, payoffAt } from '/ui/chart.mjs';
 import { sameUnderlyingCandidates, compareLabel, MAX_COMPARE } from '/ui/compare.mjs';
@@ -191,18 +191,19 @@ export async function mount(root, { tab, state, api }) {
     const ok = rows.filter((r) => Number.isFinite(r.retMonthPct));
     const best = ok[0];
     const med = (arr) => (arr.length ? arr.slice().sort((a, b) => a - b)[Math.floor(arr.length / 2)] : NaN);
+    const medMonth = med(ok.map((r) => r.retMonthPct));
     const items = [
-      ['ردیف قابل اجرا', fmt.int(rows.filter((r) => r.executable).length), `از ${fmt.int(rows.length)}`],
-      ['بهترین بازده ماهانه', best ? `${fmt.pct(best.retMonthPct)}٪` : '—', best?.underlying || ''],
-      ['میانه بازده ماهانه', `${fmt.pct(med(ok.map((r) => r.retMonthPct)))}٪`, ''],
-      ['میانه احتمال سود', `${fmt.pct(med(rows.map((r) => r.popPct).filter(Number.isFinite)))}٪`, ''],
-      ['میانه هزینه اجرا', fmt.money(med(rows.map((r) => r.execCost).filter(Number.isFinite))), `${fmt.int(def.legs.length)} پا`],
-      ['زیان نامحدود', fmt.int(rows.filter((r) => r.unlimitedLoss).length), 'ردیف'],
-      ['عمق کامل', fmt.int(rows.filter((r) => r.quality === 'exact').length), 'ردیف مرحله دو'],
-      ['بستانکار', fmt.int(rows.filter((r) => r.isCredit).length), 'ردیف'],
+      ['ردیف قابل اجرا', fmt.int(rows.filter((r) => r.executable).length), `از ${fmt.int(rows.length)}`, ''],
+      ['بهترین بازده ماهانه', best ? `${fmt.pct(best.retMonthPct)}٪` : '—', best?.underlying || '', best ? signTone(best.retMonthPct) : ''],
+      ['میانه بازده ماهانه', `${fmt.pct(medMonth)}٪`, '', signTone(medMonth)],
+      ['میانه احتمال سود', `${fmt.pct(med(rows.map((r) => r.popPct).filter(Number.isFinite)))}٪`, '', ''],
+      ['میانه هزینه اجرا', fmt.money(med(rows.map((r) => r.execCost).filter(Number.isFinite))), `${fmt.int(def.legs.length)} پا`, ''],
+      ['زیان نامحدود', fmt.int(rows.filter((r) => r.unlimitedLoss).length), 'ردیف', ''],
+      ['عمق کامل', fmt.int(rows.filter((r) => r.quality === 'exact').length), 'ردیف مرحله دو', ''],
+      ['بستانکار', fmt.int(rows.filter((r) => r.isCredit).length), 'ردیف', ''],
     ];
-    root.querySelector('#kpis').innerHTML = items.map(([k, v, sub]) => `
-      <div class="kpi"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join('');
+    root.querySelector('#kpis').innerHTML = items.map(([k, v, sub, c]) => `
+      <div class="kpi"><div class="k">${k}</div><div class="v ${c}">${v}</div><div class="s">${sub}</div></div>`).join('');
   }
 
   // ——— پانل جزئیات ———

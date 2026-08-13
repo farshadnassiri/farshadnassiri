@@ -12,7 +12,7 @@ import { COLUMNS } from '/core/evaluate.mjs';
 import { analyzePayoff } from '/core/payoff.mjs';
 import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
 import { makeTable, funnelBar } from '/ui/table.mjs';
-import { fmt, coverageInfo } from '/ui/fmt.mjs';
+import { fmt, coverageInfo, signTone } from '/ui/fmt.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { mountPayoff, payoffAt } from '/ui/chart.mjs';
 import { sameUnderlyingCandidates, compareLabel, MAX_COMPARE } from '/ui/compare.mjs';
@@ -88,13 +88,13 @@ export async function mount(root, { state, api }) {
     const ok = rows.filter((r) => Number.isFinite(r.retMonthPct));
     const best = ok[0];
     const items = [
-      ['ردیف برتر', fmt.int(rows.length), ''],
-      ['استراتژی‌های حاضر', fmt.int(new Set(rows.map((r) => r.strategyId)).size), 'از کل کاتالوگ'],
-      ['بهترین بازده ماهانه', best ? `${fmt.pct(best.retMonthPct)}٪` : '—', best ? `${best.strategy} — ${best.underlying}` : ''],
-      ['زیان نامحدود', fmt.int(rows.filter((r) => r.unlimitedLoss).length), 'ردیف — ریسک‌دار'],
+      ['ردیف برتر', fmt.int(rows.length), '', ''],
+      ['استراتژی‌های حاضر', fmt.int(new Set(rows.map((r) => r.strategyId)).size), 'از کل کاتالوگ', ''],
+      ['بهترین بازده ماهانه', best ? `${fmt.pct(best.retMonthPct)}٪` : '—', best ? `${best.strategy} — ${best.underlying}` : '', best ? signTone(best.retMonthPct) : ''],
+      ['زیان نامحدود', fmt.int(rows.filter((r) => r.unlimitedLoss).length), 'ردیف — ریسک‌دار', ''],
     ];
-    root.querySelector('#kpis').innerHTML = items.map(([k, v, sub]) => `
-      <div class="kpi"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join('');
+    root.querySelector('#kpis').innerHTML = items.map(([k, v, sub, c]) => `
+      <div class="kpi"><div class="k">${k}</div><div class="v ${c}">${v}</div><div class="s">${sub}</div></div>`).join('');
   }
 
   // ——— پانل جزئیات — همان الگوی تب استراتژی، فقط بدون کنترل اسکن جداگانه ———

@@ -24,7 +24,7 @@ import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
 import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
-import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone } from '../ui/fmt.mjs';
+import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn } from '../ui/table.mjs';
 import { sameUnderlyingCandidates, compareLabel, MAX_COMPARE } from '../ui/compare.mjs';
 
@@ -1142,6 +1142,15 @@ group('۲۱. قالب‌بندی عدد فارسی');
   check('کارت بازده روی سرمایه هم رنگ می‌گیرد، نه فقط برچسب سود', kpiTone('بازده روی سرمایه', false) === 'loss');
   check('کارت خنثی (سرمایه درگیر) بی‌رنگ می‌ماند', kpiTone('سرمایه درگیر', true) === '');
   check('کارت خنثی (موقعیت باز) بی‌رنگ می‌ماند', kpiTone('موقعیت باز', false) === '');
+
+  // رنگ کارت KPI از روی علامت خودِ عدد (تب‌های استراتژی/برترین موقعیت‌ها):
+  // «بهترین/میانه بازده ماهانه» قبلاً هیچ‌وقت رنگ نمی‌گرفت، حتی اگر بهترین
+  // ردیف موجود هم زیان‌ده بود — دقیقاً همان چیزی که دور دهم می‌خواست از
+  // اسکن سریع حذف کند.
+  check('بازده مثبت، سبز', signTone(12.5) === 'gain');
+  check('بازده منفی، قرمز', signTone(-3.2) === 'loss');
+  check('صفر هم سبز حساب می‌شود (نه زیان)', signTone(0) === 'gain');
+  check('بدون ردیف (NaN)، بی‌رنگ می‌ماند', signTone(NaN) === '');
 
   // پیام خام سرور (پ-۷ بک‌لاگ): «آخرین خطا» متن خام جاوااسکریپت بود، مثل
   // server/server.mjs:171 `${e.name}: ${e.message}` — کاربر فارسی‌زبان چیزی
