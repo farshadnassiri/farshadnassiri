@@ -170,18 +170,26 @@ export function payoffSvg(legs, netCash, opt = {}) {
  *   حرکت نشانگر   خط راهنما و خواندن سود و زیان سر همان قیمت پایه
  *   دوبار کلیک    برگشت به نمای اول
  *
- * برمی‌گرداند { analysis, reset, destroy }.
+ * `opt.initRange` بازه شروع را به‌جای نمای اول می‌نشاند — برای وقتی که
+ * نمودار قبلی برای همان موقعیت نابود و از نو ساخته می‌شود (اسکن پیوسته)
+ * و کاربر وسط زوم یا پن بوده.
+ *
+ * برمی‌گرداند { analysis, view, reset, destroy }.
  */
 export function mountPayoff(host, legs, netCash, opt = {}) {
   const { points, analysis } = seriesFor(legs, netCash, opt);
   const ys = points.map((p) => p.pnl).filter(Number.isFinite);
   if (!ys.length) {
     host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
-    return { analysis, reset() {}, destroy() {} };
+    return { analysis, view: () => null, reset() {}, destroy() {} };
   }
 
   const [homeLo, homeHi] = homeRange(points, analysis, opt);
   let lo = homeLo, hi = homeHi;
+  const [initLo, initHi] = Array.isArray(opt.initRange) ? opt.initRange : [];
+  if (Number.isFinite(initLo) && Number.isFinite(initHi) && initLo >= 0 && initHi - initLo > MIN_SPAN) {
+    lo = initLo; hi = initHi;
+  }
   let geo = null;
 
   host.innerHTML = `
@@ -301,6 +309,7 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
 
   return {
     analysis,
+    view: () => [lo, hi],
     reset,
     destroy() {
       canvas.removeEventListener('wheel', onWheel);

@@ -189,7 +189,10 @@ export async function mount(root, { tab, state, api }) {
 
   // ——— پانل جزئیات ———
   let chart = null;
+  let chartRange = null; // بازه زوم/پن چارت، برای نگه داشتن روی رفرش پیوسته همان ردیف
   function showDetail(r) {
+    const sameRow = picked && picked.id === r.id;
+    if (chart) chartRange = chart.view();
     picked = r;
     const card = root.querySelector('#detail-card');
     card.style.display = '';
@@ -200,6 +203,7 @@ export async function mount(root, { tab, state, api }) {
     const chartOpt = {
       fees, spot: r.S, width: 720, height: 260,
       sigma: r.sigmaUse, rFree: s().rFree, divYield: s().divYield,
+      ...(sameRow && chartRange ? { initRange: chartRange } : {}),
     };
     const an = single
       ? analyzePayoff(r.__legs, r.netCash, { fees })
