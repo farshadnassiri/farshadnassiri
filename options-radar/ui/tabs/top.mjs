@@ -26,6 +26,8 @@ export async function mount(root, { state, api }) {
   let rows = [];
   let picked = null;
   let busy = false;
+  let hasScanned = false;
+  const NOT_SCANNED_MSG = 'هنوز اسکن نزدی — نماد را انتخاب کن و دکمه اسکن را بزن.';
 
   root.innerHTML = `
     <div class="page-head">
@@ -80,6 +82,7 @@ export async function mount(root, { state, api }) {
     sortKey: s().rankBy, onPick: showDetail,
     all: COLUMNS, storeKey: 'top:default',
   });
+  table.setEmptyMessage(NOT_SCANNED_MSG);
 
   function drawKpis() {
     const ok = rows.filter((r) => Number.isFinite(r.retMonthPct));
@@ -204,6 +207,7 @@ export async function mount(root, { state, api }) {
     runBtn.disabled = true;
     runBtn.textContent = 'در حال اسکن…';
     setStatus('در حال غربال کل کاتالوگ…');
+    if (!hasScanned) { hasScanned = true; table.setEmptyMessage(null); }
     table.setLoading(true);
     try {
       const res = await runScanAll({ uaKeys: keys, settings: s(), qty: s().qtyDefault, limit: s().topN });
