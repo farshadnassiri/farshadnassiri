@@ -280,6 +280,15 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
 .step-btn:active { filter: brightness(.94); }
 .num-range { width: 100%; margin-top: 2px; accent-color: var(--accent); }
 
+.scan-progress {
+  height: 4px; margin-top: 10px; border-radius: 2px; overflow: hidden;
+  background: var(--line-soft);
+}
+.scan-progress-fill {
+  height: 100%; width: 0%; background: var(--accent);
+  transition: width .25s ease, opacity .25s ease;
+}
+
 .btn {
   background: var(--accent); color: #fff; border: 0; border-radius: 4px;
   padding: 8px 16px; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer;

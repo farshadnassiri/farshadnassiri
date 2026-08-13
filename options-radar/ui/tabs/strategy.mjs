@@ -77,6 +77,7 @@ export async function mount(root, { tab, state, api }) {
           <span class="sp"></span>
           <span id="status" class="picker-sum"></span>
         </div>
+        <div class="scan-progress" id="progress" style="display:none"><div class="scan-progress-fill" id="progress-fill"></div></div>
       </section>
     </div>
 
@@ -381,6 +382,13 @@ export async function mount(root, { tab, state, api }) {
   // ——— اجرای اسکن ———
   let timer = null;
   const runBtn = root.querySelector('#run');
+  const progressWrap = root.querySelector('#progress');
+  const progressFill = root.querySelector('#progress-fill');
+  const setProgress = (pct) => {
+    if (pct == null) { progressWrap.style.display = 'none'; return; }
+    progressWrap.style.display = '';
+    progressFill.style.width = `${pct}%`;
+  };
   async function run() {
     if (busy) return;
     const keys = picker.selected();
@@ -389,17 +397,19 @@ export async function mount(root, { tab, state, api }) {
     runBtn.disabled = true;
     runBtn.textContent = 'در حال اسکن…';
     setStatus('مرحله یک — غربال روی سطح اول…');
+    setProgress(5);
     try {
       await runScan({
         defId: def.id, uaKeys: keys, settings: s(), qty,
         onStage: (stage, res) => {
-          if (res.error) { setStatus(`خطا: ${res.error}`); return; }
+          if (res.error) { setStatus(`خطا: ${res.error}`); setProgress(null); return; }
           if (stage === 'one') {
             rows = res.rows;
             funnelBar(root.querySelector('#funnel'), res.funnel);
             table.set(rows);
             drawKpis();
             setStatus(`مرحله یک در ${fmt.int(res.ms)} میلی‌ثانیه — ${fmt.int(res.total)} ردیف، ${fmt.int(rows.length)} نمایش. مرحله دو…`);
+            setProgress(50);
           } else {
             const byId2 = new Map(res.rows.map((r) => [r.id, r]));
             rows = rows.map((r) => byId2.get(r.id) || r);
@@ -409,6 +419,7 @@ export async function mount(root, { tab, state, api }) {
             drawKpis();
             if (picked) { const f = byId2.get(picked.id); if (f) showDetail(f); }
             setStatus(`مرحله دو کامل — عمق ${fmt.int(res.asked || 0)} نماد گرفته شد. ${fmt.int(rows.length)} ردیف.`);
+            setProgress(100);
           }
         },
       });
@@ -416,6 +427,8 @@ export async function mount(root, { tab, state, api }) {
       busy = false;
       runBtn.disabled = false;
       runBtn.textContent = 'اسکن';
+      if (progressWrap.style.display !== 'none') setProgress(100);
+      setTimeout(() => setProgress(null), 400);
     }
   }
 
