@@ -267,11 +267,48 @@ el('rail-q').addEventListener('input', (e) => {
   railQuery = e.target.value;
   buildRail();
 });
-// در فهرست فیلترشده، اینتر یعنی «همان یکی که مانده را باز کن»
+
+const railButtons = () => [...el('rail-list').querySelectorAll('.tab-btn')];
+
+// در فهرست فیلترشده، اینتر یعنی «همان یکی که مانده را باز کن»، پایین یعنی
+// برو داخل فهرست
 el('rail-q').addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter') return;
-  const first = el('rail-list').querySelector('.tab-btn');
-  if (first) open(first.dataset.tab);
+  if (e.key === 'Enter') {
+    const first = el('rail-list').querySelector('.tab-btn');
+    if (first) open(first.dataset.tab);
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    railButtons()[0]?.focus();
+  }
+});
+
+// بالا و پایین بین تب‌های فیلترشده حرکت می‌کند؛ بالا از اولی برمی‌گردد به جست‌وجو
+el('rail-list').addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const btn = e.target.closest('.tab-btn');
+  if (!btn) return;
+  e.preventDefault();
+  const items = railButtons();
+  const i = items.indexOf(btn);
+  if (e.key === 'ArrowDown') { items[i + 1]?.focus(); return; }
+  if (i === 0) el('rail-q').focus(); else items[i - 1]?.focus();
+});
+
+// میان‌بر سراسری: / نشانگر را به جست‌وجو می‌برد، مگر همین حالا داخل یک
+// ورودی دیگر تایپ می‌کنی. Ctrl/Cmd+K همیشه می‌برد، حتی وسط تایپ.
+document.addEventListener('keydown', (e) => {
+  const t = document.activeElement;
+  const editing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+  if (e.key === '/' && !editing) {
+    e.preventDefault();
+    el('rail-q').focus();
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    el('rail-q').focus();
+    el('rail-q').select();
+  }
 });
 
 // ————————————————————————————————— شروع —————————————————————————————————
