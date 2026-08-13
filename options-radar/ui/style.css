@@ -324,6 +324,14 @@ table.data thead th:hover { color: var(--accent); }
 table.data tbody tr { transition: background .1s ease; }
 table.data tbody tr:hover { background: var(--panel-2); }
 table.data td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; direction: ltr; }
+
+.skel-row td { padding: 7px 8px; }
+.skel-bar {
+  display: block; height: 12px; border-radius: 3px; background: var(--line-soft);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.skel-row:nth-child(2n) .skel-bar { animation-delay: .15s; }
+@media (prefers-reduced-motion: reduce) { .skel-bar { animation: none; opacity: .6; } }
 .scroll { overflow: auto; max-height: 62vh; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
 
 .tag {

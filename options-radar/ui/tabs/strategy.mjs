@@ -398,11 +398,12 @@ export async function mount(root, { tab, state, api }) {
     runBtn.textContent = 'در حال اسکن…';
     setStatus('مرحله یک — غربال روی سطح اول…');
     setProgress(5);
+    table.setLoading(true);
     try {
       await runScan({
         defId: def.id, uaKeys: keys, settings: s(), qty,
         onStage: (stage, res) => {
-          if (res.error) { setStatus(`خطا: ${res.error}`); setProgress(null); return; }
+          if (res.error) { setStatus(`خطا: ${res.error}`); setProgress(null); table.setLoading(false); return; }
           if (stage === 'one') {
             rows = res.rows;
             funnelBar(root.querySelector('#funnel'), res.funnel);

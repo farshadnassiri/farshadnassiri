@@ -163,9 +163,10 @@ export async function mount(root, { state, api }) {
     runBtn.disabled = true;
     runBtn.textContent = 'در حال اسکن…';
     setStatus('در حال غربال کل کاتالوگ…');
+    table.setLoading(true);
     try {
       const res = await runScanAll({ uaKeys: keys, settings: s(), qty: s().qtyDefault, limit: s().topN });
-      if (res.error) { setStatus(`خطا: ${res.error}`); return; }
+      if (res.error) { setStatus(`خطا: ${res.error}`); table.setLoading(false); return; }
       rows = res.rows;
       funnelBar(root.querySelector('#funnel'), res.funnel);
       table.set(rows);

@@ -136,6 +136,7 @@ export function makeTable(host, cols, opts = {}) {
 
   let rows = [];
   let view = [];
+  let loading = false;
   let sortKey = opts.sortKey && byKey.has(opts.sortKey) ? opts.sortKey : keys[0];
   let sortDir = -1;
   const ranges = new Map();
@@ -372,7 +373,12 @@ export function makeTable(host, cols, opts = {}) {
       sp.innerHTML = `<td colspan="${shown.length}"></td>`;
       tbody.appendChild(sp);
     }
-    if (!view.length) {
+    if (!view.length && loading) {
+      // اسکلت بارگذاری: تا داده اول برسد، جدول کاملاً خالی و مبهم نماند
+      const skRows = Array.from({ length: 6 }, () => `<tr class="skel-row">${
+        shown.map(() => '<td><span class="skel-bar"></span></td>').join('')}</tr>`).join('');
+      tbody.innerHTML = skRows;
+    } else if (!view.length) {
       tbody.innerHTML = `<tr><td colspan="${shown.length}" style="padding:18px;color:var(--muted)">
         ردیفی نمانده. نوار تشخیص بالا می‌گوید ترکیب‌ها کجا افتادند.</td></tr>`;
     }
@@ -384,7 +390,8 @@ export function makeTable(host, cols, opts = {}) {
   buildPanel();
 
   return {
-    set(next) { rows = next || []; apply(); },
+    set(next) { rows = next || []; loading = false; apply(); },
+    setLoading(v) { loading = !!v; draw(); },
     get() { return view; },
     sortBy(key) { if (byKey.has(key)) { sortKey = key; sortDir = -1; } apply(); },
     setColumns(next) { setKeys(next); },
