@@ -3,7 +3,7 @@
 // قاعده تب تنبل: ماژول هر تب فقط لحظه اولین کلیک وارد می‌شود و اشتراک
 // عکس لحظه‌ای هم فقط برای تب باز برقرار می‌شود. تب بسته، هیچ هزینه‌ای ندارد.
 
-import { fmt, faDigits, faAgo, faClock } from '/ui/fmt.mjs';
+import { fmt, faDigits, faAgo, faClock, humanizeUpstreamError } from '/ui/fmt.mjs';
 import { defaults } from '/core/settings.mjs';
 import { CATALOG, GROUPS as SGROUPS } from '/strategies/catalog.mjs';
 
@@ -152,10 +152,14 @@ async function tickHealth() {
 
     const total = h.requests + h.cacheHits;
     el('d-cache').textContent = total > 0 ? `${faDigits(Math.round((h.cacheHits / total) * 100))}٪` : '—';
-    el('d-ms').textContent = h.avgUpstreamMs ? `${faDigits(h.avgUpstreamMs)} ms` : '—';
-    el('d-age').textContent = h.watchAgeSec == null ? '—' : `${faDigits(h.watchAgeSec)} ثانیه`;
+    el('d-ms').textContent = h.avgUpstreamMs ? `${faDigits(h.avgUpstreamMs)} میلی‌ثانیه` : '—';
+    el('d-age').textContent = h.watchAgeSec == null ? '—' : faAgo(h.watchAgeSec * 1000);
     el('d-drops').textContent = faDigits(state.link.drops);
-    el('d-err').textContent = h.lastError || 'هیچ';
+    // متن خام جاوااسکریپت («TypeError: fetch failed») چیزی به کاربر فارسی‌زبان
+    // نمی‌گوید؛ نسخه خوانا در متن می‌آید، خام برای اشکال‌زدایی در tooltip می‌ماند
+    const dErr = el('d-err');
+    dErr.textContent = h.lastError ? humanizeUpstreamError(h.lastError) : 'هیچ';
+    dErr.title = h.lastError || '';
   } catch {
     const m = el('h-market');
     m.textContent = 'سرور در دسترس نیست';

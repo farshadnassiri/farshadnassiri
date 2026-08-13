@@ -105,3 +105,23 @@ const COVERAGE_INFO = {
   none: { label: 'بدون پای فروش', tone: 'flat' },
 };
 export const coverageInfo = (state) => COVERAGE_INFO[state] || { label: state || '—', tone: 'flat' };
+
+/**
+ * پیام خام `stat.lastError` سرور (server/server.mjs) از `${e.name}: ${e.message}`
+ * جاوااسکریپت می‌آید — مثل «TypeError: fetch failed» یا «AbortError: The
+ * operation was aborted» — که برای کاربر فارسی‌زبان چیزی نمی‌گوید. این تابع
+ * علت محتمل را می‌گوید؛ متن خام برای کسی که بخواهد جزئیات فنی را ببیند در
+ * title/tooltip همان عنصر می‌ماند، نه اینجا حذف می‌شود.
+ */
+export function humanizeUpstreamError(raw) {
+  if (!raw) return null;
+  const s = String(raw);
+  if (/abort/i.test(s)) return 'زمان پاسخ بالادست تمام شد';
+  if (/fetch failed|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|network/i.test(s)) return 'اتصال به بالادست برقرار نشد';
+  if (/^Error:\s*HTTP\s*(\d+)/i.test(s)) {
+    const code = s.match(/HTTP\s*(\d+)/i)[1];
+    return `بالادست خطای HTTP ${faDigits(code)} داد`;
+  }
+  if (/SyntaxError/i.test(s)) return 'پاسخ بالادست جیسون معتبر نبود';
+  return 'خطای فنی نامشخص — برای جزئیات نشانگر را روی این متن نگه دار';
+}

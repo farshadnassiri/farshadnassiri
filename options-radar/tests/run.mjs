@@ -23,7 +23,7 @@ import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
 import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
-import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock } from '../ui/fmt.mjs';
+import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn } from '../ui/table.mjs';
 import { coverageInfo } from '../ui/fmt.mjs';
 
@@ -1051,6 +1051,22 @@ group('۲۱. قالب‌بندی عدد فارسی');
   check('پوشش ناقص، فارسی و هشدار', !latin2.test(coverageInfo('partial').label) && coverageInfo('partial').tone === 'warn');
   check('بدون پای فروش، خنثی', !latin2.test(coverageInfo('none').label) && coverageInfo('none').tone === 'flat');
   check('حالت ناشناس، سقوط نمی‌کند و تن پیش‌فرض می‌دهد', coverageInfo('چیز-عجیب').tone === 'flat');
+
+  // پیام خام سرور (پ-۷ بک‌لاگ): «آخرین خطا» متن خام جاوااسکریپت بود، مثل
+  // server/server.mjs:171 `${e.name}: ${e.message}` — کاربر فارسی‌زبان چیزی
+  // از آن نمی‌فهمد. humanizeUpstreamError باید علت را فارسی و خوانا بگوید.
+  const latin3 = /[a-zA-Z]/;
+  check('خطای بی‌پاسخی، فارسی و بدون رقم/حرف لاتین',
+        !latin3.test(humanizeUpstreamError('AbortError: The operation was aborted')),
+        humanizeUpstreamError('AbortError: The operation was aborted'));
+  check('خطای شبکه بالادست، فارسی', !latin3.test(humanizeUpstreamError('TypeError: fetch failed')),
+        humanizeUpstreamError('TypeError: fetch failed'));
+  check('خطای HTTP بالادست، کد را با رقم فارسی می‌گوید',
+        humanizeUpstreamError('Error: HTTP 502').includes('۵۰۲'), humanizeUpstreamError('Error: HTTP 502'));
+  check('جیسون خراب، فارسی', !latin3.test(humanizeUpstreamError('SyntaxError: Unexpected token')));
+  check('بدون خطا، مقدار خالی می‌دهد', humanizeUpstreamError(null) === null && humanizeUpstreamError('') === null);
+  check('خطای ناشناس هم سقوط نمی‌کند و فارسی می‌ماند',
+        !latin3.test(humanizeUpstreamError('some odd unmapped message')));
 }
 
 // ═══════════════ ۲۲. چیدمان ستون: جابه‌جایی و افزودن ═══════════════
