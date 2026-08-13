@@ -22,6 +22,7 @@ import { resolveSafe } from './safepath.mjs';
 import { isValidIns } from './validate.mjs';
 import { readBody, BodyTooLargeError } from './body.mjs';
 import { nextWatchDelay } from './backoff.mjs';
+import { pruneExpired, enforceMaxSize } from './cache.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -123,8 +124,10 @@ async function pump() {
 
 // ————————————————————————————————— کش و ادغام درخواست در پرواز —————————————————————————————————
 
-const cache = new Map();     // url -> { at, data }
+const cache = new Map();     // url -> { at, ttlSec, data }
 const inflight = new Map();  // url -> Promise
+const CACHE_MAX_ENTRIES = 5000;
+const CACHE_SWEEP_MS = 5 * 60 * 1000;
 
 async function fetchUpstream(url) {
   const ac = new AbortController();
@@ -159,7 +162,8 @@ async function get(pathname, ttlSec, priority = 5) {
       try {
         stat.requests += 1;
         const data = await schedule(() => fetchUpstream(url), priority);
-        cache.set(url, { at: Date.now(), data });
+        cache.set(url, { at: Date.now(), ttlSec, data });
+        enforceMaxSize(cache, CACHE_MAX_ENTRIES);
         return data;
       } catch (e) {
         lastErr = e;
@@ -510,3 +514,4 @@ http.createServer(handle).listen(PORT, '127.0.0.1', () => {
   log(g.open ? 'بازار باز است، حلقه دیده‌بان شروع شد' : `حلقه دیده‌بان متوقف: ${g.why}`);
 });
 watchLoop();
+setInterval(() => { pruneExpired(cache, Date.now()); enforceMaxSize(cache, CACHE_MAX_ENTRIES); }, CACHE_SWEEP_MS);

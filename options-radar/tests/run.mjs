@@ -24,6 +24,7 @@ import { resolveSafe } from '../server/safepath.mjs';
 import { isValidIns } from '../server/validate.mjs';
 import { readBody, BodyTooLargeError } from '../server/body.mjs';
 import { nextWatchDelay, WATCH_BACKOFF_MAX_SEC } from '../server/backoff.mjs';
+import { pruneExpired, enforceMaxSize } from '../server/cache.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -870,6 +871,33 @@ group('۲۱. عقب‌نشینی حلقه دیده‌بان');
   check('عقب‌نشینی از سقف بیشتر نمی‌شود',
     nextWatchDelay(5, 10) === WATCH_BACKOFF_MAX_SEC, `${nextWatchDelay(5, 10)}`);
   check('سقف عقب‌نشینی قابل تنظیم است', nextWatchDelay(5, 10, 30) === 30);
+}
+
+// ═══════════════════════════ ۲۲. سقف و پاک‌سازی کش ═══════════════════════════
+group('۲۲. سقف و پاک‌سازی کش');
+{
+  const now = 1_000_000_000;
+  const c1 = new Map([
+    ['fresh', { at: now, ttlSec: 10, data: 1 }],
+    ['expired', { at: now - 20_000, ttlSec: 10, data: 2 }],
+    ['edge', { at: now - 10_000, ttlSec: 10, data: 3 }],
+  ]);
+  const removed = pruneExpired(c1, now);
+  check('ورودی منقضی حذف شد', !c1.has('expired'));
+  check('ورودی تازه دست‌نخورده ماند', c1.has('fresh'));
+  check('لبه دقیق سقف زمانی هم منقضی حساب می‌شود', !c1.has('edge'));
+  check('شمار حذف‌شده درست برگشت', removed === 2, `${removed}`);
+
+  const c2 = new Map();
+  for (let i = 0; i < 10; i += 1) c2.set(`k${i}`, { at: now, ttlSec: 999, data: i });
+  const removed2 = enforceMaxSize(c2, 4);
+  check('اندازه کش به سقف رسید', c2.size === 4, `${c2.size}`);
+  check('قدیمی‌ترین ورودی‌ها حذف شدند', !c2.has('k0') && !c2.has('k5'));
+  check('تازه‌ترین ورودی‌ها ماندند', c2.has('k9') && c2.has('k6'));
+  check('شمار حذف‌شده در سقف اندازه درست برگشت', removed2 === 6, `${removed2}`);
+
+  const c3 = new Map([['a', { at: now, ttlSec: 10, data: 1 }]]);
+  check('زیر سقف چیزی حذف نمی‌شود', enforceMaxSize(c3, 10) === 0 && c3.size === 1);
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════
