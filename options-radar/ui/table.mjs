@@ -137,6 +137,7 @@ export function makeTable(host, cols, opts = {}) {
   let rows = [];
   let view = [];
   let loading = false;
+  let emptyMsg = null;
   let sortKey = opts.sortKey && byKey.has(opts.sortKey) ? opts.sortKey : keys[0];
   let sortDir = -1;
   const ranges = new Map();
@@ -379,8 +380,8 @@ export function makeTable(host, cols, opts = {}) {
         shown.map(() => '<td><span class="skel-bar"></span></td>').join('')}</tr>`).join('');
       tbody.innerHTML = skRows;
     } else if (!view.length) {
-      tbody.innerHTML = `<tr><td colspan="${shown.length}" style="padding:18px;color:var(--muted)">
-        ردیفی نمانده. نوار تشخیص بالا می‌گوید ترکیب‌ها کجا افتادند.</td></tr>`;
+      const msg = emptyMsg || 'ردیفی نمانده. نوار تشخیص بالا می‌گوید ترکیب‌ها کجا افتادند.';
+      tbody.innerHTML = `<tr><td colspan="${shown.length}" style="padding:18px;color:var(--muted)">${msg}</td></tr>`;
     }
   }
 
@@ -392,6 +393,7 @@ export function makeTable(host, cols, opts = {}) {
   return {
     set(next) { rows = next || []; loading = false; apply(); },
     setLoading(v) { loading = !!v; draw(); },
+    setEmptyMessage(text) { emptyMsg = text || null; draw(); },
     get() { return view; },
     sortBy(key) { if (byKey.has(key)) { sortKey = key; sortDir = -1; } apply(); },
     setColumns(next) { setKeys(next); },

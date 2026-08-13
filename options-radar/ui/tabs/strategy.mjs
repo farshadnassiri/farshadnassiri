@@ -50,6 +50,8 @@ export async function mount(root, { tab, state, api }) {
   let picked = null;
   let view = 'خلاصه';
   let busy = false;
+  let hasScanned = false;
+  const NOT_SCANNED_MSG = 'هنوز اسکن نزدی — نماد را انتخاب کن و دکمه اسکن را بزن.';
   let qty = s().qtyDefault;
 
   root.innerHTML = `
@@ -179,6 +181,7 @@ export async function mount(root, { tab, state, api }) {
       all: COLUMNS, storeKey: `${def.id}:${view}`,
     });
     table.set(rows);
+    if (!hasScanned) table.setEmptyMessage(NOT_SCANNED_MSG);
   }
   buildTable();
 
@@ -398,6 +401,7 @@ export async function mount(root, { tab, state, api }) {
     runBtn.textContent = 'در حال اسکن…';
     setStatus('مرحله یک — غربال روی سطح اول…');
     setProgress(5);
+    if (!hasScanned) { hasScanned = true; table.setEmptyMessage(null); }
     table.setLoading(true);
     try {
       await runScan({
