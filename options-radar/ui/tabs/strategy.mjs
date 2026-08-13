@@ -12,11 +12,22 @@ import { byId } from '/strategies/catalog.mjs';
 import { COLUMNS } from '/core/evaluate.mjs';
 import { analyzePayoff, scenarioGrid } from '/core/payoff.mjs';
 import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
+import { timeMachine } from '/core/timemachine.mjs';
+import { gregorianToJalali } from '/core/jalali.mjs';
 import { makeTable, funnelBar } from '/ui/table.mjs';
-import { fmt, faNum, coverageInfo } from '/ui/fmt.mjs';
+import { fmt, faNum, faDigits, coverageInfo } from '/ui/fmt.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { mountPayoff } from '/ui/chart.mjs';
 import { runScan, onChain, pushRows, chainState } from '/ui/scanner.mjs';
+
+/** dEven عددی (مثلاً ۲۰۲۶۰۱۰۱) به تاریخ شمسی خوانا. */
+function jalaliFromDEven(dEven) {
+  const s2 = String(dEven);
+  if (s2.length !== 8) return faDigits(s2);
+  const gy = +s2.slice(0, 4), gm = +s2.slice(4, 6), gd = +s2.slice(6, 8);
+  const [jy, jm, jd] = gregorianToJalali(gy, gm, gd);
+  return faDigits(`${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`);
+}
 
 const VIEWS = {
   خلاصه: ['underlying', 'legsText', 'days', 'cashLabel', 'netCash', 'breakevens', 'maxProfit',
@@ -84,6 +95,7 @@ export async function mount(root, { tab, state, api }) {
     <section class="card" id="detail-card" style="margin-top:16px;display:none">
       <h3 id="detail-title">جزئیات ردیف</h3>
       <div class="detail" id="detail"></div>
+      <div id="tm-wrap" style="margin-top:16px"></div>
     </section>`;
 
   // ——— انتخابگر ———
@@ -301,6 +313,47 @@ export async function mount(root, { tab, state, api }) {
     // نمودار بعد از نشستن قالب سوار می‌شود، چون به اندازه واقعی قاب نیاز دارد
     chart?.destroy();
     chart = mountPayoff(root.querySelector('#chart'), r.__legs, r.netCash, chartOpt);
+
+    // ——— ماشین زمان (قلم پ-۴ بک‌لاگ) ———
+    const tmWrap = root.querySelector('#tm-wrap');
+    tmWrap.innerHTML = `<button class="ghost" type="button" id="tm-btn">ماشین زمان — اگر همین ترکیب را چند روز پیش می‌گرفتم</button>
+      <div id="tm-out"></div>`;
+    tmWrap.querySelector('#tm-btn').addEventListener('click', () => runTimeMachine(r, tmWrap.querySelector('#tm-out')));
+  }
+
+  async function runTimeMachine(r, out) {
+    if (!r.uaIns) { out.innerHTML = '<p class="note">نماد پایه این ردیف شناخته نشد.</p>'; return; }
+    if (!(r.sigmaUse > 0)) { out.innerHTML = '<p class="note">تلاطم مبنا نامعتبر است؛ شبیه‌سازی ممکن نیست.</p>'; return; }
+    out.innerHTML = '<p class="note">در حال دریافت تاریخچه قیمت پایه…</p>';
+    let res;
+    try {
+      res = await (await fetch(`/api/daily?ins=${r.uaIns}&n=${s().volDays}`)).json();
+    } catch (e) {
+      out.innerHTML = `<p class="note" style="color:var(--loss)">دریافت تاریخچه ناموفق: ${e.message}</p>`;
+      return;
+    }
+    if (res.error) {
+      out.innerHTML = `<p class="note" style="color:var(--loss)">دریافت تاریخچه ناموفق: ${res.error}</p>`;
+      return;
+    }
+    const closes = (res.rows || []).filter((x) => x.close > 0);
+    if (closes.length < 2) { out.innerHTML = '<p class="note">تاریخچه کافی برای این نماد نیست.</p>'; return; }
+
+    const tm = timeMachine(r.__legs, closes, {
+      daysToday: r.days, sigma: r.sigmaUse, rFree: s().rFree, divYield: s().divYield,
+    });
+    const rows2 = tm.map((x) => `
+      <tr><td>${jalaliFromDEven(x.date)}</td><td class="n">${fmt.money(x.S)}</td>
+        <td class="n">${fmt.int(x.daysLeft)}</td>
+        <td class="n" style="color:${x.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(x.pnl)}</td></tr>`).join('');
+    out.innerHTML = `
+      <p class="note" style="color:var(--warn)">شبیه‌سازی بلک-شولز با تلاطم امروز (${fmt.num(r.sigmaUse)})
+        روی قیمت پایانی تاریخی پایه — نه قیمت واقعی اختیار در آن روز. دیده‌بان تاریخچه مظنه ذخیره نمی‌کند،
+        پس این عدد راهنماست، ادعای اجرا ندارد.</p>
+      <table class="mini">
+        <thead><tr><th>تاریخ</th><th>قیمت پایه آن‌روز</th><th>روز تا سررسید آن‌روز</th><th>سود/زیان شبیه‌سازی‌شده</th></tr></thead>
+        <tbody>${rows2}</tbody>
+      </table>`;
   }
 
   // ——— اجرای اسکن ———
