@@ -375,7 +375,17 @@ table.data td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; 
 
 /* ——— شاخص‌های کلیدی ——— */
 .kpis { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); margin-bottom: 16px; }
-.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.kpi {
+  background: var(--panel); border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--line);
+  border-radius: var(--radius); padding: 10px 12px;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.kpi:hover { box-shadow: var(--shadow); }
+/* مرز رنگی سمت شروع، همان جهت سود/زیان کارت را از فاصله چشم می‌رساند،
+   بی‌آنکه رنگ‌آمیزی کل کارت ادعای اجرا یا داده کیفی دیگر را رنگ کند. */
+.kpi:has(.v.gain) { border-inline-start-color: var(--gain); }
+.kpi:has(.v.loss) { border-inline-start-color: var(--loss); }
 .kpi .k { font-size: 11px; color: var(--muted); }
 .kpi .v { font-family: var(--mono); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; direction: ltr; }
 .kpi .v.gain { color: var(--gain); }
