@@ -32,6 +32,7 @@ export async function mount(root, { state, api }) {
   const holder = root.querySelector('#groups');
   const nav = root.querySelector('#settings-nav');
   const inputs = new Map();
+  const navByCard = new Map();
 
   for (const [key, meta] of Object.entries(GROUPS)) {
     const fields = SCHEMA.filter((f) => f.group === key);
@@ -50,8 +51,10 @@ export async function mount(root, { state, api }) {
     navBtn.type = 'button';
     navBtn.className = 'chip';
     navBtn.textContent = meta.title;
+    navBtn.setAttribute('aria-pressed', 'false');
     navBtn.addEventListener('click', () => card.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     nav.appendChild(navBtn);
+    navByCard.set(card, navBtn);
 
     for (const f of fields) {
       const wrap = document.createElement('div');
@@ -115,6 +118,28 @@ export async function mount(root, { state, api }) {
     holder.appendChild(card);
   }
 
+  // نوار پرش، پیشِ‌رو: چیپ کارتی که زیر نوار ایستاده روشن می‌ماند، تا در
+  // فهرست بلند تنظیمات معلوم باشد الان کجای صفحه‌ای — بی‌آنکه کلیک لازم باشد.
+  const cardsArr = [...navByCard.keys()];
+  const setActive = (card) => {
+    for (const [c, btn] of navByCard) btn.setAttribute('aria-pressed', String(c === card));
+  };
+  // کارت آخر («نمایش») کوتاه‌تر از نوار مشاهده است و ممکن است هیچ‌وقت
+  // داخلش نیفتد؛ رسیدن واقعی به ته صفحه خودش باید چیپ آخر را روشن کند —
+  // این بررسی هم در رویداد اسکرول اجرا می‌شود هم داخل خودِ IntersectionObserver،
+  // چون ترتیب اجرای آن دو تضمینی نیست و هرکدام دیرتر برسد باید همین را بگوید.
+  const atBottom = () => window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+  // پیش از اولین اسکرول هنوز هیچ کارتی وارد نوار مشاهده نشده، پس کارت اول
+  // پیش‌فرض روشن می‌ماند.
+  setActive(cardsArr[0]);
+  const spy = new IntersectionObserver((entries) => {
+    if (atBottom()) { setActive(cardsArr[cardsArr.length - 1]); return; }
+    for (const en of entries) if (en.isIntersecting) setActive(en.target);
+  }, { rootMargin: '-112px 0px -70% 0px', threshold: 0 });
+  for (const card of cardsArr) spy.observe(card);
+  const onScroll = () => { if (atBottom()) setActive(cardsArr[cardsArr.length - 1]); };
+  window.addEventListener('scroll', onScroll, { passive: true });
+
   const read = () => {
     const out = {};
     for (const [key, { field, node }] of inputs) {
@@ -165,5 +190,5 @@ export async function mount(root, { state, api }) {
     }
   });
 
-  return () => {};
+  return () => { spy.disconnect(); window.removeEventListener('scroll', onScroll); };
 }
