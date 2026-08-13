@@ -251,6 +251,21 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
   border: 1px solid var(--line); border-radius: 3px; padding: 0 4px;
 }
 .card > .note { margin: 0 0 14px; color: var(--muted); font-size: 12.5px; }
+
+/* ——— تب تنظیمات: نوار پرش و سلسله‌مراتب تایپوگرافی ——— */
+.settings-nav {
+  position: sticky; top: 46px; z-index: 5;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px; margin-bottom: 16px;
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--line-soft); border-radius: var(--radius);
+}
+.settings-card { scroll-margin-top: 108px; }
+.settings-card > h3 {
+  font-size: 15px; padding-inline-start: 10px;
+  border-inline-start: 3px solid var(--accent);
+}
 .grid { display: grid; gap: 12px 18px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 
 .field { display: flex; flex-direction: column; gap: 4px; }

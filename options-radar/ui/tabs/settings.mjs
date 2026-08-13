@@ -19,6 +19,7 @@ export async function mount(root, { state, api }) {
       <p>هر عددی که در محاسبه اثر دارد اینجاست و در هیچ جای کد سخت‌کد نشده.
          تنظیمات سرور روی حلقه دریافت داده اثر می‌گذارد، تنظیمات مرورگر روی محاسبه و نمایش.</p>
     </div>
+    <nav class="settings-nav" id="settings-nav"></nav>
     <div id="groups"></div>
     <div class="bar card" style="position:sticky;bottom:12px">
       <button class="btn" id="save">ذخیره تنظیمات</button>
@@ -29,6 +30,7 @@ export async function mount(root, { state, api }) {
     </div>`;
 
   const holder = root.querySelector('#groups');
+  const nav = root.querySelector('#settings-nav');
   const inputs = new Map();
 
   for (const [key, meta] of Object.entries(GROUPS)) {
@@ -36,12 +38,20 @@ export async function mount(root, { state, api }) {
     if (!fields.length) continue;
     const scopes = [...new Set(fields.map((f) => f.scope))];
     const card = document.createElement('section');
-    card.className = 'card';
+    card.className = 'card settings-card';
+    card.id = `grp-${key}`;
     card.innerHTML = `
       <h3>${meta.title}<span class="scope">${scopes.map((x) => SCOPE_LABEL[x]).join(' + ')}</span></h3>
       ${meta.note ? `<p class="note">${meta.note}</p>` : ''}
       <div class="grid"></div>`;
     const grid = card.querySelector('.grid');
+
+    const navBtn = document.createElement('button');
+    navBtn.type = 'button';
+    navBtn.className = 'chip';
+    navBtn.textContent = meta.title;
+    navBtn.addEventListener('click', () => card.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    nav.appendChild(navBtn);
 
     for (const f of fields) {
       const wrap = document.createElement('div');
