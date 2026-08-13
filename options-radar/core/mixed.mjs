@@ -44,7 +44,10 @@ export function analyzeMixed(legs, netCash, opt = {}) {
   };
 
   const optLegs = legs.filter((l) => l.kind !== 'underlying');
-  const horizon = Math.min(...optLegs.map((l) => num(l.days, 0)));
+  // افق ارزش‌گذاری قابل بازنویسی است: horizonDays=0 یعنی «امروز»، ارزش‌گذاری
+  // بلک-شولز روی هر پای زنده بدون فرض سررسید هیچ‌کدام — دقیقاً همان چیزی که
+  // نمودار «امروز» (نه سررسید) کنار نمودار اصلی لازم دارد.
+  const horizon = Number.isFinite(opt.horizonDays) ? opt.horizonDays : Math.min(...optLegs.map((l) => num(l.days, 0)));
 
   const value = (S) => {
     let v = num(netCash, 0);

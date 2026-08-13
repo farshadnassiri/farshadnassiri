@@ -61,10 +61,28 @@ function seriesFor(legs, netCash, opt) {
 }
 
 /**
+ * منحنی «امروز» — همان موتور بلک-شولز چند-سررسیدی، فقط با افق ارزش‌گذاری
+ * صفر، یعنی هیچ پایی هنوز سررسید نشده فرض می‌شود. برای هر ترکیبی کار
+ * می‌کند (تک‌سررسید یا چندسررسید)، چون فرمولش فقط به «چند روز مانده» هر
+ * پا وابسته است، نه به اینکه سررسیدها با هم یکی‌اند یا نه.
+ *
+ * بدون تلاطم معتبر، قیمت‌گذاری بلک-شولز ممکن نیست، پس چیزی رسم نمی‌شود —
+ * نه یک خط غلط با تلاطم پیش‌فرض حدسی.
+ */
+function todaySeries(legs, netCash, opt) {
+  if (!(opt.sigma > 0)) return null;
+  const today = analyzeMixed(legs, netCash, {
+    fees: opt.fees, spot: opt.spot, sigma: opt.sigma,
+    rFree: opt.rFree, divYield: opt.divYield, horizonDays: 0,
+  });
+  return { points: today.points.filter((_, i) => i % 3 === 0), at: today.at };
+}
+
+/**
  * بدنه رسم. روی یک بازه دلخواه از محور قیمت پایه کار می‌کند، پس هم برای
  * نمای اول و هم برای هر سطح زوم یکی است.
  */
-function frame(points, analysis, opt, xMin, xMax) {
+function frame(points, analysis, opt, xMin, xMax, todayPoints) {
   const spot = opt.spot;
   const W = opt.width ?? 760, H = opt.height ?? 280;
   // حاشیه چپ جا برای برچسب محور عمودی باز می‌کند و حاشیه پایین برای دو ردیف
@@ -98,6 +116,20 @@ function frame(points, analysis, opt, xMin, xMax) {
 
   const line = seq.map((p, i) => `${i ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(p.pnl).toFixed(1)}`).join(' ');
 
+  // ——— منحنی «امروز» — همان محور، رنگ و خط‌چین جدا، بدون ناحیه رنگی خودش ———
+  // چون تلاطم زمان را صاف می‌کند، این خط معمولاً داخل محدوده منحنی سررسید
+  // می‌ماند؛ مقیاس Y از منحنی سررسید گرفته شده، نه دوباره حساب شده.
+  let todayLine = '';
+  if (todayPoints && Number.isFinite(spot)) {
+    const inRange2 = todayPoints.points.filter((p) => p.S >= xMin && p.S <= xMax);
+    const seq2 = [{ S: xMin, pnl: todayPoints.at(xMin) }, ...inRange2, { S: xMax, pnl: todayPoints.at(xMax) }]
+      .filter((p) => Number.isFinite(p.pnl))
+      .sort((a, b) => a.S - b.S);
+    if (seq2.length >= 2) {
+      todayLine = seq2.map((p, i) => `${i ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(Math.min(Math.max(p.pnl, yMin), yMax)).toFixed(1)}`).join(' ');
+    }
+  }
+
   // ——— محور عمودی: گام گرد، برچسب سمت چپ، صفر جدا کشیده می‌شود ———
   const yTicks = ticksFor(yMin, yMax, 4).filter((v) => Math.abs(Y(v) - y0) > 9 || v === 0);
   const grid = yTicks.map((v) => `
@@ -128,12 +160,21 @@ function frame(points, analysis, opt, xMin, xMax) {
     ? `<line class="spot" x1="${X(spot)}" y1="${pad.t}" x2="${X(spot)}" y2="${H - pad.b}"/>
        <text class="lbl" x="${X(spot)}" y="${pad.t - 6}" text-anchor="middle" style="fill:var(--warn)">پایه ${money(spot)}</text>` : '';
 
+  const legend2 = todayLine ? `
+    <g class="curve2-legend">
+      <line x1="${W - pad.r - 78}" y1="${pad.t + 5}" x2="${W - pad.r - 58}" y2="${pad.t + 5}" class="curve-today"/>
+      <text x="${W - pad.r - 82}" y="${pad.t + 8}" text-anchor="end" class="lbl">امروز</text>
+      <line x1="${W - pad.r - 78}" y1="${pad.t + 18}" x2="${W - pad.r - 58}" y2="${pad.t + 18}" class="curve"/>
+      <text x="${W - pad.r - 82}" y="${pad.t + 21}" text-anchor="end" class="lbl">سررسید</text>
+    </g>` : '';
+
   const svg = `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار بازده در سررسید">
       ${grid}${areas.join('')}${strikes}${spotLine}
       <line class="axis" x1="${pad.l}" y1="${H - pad.b}" x2="${W - pad.r}" y2="${H - pad.b}"/>
       ${xTicks}
       <line class="zero" x1="${pad.l}" y1="${y0}" x2="${W - pad.r}" y2="${y0}"/>
-      <path class="curve" d="${line}"/>${bes}
+      ${todayLine ? `<path class="curve-today" d="${todayLine}"/>` : ''}
+      <path class="curve" d="${line}"/>${bes}${legend2}
       <g class="cursor" hidden>
         <line class="cur-x" y1="${pad.t}" y2="${H - pad.b}"/>
         <circle class="cur-dot" r="3.5"/>
@@ -329,10 +370,11 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
     host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
     return { analysis, view: () => null, reset() {}, destroy() {} };
   }
+  const todayPoints = opt.showToday === false ? null : todaySeries(legs, netCash, opt);
   const [homeLo, homeHi] = homeRange(points, analysis, opt);
   const api = mountInteractive(host, {
     homeLo, homeHi, initRange: opt.initRange,
-    frameOf: (lo, hi) => frame(points, analysis, opt, lo, hi),
+    frameOf: (lo, hi) => frame(points, analysis, opt, lo, hi, todayPoints),
     valueAt: (S) => analysis.at(S),
     readLabel: 'سود و زیان',
     hint: PAYOFF_HINT,

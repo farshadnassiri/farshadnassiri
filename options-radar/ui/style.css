@@ -384,6 +384,9 @@ table.data td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; 
 .payoff .strike { stroke: var(--accent-2); stroke-width: 1; stroke-dasharray: 2 4; }
 .payoff .be { fill: var(--panel); stroke: var(--ink); stroke-width: 2; }
 .payoff .spot { stroke: var(--warn); stroke-width: 1.5; }
+.payoff path.curve-today { fill: none; stroke: var(--accent-2); stroke-width: 1.75; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.curve2-legend line.curve-today { stroke: var(--accent-2); stroke-width: 1.75; stroke-dasharray: 5 4; }
+.curve2-legend line.curve { stroke: var(--accent); stroke-width: 2.5; }
 /* عدد محور باید چپ‌به‌راست خوانده شود، وگرنه در صفحه راست‌به‌چپ علامت منفی
    به انتهای عدد می‌پرد و «−۴۰M» به شکل «۴۰M−» دیده می‌شود. */
 /* برچسب محور «−۴۱ م» هم رقم دارد هم واژه فارسی. جهت پاراگراف چپ‌به‌راست
