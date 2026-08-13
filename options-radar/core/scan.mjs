@@ -42,10 +42,31 @@ function equalWidth(ks) {
   return true;
 }
 
-const FUNNEL_KEYS = ['built', 'noQuote', 'noDepth', 'filtered', 'kept'];
+const FUNNEL_KEYS = ['built', 'noQuote', 'refBasis', 'noDepth', 'filtered', 'kept'];
+
+/**
+ * چرا ردیف ادعای اجرا ندارد.
+ *
+ * قبلاً هر ردیف غیرقابل‌اجرا در سطل «عمق ناکافی» می‌افتاد. آن برچسب برای دو
+ * حالت پرتکرار دروغ بود:
+ *
+ *   مبنای قیمت مرجع    پایانی و آخرین و کمترین و بیشترین، طبق طراحی ادعای
+ *                      اجرا ندارند. هیچ ربطی به عمق ندارد و «خرابی» هم نیست،
+ *                      ولی کاربر جز یک تب خالی چیزی نمی‌دید.
+ *   حجم مظنه صفر       قیمت هست ولی حجمی پشتش نیست. این بی‌مظنه بودن است،
+ *                      نه کم بودن عمق.
+ *
+ * علت واقعی از کیفیت ماشین‌خوان هر پا می‌آید، نه از متن برچسب.
+ */
+export function unexecutableReason(row) {
+  const q = (row.legPrices || []).map((l) => l.quality);
+  if (q.some((x) => x === 'reference')) return 'refBasis';
+  if (q.some((x) => x === 'none')) return 'noQuote';
+  return 'noDepth';
+}
 
 export function emptyFunnel() {
-  return { built: 0, noQuote: 0, noDepth: 0, filtered: 0, kept: 0, evaluated: 0, capped: false };
+  return { built: 0, noQuote: 0, refBasis: 0, noDepth: 0, filtered: 0, kept: 0, evaluated: 0, capped: false };
 }
 
 /**
@@ -173,7 +194,7 @@ export function scan({ def, chain, uaKeys, settings, sigmaByUa = {}, qty }) {
       } catch { continue; }
       funnel.evaluated += 1;
 
-      if (!row.executable && !s.showUnexecutable) { funnel.noDepth += 1; continue; }
+      if (!row.executable && !s.showUnexecutable) { funnel[unexecutableReason(row)] += 1; continue; }
       if (!passesFilters(row, s)) { funnel.filtered += 1; continue; }
 
       row.uaIns = c.uaIns;

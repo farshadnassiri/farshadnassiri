@@ -311,13 +311,32 @@ export function makeTable(host, cols, opts = {}) {
 export function funnelBar(host, f) {
   if (!host) return;
   if (!f) { host.innerHTML = '<div class="funnel-key"><span>اسکنی انجام نشده.</span></div>'; return; }
-  const parts = [
-    ['کنار گذاشته — بی‌مظنه', f.noQuote, '--muted'],
-    ['کنار گذاشته — عمق ناکافی', f.noDepth, '--warn'],
-    ['کنار گذاشته — فیلتر تو', f.filtered, '--accent-2'],
-    ['مانده', f.kept, '--accent'],
+  // سطل صفر نشان داده نمی‌شود، جز «مانده» که همیشه جواب اصلی است
+  const all = [
+    ['کنار گذاشته — بی‌مظنه', f.noQuote || 0, '--muted'],
+    ['کنار گذاشته — مبنای قیمت مرجع', f.refBasis || 0, '--loss'],
+    ['کنار گذاشته — عمق ناکافی', f.noDepth || 0, '--warn'],
+    ['کنار گذاشته — فیلتر تو', f.filtered || 0, '--accent-2'],
   ];
+  const parts = [...all.filter(([, v]) => v > 0), ['مانده', f.kept || 0, '--accent']];
   const total = parts.reduce((a, p) => a + p[1], 0) || 1;
+
+  // وقتی جدول خالی است، شمردن کافی نیست: باید گفت چه چیزی را عوض کند.
+  const hints = [];
+  if (f.refBasis > 0) {
+    hints.push('مبنای قیمت تو مرجع است — پایانی و آخرین و کمترین و بیشترین طبق طراحی ادعای اجرا ندارند، '
+      + 'پس هیچ ردیفی اجرایی شمرده نمی‌شود. مبنا را «دفتر سفارش» کن، یا اگر فقط می‌خواهی ببینی چه ترکیبی هست، '
+      + '«نمایش غیرقابل اجرا» را روشن کن.');
+  }
+  if (f.noQuote > 0 && !f.kept) {
+    hints.push('پای این ترکیب‌ها مظنه قابل اجرا ندارد — یا قیمتی در تابلو نیست، یا قیمت هست و حجمی پشتش نیست. '
+      + 'این در بازار ایران عادی است؛ نماد پرمعامله‌تر یا استراتژی کم‌پاتر را امتحان کن.');
+  }
+  if (f.filtered > 0 && !f.kept) {
+    hints.push('همه ترکیب‌ها به فیلترهای خودت خوردند — «حداقل بازده دوره» و «سقف اسپرد» را شل‌تر کن.');
+  }
+  if (f.capped) hints.push('سقف ترکیب خورد — پنجره قیمت اعمال را باریک‌تر کن.');
+
   host.innerHTML = `
     <div class="funnel">
       ${parts.map(([, v, c]) => `<span style="width:${(v / total) * 100}%;background:var(${c})"></span>`).join('')}
@@ -325,6 +344,6 @@ export function funnelBar(host, f) {
     <div class="funnel-key">
       <span><b>${f.built.toLocaleString('en-US')}</b> ترکیب ساخته شد</span>
       ${parts.map(([k, v, c]) => `<span><i style="background:var(${c})"></i>${k}: <b>${v.toLocaleString('en-US')}</b></span>`).join('')}
-      ${f.capped ? '<span style="color:var(--warn)">سقف ترکیب خورد — پنجره قیمت اعمال را باریک‌تر کن</span>' : ''}
-    </div>`;
+    </div>
+    ${hints.map((h) => `<p class="funnel-hint">${h}</p>`).join('')}`;
 }

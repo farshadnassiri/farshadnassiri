@@ -192,7 +192,10 @@ export function evaluate({ legs, quotes, ctx }) {
     priceBasis: s.priceBasis, execMode: s.execMode,
     legPrices: priced.map((l) => ({
       key: l.key || `${l.kind}${l.strike ?? ''}`, side: l.side, kind: l.kind, strike: num(l.strike),
-      price: num(l.price), source: l.exec?.source, slipPct: num(l.exec?.slipPct),
+      // کیفیت ماشین‌خوان، جدا از برچسب فارسی. نوار تشخیص باید بتواند بگوید
+      // ردیف چرا افتاد، و «منبع» متن است نه مقدار قابل شاخه زدن.
+      price: num(l.price), source: l.exec?.source, quality: l.exec?.quality,
+      slipPct: num(l.exec?.slipPct),
       filled: num(l.exec?.filled), short: num(l.exec?.short), levels: num(l.exec?.levels),
       spreadPct: spreadPct(l.quote || {}), mid: midOf(l.quote || {}), sigma: l.sigma,
     })),

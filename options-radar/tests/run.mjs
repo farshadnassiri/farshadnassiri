@@ -17,9 +17,10 @@ import { evaluate, profitRegions, probOfProfit, breakevenMetrics } from '../core
 import { CATALOG, buildLegs, byId } from '../strategies/catalog.mjs';
 import { defaults } from '../core/settings.mjs';
 import { buildChain, underlyingList, chainStats } from '../core/chain.mjs';
-import { scan as scanFn, generateCombos } from '../core/scan.mjs';
+import { scan as scanFn, generateCombos, unexecutableReason } from '../core/scan.mjs';
 import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
+import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -788,6 +789,161 @@ group('۱۷. سنجه‌های سربه‌سری');
   // مقدار بی‌معنی در فهرست، دور ریخته می‌شود
   const dirty = breakevenMetrics([NaN, -5, 0, 103000], S);
   check('سربه‌سری بی‌معنی کنار گذاشته شد', dirty.beCount === 1 && dirty.beNear === 103000);
+}
+
+group('۱۹. نوار تشخیص، علت واقعی افتادن را می‌گوید');
+{
+  // این گروه یک باگ گزارش‌شده کاربر را قفل می‌کند: تب خالی بود و نوار تشخیص
+  // می‌گفت «عمق ناکافی»، در حالی که علت واقعی این بود که مبنای قیمت روی
+  // «پایانی» بود — مبنایی که طبق طراحی هرگز ادعای اجرا ندارد. کاربر هیچ راهی
+  // نداشت این را بفهمد.
+  const mkRow = (strike, days, cBid, pBid, qty = 100) => ({
+    uaInsCode: '1', lval30_UA: 'نمونه', pDrCotVal_UA: 100000, pClosing_UA: 100000, priceYesterday_UA: 99000,
+    insCode_C: `c${strike}_${days}`, lVal18AFC_C: `ض${strike}`, insCode_P: `p${strike}_${days}`, lVal18AFC_P: `ط${strike}`,
+    strikePrice: strike, contractSize: 1000, remainedDay: days, endDate: 20260101,
+    pMeDem_C: cBid, qTitMeDem_C: qty, pMeOf_C: Math.round(cBid * 1.05), qTitMeOf_C: qty,
+    pDrCotVal_C: cBid, pClosing_C: cBid, oP_C: 500, qTotTran5J_C: 1000,
+    pMeDem_P: pBid, qTitMeDem_P: qty, pMeOf_P: Math.round(pBid * 1.05), qTitMeOf_P: qty,
+    pDrCotVal_P: pBid, pClosing_P: pBid, oP_P: 400, qTotTran5J_P: 800,
+  });
+  const market = (qty) => {
+    const rows = [];
+    for (const k of [90000, 95000, 100000, 105000, 110000]) {
+      rows.push(mkRow(k, 30, Math.max(200, 100000 - k + 4000), Math.max(200, k - 100000 + 4000), qty));
+      rows.push(mkRow(k, 90, Math.max(300, 100000 - k + 7000), Math.max(300, k - 100000 + 7000), qty));
+    }
+    return rows;
+  };
+  const runScan = (rows, over = {}) => {
+    const s = { ...defaults(), ...over };
+    return scanFn({ def: byId('bull-call-spread'), chain: buildChain(rows, s), uaKeys: ['1'], settings: s, qty: s.qtyDefault });
+  };
+
+  const base = runScan(market(100));
+  check('با دفتر سفارش و مظنه سالم، ردیف می‌ماند', base.funnel.kept > 0, `${base.funnel.kept} ردیف`);
+  check('و هیچ‌کدام در سطل مرجع یا عمق نمی‌افتد',
+    base.funnel.refBasis === 0 && base.funnel.noDepth === 0);
+
+  // ——— علت یک: مبنای قیمت مرجع ———
+  for (const basis of ['CLOSE', 'LAST', 'LOW', 'HIGH']) {
+    const r = runScan(market(100), { priceBasis: basis });
+    check(`مبنای ${basis} در سطل «مبنای مرجع» می‌افتد، نه «عمق ناکافی»`,
+      r.funnel.refBasis === r.funnel.built && r.funnel.noDepth === 0 && r.funnel.kept === 0,
+      `مرجع ${r.funnel.refBasis} از ${r.funnel.built}`);
+  }
+
+  // با روشن کردن نمایش غیرقابل اجرا، همان ترکیب‌ها برمی‌گردند
+  const shown = runScan(market(100), { priceBasis: 'CLOSE', showUnexecutable: true });
+  check('با نمایش غیرقابل اجرا، ردیف‌های مبنای مرجع برمی‌گردند',
+    shown.funnel.kept > 0 && shown.funnel.refBasis === 0, `${shown.funnel.kept} ردیف`);
+
+  // ——— علت دو: قیمت هست ولی حجمی پشتش نیست ———
+  const dry = runScan(market(0));
+  check('حجم مظنه صفر، «بی‌مظنه» شمرده می‌شود نه «عمق ناکافی»',
+    dry.funnel.noQuote === dry.funnel.built && dry.funnel.noDepth === 0 && dry.funnel.kept === 0,
+    `بی‌مظنه ${dry.funnel.noQuote} از ${dry.funnel.built}`);
+
+  // ——— علت سه: فیلتر خود کاربر ———
+  const tight = runScan(market(100), { maxSpreadPct: 1 });
+  check('سقف اسپرد تنگ، در سطل فیلتر تو می‌افتد',
+    tight.funnel.filtered === tight.funnel.built && tight.funnel.kept === 0);
+
+  // حالت میانه ادعای اجرا ندارد ولی ردیف را نمی‌اندازد — عمداً
+  const mid = runScan(market(100), { execMode: 'MID' });
+  check('حالت میانه ردیف را نمی‌اندازد', mid.funnel.kept > 0 && mid.funnel.refBasis === 0);
+
+  // ——— علت، از کیفیت ماشین‌خوان می‌آید نه از متن برچسب ———
+  check('علت مرجع، از کیفیت پا خوانده می‌شود',
+    unexecutableReason({ legPrices: [{ quality: 'depth' }, { quality: 'reference' }] }) === 'refBasis');
+  check('علت بی‌مظنه، از کیفیت پا خوانده می‌شود',
+    unexecutableReason({ legPrices: [{ quality: 'none' }, { quality: 'depth' }] }) === 'noQuote');
+  check('مرجع بر بی‌مظنه اولویت دارد، چون تنظیم کاربر است نه واقعیت بازار',
+    unexecutableReason({ legPrices: [{ quality: 'none' }, { quality: 'reference' }] }) === 'refBasis');
+  check('بی هیچ نشانه‌ای، عمق ناکافی می‌ماند',
+    unexecutableReason({ legPrices: [{ quality: 'depth' }] }) === 'noDepth');
+  check('ردیف بی‌پا، خطا نمی‌دهد', unexecutableReason({}) === 'noDepth');
+
+  // کیفیت ماشین‌خوان باید واقعاً روی ردیف بنشیند، وگرنه علت همیشه noDepth است
+  const one = runScan(market(100), { priceBasis: 'CLOSE', showUnexecutable: true });
+  check('کیفیت هر پا روی ردیف ثبت می‌شود',
+    one.rows[0].legPrices.every((l) => typeof l.quality === 'string'),
+    one.rows[0].legPrices.map((l) => l.quality).join(' , '));
+}
+
+group('۱۸. نگهبان مرز سرور');
+{
+  const ROOT = '/x/options-radar';
+  const ok = (p) => safeStaticPath(ROOT, p);
+
+  // ——— مسیر مجاز ———
+  check('ریشه به صفحه اصلی می‌رود', ok('/') === '/x/options-radar/ui/index.html', `${ok('/')}`);
+  check('فایل معمولی زیر ریشه قبول است', ok('/ui/style.css') === '/x/options-radar/ui/style.css');
+  check('مسیر تودرتو قبول است', ok('/ui/tabs/engine.mjs') === '/x/options-radar/ui/tabs/engine.mjs');
+
+  // ——— همان باگی که این گروه برایش نوشته شد ———
+  // مقایسه رشته‌ای startsWith، پوشه هم‌نام‌شروع کنار ریشه را رد نمی‌کرد
+  check('پوشه هم‌نام‌شروع کنار ریشه رد می‌شود',
+    ok('/../options-radar-private/secret.env') === null,
+    `${ok('/../options-radar-private/secret.env')}`);
+
+  // ——— عبور از ریشه ———
+  check('بالا رفتن ساده رد می‌شود', ok('/../../etc/passwd') === null);
+  check('بالا رفتن از میان مسیر رد می‌شود', ok('/ui/../../etc/passwd') === null);
+  check('رمزگشایی درصدی هم گرفته می‌شود', ok('/%2e%2e%2f%2e%2e%2fetc%2fpasswd') === null,
+    `${ok('/%2e%2e%2f%2e%2e%2fetc%2fpasswd')}`);
+  check('رمزگشایی درصدی نیمه‌کاره رد می‌شود', ok('/%2e%2e/secret') === null);
+  check('درصد خراب، خطا نمی‌دهد و رد می‌شود', ok('/%zz') === null);
+  check('بایت صفر رد می‌شود', ok('/ui/style.css\0.png') === null);
+  check('خود ریشه فایل نیست', ok('/..') === null);
+  check('ورودی غیرمتنی رد می‌شود', safeStaticPath(ROOT, null) === null);
+
+  // ——— کد ابزار ———
+  check('کد رقمی قبول است', validIns('17914401791772679'));
+  check('کد خالی رد می‌شود', !validIns(''));
+  check('کد با عبور از مسیر رد می‌شود', !validIns('123/../GetSomethingElse'));
+  check('کد با نقطه رد می‌شود', !validIns('12.3'));
+  check('کد با حرف رد می‌شود', !validIns('12a3'));
+  check('کد با فاصله رد می‌شود', !validIns(' 123'));
+  check('کد بیش از حد بلند رد می‌شود', !validIns('9'.repeat(33)));
+  check('عدد به‌جای رشته رد می‌شود', !validIns(123));
+
+  // ——— فهرست کد ———
+  const list = parseInsList(' 111 , 222,۳۳۳,../x,333,111 , ');
+  check('فهرست کد: نامعتبر و تکراری دور ریخته شد',
+    list.length === 3 && list.join(',') === '111,222,333', list.join(','));
+  check('رقم فارسی، کد معتبر نیست', !parseInsList('۱۲۳').length);
+  check('سقف تعداد اعمال می‌شود',
+    parseInsList(Array.from({ length: 500 }, (_, i) => String(i + 1)).join(','), 200).length === 200);
+  check('ورودی خالی، فهرست خالی می‌دهد', parseInsList(null).length === 0);
+
+  // ——— سقف بدنه ———
+  const streamOf = (...parts) => ({
+    async *[Symbol.asyncIterator]() { for (const p of parts) yield Buffer.from(p); },
+  });
+  const read = async (stream, max) => {
+    try { return { body: await readBody(stream, max) }; }
+    catch (e) { return { err: e }; }
+  };
+
+  const small = await read(streamOf('{"a":', '1}'), 1000);
+  check('بدنه کوچک، کامل و چسبیده خوانده می‌شود', small.body === '{"a":1}', small.body);
+
+  const big = await read(streamOf('x'.repeat(50), 'y'.repeat(60)), 100);
+  check('بدنه بزرگ‌تر از سقف، خطای BodyTooLarge می‌دهد',
+    big.err instanceof BodyTooLarge && big.err.limit === 100, big.err?.name);
+
+  // سقف باید حین دریافت بزند، نه بعد از جمع شدن همه‌چیز در حافظه
+  let pulled = 0;
+  const counted = {
+    async *[Symbol.asyncIterator]() {
+      for (let i = 0; i < 1000; i++) { pulled += 1; yield Buffer.from('z'.repeat(100)); }
+    },
+  };
+  await read(counted, 250);
+  check('سقف حین دریافت می‌زند، نه بعدش', pulled === 3, `${pulled} تکه خوانده شد از ۱۰۰۰`);
+
+  const exact = await read(streamOf('a'.repeat(100)), 100);
+  check('بدنه دقیقاً هم‌اندازه سقف، قبول است', exact.body?.length === 100);
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

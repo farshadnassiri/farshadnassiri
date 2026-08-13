@@ -18,11 +18,16 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaults, sanitize } from '../core/settings.mjs';
+import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from './guard.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const PORT = Number(process.env.PORT || 8787);
 const SETTINGS_FILE = path.join(ROOT, 'data', 'settings.json');
+
+// سقف بدنه درخواست. تنظیمات چند کیلوبایت است و فهرست موقعیت‌ها هم کوچک؛
+// یک مگابایت جای فراوانی می‌دهد و هنوز جلوی پر کردن حافظه را می‌گیرد.
+const MAX_BODY = 1024 * 1024;
 
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
@@ -290,9 +295,8 @@ function send(res, code, body, type = 'application/json; charset=utf-8') {
 const sendJson = (res, code, obj) => send(res, code, JSON.stringify(obj));
 
 async function serveStatic(res, pathname) {
-  const rel = pathname === '/' ? '/ui/index.html' : pathname;
-  const file = path.join(ROOT, rel);
-  if (!file.startsWith(ROOT)) return send(res, 403, 'forbidden', 'text/plain');
+  const file = safeStaticPath(ROOT, pathname);
+  if (!file) return send(res, 403, 'مسیر مجاز نیست', 'text/plain; charset=utf-8');
   try {
     const buf = await fs.readFile(file);
     send(res, 200, buf, MIME[path.extname(file)] || 'application/octet-stream');
@@ -321,9 +325,7 @@ async function handle(req, res) {
     if (p === '/api/settings') {
       if (req.method === 'GET') return sendJson(res, 200, S);
       if (req.method === 'PUT') {
-        const chunks = [];
-        for await (const c of req) chunks.push(c);
-        const next = await saveSettings(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'));
+        const next = await saveSettings(JSON.parse(await readBody(req, MAX_BODY) || '{}'));
         tokens = Math.min(tokens, next.burst);
         log('تنظیمات ذخیره شد');
         return sendJson(res, 200, next);
@@ -353,6 +355,13 @@ async function handle(req, res) {
     }
 
     // ——— غنی‌سازی، فقط بر اساس تقاضا ———
+    // کد ابزار مستقیم داخل مسیر بالادست می‌نشیند. بدون صحت‌سنجی، یک «..»
+    // درخواست را به نقطه پایانی دیگری می‌برد.
+    if (p === '/api/book' || p === '/api/info' || p === '/api/optionmeta'
+      || p === '/api/daily' || p === '/api/clienttype') {
+      if (!validIns(ins)) return sendJson(res, 400, { error: 'کد ابزار باید فقط رقم باشد' });
+    }
+
     if (p === '/api/book') {
       const rows = firstList(await get(`/BestLimits/${ins}`, S.ttlBookSec, 3));
       const book = rows
@@ -415,7 +424,7 @@ async function handle(req, res) {
 
     // ——— دریافت دسته‌ای: یک رفت و برگشت به‌جای چند ده تا ———
     if (p === '/api/books' || p === '/api/infos') {
-      const codes = String(u.searchParams.get('ins') || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 200);
+      const codes = parseInsList(u.searchParams.get('ins'), 200);
       const wantBook = p === '/api/books';
       const one = async (code) => {
         try {
@@ -461,10 +470,7 @@ async function handle(req, res) {
         catch { return sendJson(res, 200, []); }
       }
       if (req.method === 'PUT') {
-        const chunks = [];
-        for await (const c of req) chunks.push(c);
-        const body = Buffer.concat(chunks).toString('utf8') || '[]';
-        const list = JSON.parse(body);
+        const list = JSON.parse(await readBody(req, MAX_BODY) || '[]');
         if (!Array.isArray(list)) return sendJson(res, 400, { error: 'فهرست لازم است' });
         await fs.mkdir(path.dirname(file), { recursive: true });
         await fs.writeFile(file, JSON.stringify(list, null, 2), 'utf8');
@@ -482,6 +488,9 @@ async function handle(req, res) {
     if (p.startsWith('/api/')) return sendJson(res, 404, { error: 'نقطه پایانی ناشناخته' });
     return serveStatic(res, p);
   } catch (e) {
+    // بدنه بزرگ و جیسون خراب، خطای فرستنده‌اند نه خطای بالادست
+    if (e instanceof BodyTooLarge) return sendJson(res, 413, { error: e.message });
+    if (e instanceof SyntaxError) return sendJson(res, 400, { error: 'بدنه، جیسون معتبر نیست' });
     return sendJson(res, 502, { error: `${e.name}: ${e.message}` });
   }
 }
