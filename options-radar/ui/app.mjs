@@ -6,7 +6,6 @@
 import { fmt, faDigits, faAgo, faClock } from '/ui/fmt.mjs';
 import { defaults } from '/core/settings.mjs';
 import { CATALOG, GROUPS as SGROUPS } from '/strategies/catalog.mjs';
-import { strategyGlyph } from '/ui/glyph.mjs';
 
 export const state = {
   settings: defaults(),
@@ -283,16 +282,13 @@ function buildRail() {
       const infeasible = t.def && !t.def.feasible;
       b.title = infeasible ? t.def.infeasibleWhy : (t.def?.note || t.def?.dir || t.title);
       const [tone, cls] = dirTone(t.def);
-      // دو سطر: نام بالا، و زیرش نشان شکل بازده کنار برچسب‌های کوتاه.
-      // نشان فقط برای تب استراتژی معنی دارد؛ تب‌های پایه شکل بازده ندارند.
-      const glyph = strategyGlyph(t.def);
+      // دو سطر: نام بالا، و زیرش برچسب‌های کوتاه.
       b.innerHTML = `
         <span class="tab-main">
           <span class="tab-name">${t.title}</span>
           ${infeasible ? '<span class="tab-flag" title="اجرا در تابلو ممکن نیست">⃰</span>' : ''}
         </span>
         <span class="tab-meta">
-          ${glyph}
           ${tone ? `<span class="tone ${cls}">${tone}</span>` : ''}
           ${t.def?.legs?.length ? `<span class="phase">${faDigits(t.def.legs.length)} پا</span>` : ''}
         </span>`;
