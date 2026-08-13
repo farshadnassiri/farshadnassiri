@@ -77,6 +77,17 @@ export function generateCombos(def, ua, s, funnel = emptyFunnel()) {
   const spot = ua.close || ua.last;
   if (!(spot > 0)) return [];
 
+  // نقدشوندگی زنجیره: مجموع ارزش معاملات امروز کل زنجیره همین پایه، نه یک
+  // قرارداد. پایه‌ای که کل زنجیره‌اش خوابیده، حتی اگر یک مظنه تنها زنده
+  // مانده باشد، ارزش اسکن ندارد.
+  if (s.minUaLiquidity > 0) {
+    let uaValue = 0;
+    for (const ex of ua.expiryList) {
+      for (const row of ex.strikeList) uaValue += row.call.value + row.put.value;
+    }
+    if (uaValue < s.minUaLiquidity) return [];
+  }
+
   const win = s.comboWindowPct / 100;
   const lo = spot * (1 - win), hi = spot * (1 + win);
   const out = [];
@@ -124,7 +135,8 @@ export function generateCombos(def, ua, s, funnel = emptyFunnel()) {
         // فروش به بهترین تقاضا نیاز دارد، خرید به بهترین عرضه
         const px = t.side === 'sell' ? q.bid : q.ask;
         if (!(px > 0)) missing = true;
-        if (t.side === 'sell' && (q.bidQty < s.minBidQty || q.oi < s.minOpenInt)) missing = missing || false;
+        if (t.side === 'sell' && (q.bidQty < s.minBidQty || q.oi < s.minOpenInt)) missing = true;
+        if (q.vol < s.minLegVol || q.value < s.minLegValue) missing = true;
         legs.push({
           kind: t.kind, side: t.side, ratio: t.ratio, strike: K, size: row.size,
           days: ex.days, price: 0, ins: q.ins, name: q.name, exp: t.exp, slot: t.slot,
