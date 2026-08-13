@@ -260,6 +260,7 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
   background: var(--panel-2); color: var(--ink);
   border: 1px solid var(--line); border-radius: 4px;
   padding: 6px 8px; font: inherit; font-size: 13px; width: 100%;
+  transition: border-color .12s ease;
 }
 .field input[type="number"] { font-family: var(--mono); direction: ltr; text-align: start; }
 .field input:focus, .field select:focus { border-color: var(--accent); }
@@ -273,21 +274,27 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
   flex: none; width: 26px; height: 28px; padding: 0;
   background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); border-radius: 4px;
   font: inherit; font-size: 15px; line-height: 1; cursor: pointer;
+  transition: background .12s ease, border-color .12s ease;
 }
 .step-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+.step-btn:active { filter: brightness(.94); }
 .num-range { width: 100%; margin-top: 2px; accent-color: var(--accent); }
 
 .btn {
   background: var(--accent); color: #fff; border: 0; border-radius: 4px;
   padding: 8px 16px; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer;
+  transition: filter .12s ease;
 }
 .btn:hover { filter: brightness(1.08); }
+.btn:active { filter: brightness(.92); }
 .btn.sec { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); }
 .ghost {
   background: none; border: 1px solid var(--line); color: var(--ink-2);
   border-radius: 4px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
 }
 .ghost:hover { border-color: var(--accent); color: var(--accent); }
+.ghost:active { background: var(--accent-soft); }
 .ghost[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .bar .sp { flex: 1; }
@@ -304,6 +311,7 @@ table.data thead th {
   border-bottom: 1px solid var(--line); cursor: pointer; user-select: none;
 }
 table.data thead th:hover { color: var(--accent); }
+table.data tbody tr { transition: background .1s ease; }
 table.data tbody tr:hover { background: var(--panel-2); }
 table.data td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; direction: ltr; }
 .scroll { overflow: auto; max-height: 62vh; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
@@ -375,7 +383,9 @@ table.data td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; 
 .chip {
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px;
   padding: 3px 11px; font-size: 12px; cursor: pointer; color: var(--ink-2); font: inherit;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
 }
+.chip:hover:not([aria-pressed="true"]) { border-color: var(--accent); color: var(--accent); }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 
 dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0; font-size: 12.5px; }
