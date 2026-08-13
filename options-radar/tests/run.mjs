@@ -753,6 +753,24 @@ group('۱۶. موتور چند-سررسیدی — کرانداری');
   // ارزش در قیمت پایه نزدیک صفر: هر دو کال بی‌ارزش، پس همان بدهکار خالص
   check('ارزش در قیمت پایه صفر، بدهکار خالص است', near(a.atZero, -2_000_000, 1e-6),
     `${Math.round(a.atZero).toLocaleString()}`);
+
+  // باگ دوم: بازه نمونه‌برداری [۰٫۳۵، ۲٫۲] × پایه ناحیه سود را می‌برید.
+  // پوت تقویمی معکوس (خرید نزدیک، فروش دور) در قیمت‌های خیلی پایین هم سود
+  // می‌دهد؛ لبه پایین پنجره (۳۵٬۰۰۰) خودش سود بود، پس بدون اصلاح region
+  // از همان‌جا شروع می‌شد و ناحیه واقعی زیر آن دیده نمی‌شد.
+  const putLeg = (side, K, price, days) => ({ kind: 'put', side, ratio: 1, strike: K, price, size, days, sigma: 0.6 });
+  const revPutCal = [putLeg('buy', 100000, 1500, 20), putLeg('sell', 100000, 2500, 80)];
+  const d = run(revPutCal);
+  check('پوت تقویمی معکوس، ناحیه سود پایینی تا صفر می‌رسد، نه لبه پنجره',
+    d.regions[0][0] === 0, `${JSON.stringify(d.regions)}`);
+  check('ارزش نزدیک صفر مثبت است، پس بریدن نادرست بود', d.atZero > 0,
+    `${Math.round(d.atZero).toLocaleString()}`);
+
+  const truncated = { regions: [[35000, d.regions[0][1]], d.regions[1]] };
+  const fixedPop = probOfProfit(d, spot, 0.5, 0.6);
+  const truncatedPop = probOfProfit(truncated, spot, 0.5, 0.6);
+  check('احتمال سود پس از اصلاح، از نسخه بریده‌شده کمتر برآورد نمی‌شود',
+    fixedPop > truncatedPop, `${fixedPop.toFixed(2)}٪ در برابر ${truncatedPop.toFixed(2)}٪`);
 }
 
 group('۱۷. سنجه‌های سربه‌سری');

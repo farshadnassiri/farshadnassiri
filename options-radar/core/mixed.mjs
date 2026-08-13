@@ -155,6 +155,23 @@ export function analyzeMixed(legs, netCash, opt = {}) {
   }
   if (open != null) regions.push([open, Infinity]);
 
+  // اگر همان اولین نمونه (لبه پایین پنجره) خودش سود است، بازه سود واقعی
+  // پایین‌تر از لبه شروع می‌شود — ترکیب پوت‌دار همین‌جا کم‌برآورد می‌شد.
+  // بین صفر و لبه دنبال سربه‌سری واقعی بگرد، یا اگر تا صفر هم سود است
+  // بازه را به صفر برسان.
+  if (regions.length && regions[0][0] === lo && pts[0].pnl > 0) {
+    if (ok(value(farDn)) && value(farDn) > 0) {
+      regions[0][0] = 0;
+    } else {
+      let x0 = farDn, x1 = lo;
+      for (let k = 0; k < 60; k++) {
+        const m = (x0 + x1) / 2;
+        if (value(m) > 0) x1 = m; else x0 = m;
+      }
+      regions[0][0] = (x0 + x1) / 2;
+    }
+  }
+
   return {
     approx: true,
     horizonDays: horizon,
