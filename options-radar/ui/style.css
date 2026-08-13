@@ -357,6 +357,17 @@ table.data td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; 
 .skel-row:nth-child(2n) .skel-bar { animation-delay: .15s; }
 @media (prefers-reduced-motion: reduce) { .skel-bar { animation: none; opacity: .6; } }
 .scroll { overflow: auto; max-height: 62vh; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+/* همان مشکل tbl-body: این جدول‌ها (دفتر بازه‌ها، رول، زنجیره، فهرست موقعیت‌ها)
+   قاب پیمایش خودشان را دارند، نه کل صفحه. top:46px قاعده عمومی برای سرستونی
+   است که زیر نوار بالای صفحه می‌چسبد؛ اینجا همان ۴۶ پیکسل سرستون را داخل قاب
+   پایین می‌انداخت و ردیف اول زیرش گم می‌شد. */
+.scroll table.data thead th { top: 0; }
+/* دیده‌بان زنجیره دو ردیف سرستون دارد (گروه خرید/فروش، بعد برچسب ستون‌ها).
+   اگر هر th مستقل بچسبد، هر دو ردیف روی هم سعی می‌کنند در همان top:0 بنشینند —
+   موقع اسکرول ردیف دوم روی اول می‌نشیند و ردیف اول از دید گم می‌شود. چسباندن
+   خودِ thead هر دو ردیف را یک واحد نگه می‌دارد. */
+#chain thead { position: sticky; top: 0; z-index: 2; }
+#chain thead th { position: static; }
 
 .tag {
   display: inline-block; padding: 1px 6px; border-radius: 3px;
