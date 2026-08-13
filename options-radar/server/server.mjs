@@ -19,6 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaults, sanitize } from '../core/settings.mjs';
 import { resolveSafe } from './safepath.mjs';
+import { isValidIns } from './validate.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -353,6 +354,11 @@ async function handle(req, res) {
     }
 
     // ——— غنی‌سازی، فقط بر اساس تقاضا ———
+    if (['/api/book', '/api/info', '/api/optionmeta', '/api/daily', '/api/clienttype'].includes(p)
+      && !isValidIns(ins)) {
+      return sendJson(res, 400, { error: 'کد ابزار نامعتبر' });
+    }
+
     if (p === '/api/book') {
       const rows = firstList(await get(`/BestLimits/${ins}`, S.ttlBookSec, 3));
       const book = rows
@@ -415,7 +421,8 @@ async function handle(req, res) {
 
     // ——— دریافت دسته‌ای: یک رفت و برگشت به‌جای چند ده تا ———
     if (p === '/api/books' || p === '/api/infos') {
-      const codes = String(u.searchParams.get('ins') || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 200);
+      const codes = String(u.searchParams.get('ins') || '').split(',').map((x) => x.trim())
+        .filter(isValidIns).slice(0, 200);
       const wantBook = p === '/api/books';
       const one = async (code) => {
         try {

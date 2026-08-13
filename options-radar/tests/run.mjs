@@ -21,6 +21,7 @@ import { scan as scanFn, generateCombos } from '../core/scan.mjs';
 import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
 import { resolveSafe } from '../server/safepath.mjs';
+import { isValidIns } from '../server/validate.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -805,6 +806,18 @@ group('۱۸. مسیر امن سرو فایل ایستا');
     resolveSafe(ROOT, '/../../../../etc/passwd') === null);
   check('صعود درون‌مسیری که هنوز زیر ریشه است پذیرفته شد',
     resolveSafe(ROOT, '/ui/../data/settings.json') === '/x/options-radar/data/settings.json');
+}
+
+// ═══════════════════════════ ۱۹. صحت‌سنجی کد ابزار ═══════════════════════════
+group('۱۹. صحت‌سنجی کد ابزار');
+{
+  check('کد عددی پذیرفته شد', isValidIns('63917421733088005'));
+  check('کد خالی رد شد', !isValidIns(''));
+  check('کد نامعلوم رد شد', !isValidIns(null));
+  check('مسیر صعودی رد شد', !isValidIns('../../etc/passwd'));
+  check('کد با حرف رد شد', !isValidIns('123abc'));
+  check('کد با اسلش رد شد', !isValidIns('123/456'));
+  check('عدد جاوااسکریپتی رد شد', !isValidIns(123));
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════
