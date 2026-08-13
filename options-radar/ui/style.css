@@ -555,6 +555,14 @@ dl.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nu
 /* ——— انتخابگر نماد ——— */
 .picker { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .picker-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.picker-tools input[type="search"] {
+  flex: 1; min-width: 140px;
+  background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 4px;
+  padding: 5px 8px; font: inherit; font-size: 13px;
+  transition: border-color .12s ease;
+}
+.picker-tools input[type="search"]:focus { border-color: var(--accent); outline: none; }
 .picker-list {
   max-height: 260px; overflow: auto; border: 1px solid var(--line);
   border-radius: 4px; background: var(--panel-2);

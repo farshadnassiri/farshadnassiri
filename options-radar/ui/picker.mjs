@@ -15,8 +15,7 @@ export function makePicker(host, opts = {}) {
   host.innerHTML = `
     <div class="picker">
       <div class="picker-tools">
-        <input type="search" id="pk-q" placeholder="کوتاه کردن فهرست" style="flex:1;min-width:140px;
-          background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:5px 8px;font:inherit;font-size:13px;color:var(--ink)">
+        <input type="search" id="pk-q" placeholder="کوتاه کردن فهرست">
         <button class="ghost" data-pre="all">همه</button>
         <button class="ghost" data-pre="liquid">پرمعامله</button>
         <button class="ghost" data-pre="quoted">دارای مظنه</button>
