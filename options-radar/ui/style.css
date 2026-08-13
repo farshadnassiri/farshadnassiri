@@ -21,6 +21,11 @@
   --loss-soft: #fadfe2;
   --warn: #8a5a00;
   --warn-soft: #fbf0d6;
+  /* منحنی‌های اضافه روی نمودار — نامزد رول، یا موقعیت مقایسه‌ای */
+  --cmp1: #6a4fa0;
+  --cmp2: #b5651d;
+  --cmp3: #1f6f8b;
+  --cmp4: #5c7a29;
   --shadow: 0 1px 2px rgba(22, 32, 44, .06), 0 8px 24px rgba(22, 32, 44, .05);
   --radius: 6px;
   --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -45,6 +50,10 @@ body[data-theme="board"] {
   --loss-soft: #33141c;
   --warn: #d9a13a;
   --warn-soft: #322614;
+  --cmp1: #b79cf2;
+  --cmp2: #e0a15c;
+  --cmp3: #5fb8d6;
+  --cmp4: #a9c96e;
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .3);
 }
 
@@ -388,12 +397,25 @@ table.data td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; 
 .curve2-legend line.curve-today { stroke: var(--accent-2); stroke-width: 1.75; stroke-dasharray: 5 4; }
 .curve2-legend line.curve { stroke: var(--accent); stroke-width: 2.5; }
 
-/* نامزدهای دیگر رول روی همان نمودار تفاضل — کم‌رنگ‌تر از منحنی انتخاب‌شده،
-   با دو الگوی خط‌چین جدا تا خودشان هم از هم متمایز بمانند. */
-.payoff path.curve-extra1 { fill: none; stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: .75; }
-.payoff path.curve-extra2 { fill: none; stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 1 3; stroke-linecap: round; opacity: .75; }
-.curve2-legend line.curve-extra1 { stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 4 3; opacity: .75; }
-.curve2-legend line.curve-extra2 { stroke: var(--ink-2); stroke-width: 1.5; stroke-dasharray: 1 3; opacity: .75; }
+/* منحنی‌های اضافه، هم‌زمان روی یک نمودار — نامزدهای دیگر رول روی نمودار
+   تفاضل، یا موقعیت‌های مقایسه‌ای روی نمودار بازده. رنگ و الگوی خط‌چین هر دو
+   جدا، چون شناسه هرگز فقط رنگ نیست — legend اسم را هم می‌گوید. */
+.payoff path.curve-extra1 { fill: none; stroke: var(--cmp1); stroke-width: 1.75; stroke-dasharray: 4 3; opacity: .85; }
+.payoff path.curve-extra2 { fill: none; stroke: var(--cmp2); stroke-width: 1.75; stroke-dasharray: 1 3; stroke-linecap: round; opacity: .85; }
+.payoff path.curve-extra3 { fill: none; stroke: var(--cmp3); stroke-width: 1.75; stroke-dasharray: 7 3; opacity: .85; }
+.payoff path.curve-extra4 { fill: none; stroke: var(--cmp4); stroke-width: 1.75; stroke-dasharray: 2 2 6 2; opacity: .85; }
+.curve2-legend line.curve-extra1 { stroke: var(--cmp1); stroke-width: 1.75; stroke-dasharray: 4 3; }
+.curve2-legend line.curve-extra2 { stroke: var(--cmp2); stroke-width: 1.75; stroke-dasharray: 1 3; }
+.curve2-legend line.curve-extra3 { stroke: var(--cmp3); stroke-width: 1.75; stroke-dasharray: 7 3; }
+.curve2-legend line.curve-extra4 { stroke: var(--cmp4); stroke-width: 1.75; stroke-dasharray: 2 2 6 2; }
+
+/* فهرست تیک موقعیت‌های مقایسه‌ای زیر نمودار بازده */
+.cmp-list { display: flex; flex-direction: column; gap: 2px; max-height: 150px; overflow-y: auto; }
+.cmp-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+.cmp-row:hover { background: var(--panel-2); }
+.cmp-row input { accent-color: var(--accent); flex: none; }
+.cmp-row input:disabled { accent-color: var(--muted); }
+.cmp-row:has(input:disabled) { color: var(--muted); cursor: not-allowed; }
 /* عدد محور باید چپ‌به‌راست خوانده شود، وگرنه در صفحه راست‌به‌چپ علامت منفی
    به انتهای عدد می‌پرد و «−۴۰M» به شکل «۴۰M−» دیده می‌شود. */
 /* برچسب محور «−۴۱ م» هم رقم دارد هم واژه فارسی. جهت پاراگراف چپ‌به‌راست

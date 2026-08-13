@@ -18,7 +18,8 @@ import { gregorianToJalali } from '/core/jalali.mjs';
 import { makeTable, funnelBar } from '/ui/table.mjs';
 import { fmt, faNum, faDigits, coverageInfo } from '/ui/fmt.mjs';
 import { makePicker } from '/ui/picker.mjs';
-import { mountPayoff } from '/ui/chart.mjs';
+import { mountPayoff, payoffAt } from '/ui/chart.mjs';
+import { sameUnderlyingCandidates, compareLabel, MAX_COMPARE } from '/ui/compare.mjs';
 import { runScan, onChain, pushRows, chainState } from '/ui/scanner.mjs';
 
 /** dEven عددی (مثلاً ۲۰۲۶۰۱۰۱) به تاریخ شمسی خوانا. */
@@ -207,9 +208,11 @@ export async function mount(root, { tab, state, api }) {
   // ——— پانل جزئیات ———
   let chart = null;
   let chartRange = null; // بازه زوم/پن چارت، برای نگه داشتن روی رفرش پیوسته همان ردیف
+  let compareIds = new Set(); // موقعیت‌های مقایسه‌ای تیک‌خورده، برای همین ردیف انتخاب‌شده
   function showDetail(r) {
     const sameRow = picked && picked.id === r.id;
     if (chart) chartRange = chart.view();
+    if (!sameRow) compareIds = new Set();
     picked = r;
     const card = root.querySelector('#detail-card');
     card.style.display = '';
@@ -217,6 +220,7 @@ export async function mount(root, { tab, state, api }) {
 
     const fees = { buyStock: s().feeBuyStock, sellStock: s().feeSellStock, option: s().feeOption, exercise: s().feeExercise };
     const single = isSingleExpiry(r.__legs);
+    const candidates = sameUnderlyingCandidates(rows, r);
     const chartOpt = {
       fees, spot: r.S, width: 720, height: 260,
       sigma: r.sigmaUse, rFree: s().rFree, divYield: s().divYield,
@@ -277,6 +281,7 @@ export async function mount(root, { tab, state, api }) {
           <span>بیشترین سود: ${fmt.money(an.maxProfit)}</span>
           <span>بیشترین زیان: <b style="color:${Number.isFinite(an.maxLoss) ? 'inherit' : 'var(--loss)'}">${fmt.money(an.maxLoss)}</b></span>
         </div>
+        <div id="cmp-picker"></div>
         <h4 style="margin:14px 0 4px;font-size:12px">قیمت و عمق هر پا</h4>
         <table class="mini">
           <thead><tr><th>پا</th><th>اعمال</th><th>قیمت اجرا</th><th>میانه</th><th>اسپرد ٪</th><th>افت ٪</th><th>پرشده</th><th>کمبود</th><th>منبع</th></tr></thead>
@@ -336,9 +341,48 @@ export async function mount(root, { tab, state, api }) {
         </table>` : ''}
       </div>`;
 
+    // ——— مقایسه با موقعیت‌های دیگر هم‌نماد (قلم الف-۱ بک‌لاگ) ———
+    // «مشابه» یعنی فقط هم‌نماد؛ محدودتر کردنش گزینه‌های جالب را پنهان می‌کرد.
+    // منحنی مقایسه‌ای فقط از payoffAt می‌آید، نه رسم کامل — روی مقیاس همین
+    // نمودار سوار می‌شود، نه نمودار جدا.
+    compareIds = new Set([...compareIds].filter((id) => candidates.some((c) => c.id === id)));
+    function mountChart() {
+      const compare = candidates
+        .filter((c) => compareIds.has(c.id))
+        .slice(0, MAX_COMPARE)
+        .map((c) => ({
+          at: payoffAt(c.__legs, c.netCash, { fees, spot: c.S, sigma: c.sigmaUse, rFree: s().rFree, divYield: s().divYield }),
+          label: compareLabel(c),
+        }));
+      chart?.destroy();
+      chart = mountPayoff(root.querySelector('#chart'), r.__legs, r.netCash, { ...chartOpt, compare });
+    }
+    function renderCmpPicker() {
+      const box = root.querySelector('#cmp-picker');
+      if (!candidates.length) { box.innerHTML = ''; return; }
+      box.innerHTML = `
+        <p class="note" style="margin:10px 0 4px">مقایسه با موقعیت‌های دیگر همین نماد — حداکثر ${fmt.int(MAX_COMPARE)} هم‌زمان</p>
+        <div class="cmp-list">
+          ${candidates.map((c) => {
+            const checked = compareIds.has(c.id);
+            const disabled = !checked && compareIds.size >= MAX_COMPARE;
+            return `<label class="cmp-row">
+              <input type="checkbox" data-id="${c.id}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+              <span>${c.strategy ? `${c.strategy} — ` : ''}${c.legsText}</span>
+            </label>`;
+          }).join('')}
+        </div>`;
+      box.querySelectorAll('input[type=checkbox]').forEach((cb) => {
+        cb.addEventListener('change', (e) => {
+          if (e.target.checked) compareIds.add(e.target.dataset.id); else compareIds.delete(e.target.dataset.id);
+          renderCmpPicker();
+          mountChart();
+        });
+      });
+    }
+    renderCmpPicker();
     // نمودار بعد از نشستن قالب سوار می‌شود، چون به اندازه واقعی قاب نیاز دارد
-    chart?.destroy();
-    chart = mountPayoff(root.querySelector('#chart'), r.__legs, r.netCash, chartOpt);
+    mountChart();
 
     // ——— ماشین زمان (قلم پ-۴ بک‌لاگ) ———
     const tmWrap = root.querySelector('#tm-wrap');

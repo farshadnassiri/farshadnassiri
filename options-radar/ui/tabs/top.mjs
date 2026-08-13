@@ -14,7 +14,8 @@ import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
 import { makeTable, funnelBar } from '/ui/table.mjs';
 import { fmt, coverageInfo } from '/ui/fmt.mjs';
 import { makePicker } from '/ui/picker.mjs';
-import { mountPayoff } from '/ui/chart.mjs';
+import { mountPayoff, payoffAt } from '/ui/chart.mjs';
+import { sameUnderlyingCandidates, compareLabel, MAX_COMPARE } from '/ui/compare.mjs';
 import { runScanAll, onChain, pushRows, chainState } from '/ui/scanner.mjs';
 
 const DEFAULT_COLS = ['strategy', 'underlying', 'legsText', 'days', 'netCash', 'capital',
@@ -96,9 +97,11 @@ export async function mount(root, { state, api }) {
   // ——— پانل جزئیات — همان الگوی تب استراتژی، فقط بدون کنترل اسکن جداگانه ———
   let chart = null;
   let chartRange = null;
+  let compareIds = new Set();
   function showDetail(r) {
     const sameRow = picked && picked.id === r.id;
     if (chart) chartRange = chart.view();
+    if (!sameRow) compareIds = new Set();
     picked = r;
     const card = root.querySelector('#detail-card');
     card.style.display = '';
@@ -106,6 +109,8 @@ export async function mount(root, { state, api }) {
 
     const fees = { buyStock: s().feeBuyStock, sellStock: s().feeSellStock, option: s().feeOption, exercise: s().feeExercise };
     const single = isSingleExpiry(r.__legs);
+    const candidates = sameUnderlyingCandidates(rows, r);
+    compareIds = new Set([...compareIds].filter((id) => candidates.some((c) => c.id === id)));
     const chartOpt = {
       fees, spot: r.S, width: 720, height: 260,
       sigma: r.sigmaUse, rFree: s().rFree, divYield: s().divYield,
@@ -124,6 +129,7 @@ export async function mount(root, { state, api }) {
           <span>بیشترین سود: ${fmt.money(an.maxProfit)}</span>
           <span>بیشترین زیان: <b style="color:${Number.isFinite(an.maxLoss) ? 'inherit' : 'var(--loss)'}">${fmt.money(an.maxLoss)}</b></span>
         </div>
+        <div id="cmp-picker"></div>
       </div>
       <div>
         <dl class="kv">
@@ -149,8 +155,43 @@ export async function mount(root, { state, api }) {
           تب «${r.strategy}» را باز کن و دوباره اسکن بزن.</p>
       </div>`;
 
-    chart?.destroy();
-    chart = mountPayoff(root.querySelector('#chart'), r.__legs, r.netCash, chartOpt);
+    // ——— مقایسه با موقعیت‌های دیگر هم‌نماد (قلم الف-۱ بک‌لاگ) ———
+    function mountChart() {
+      const compare = candidates
+        .filter((c) => compareIds.has(c.id))
+        .slice(0, MAX_COMPARE)
+        .map((c) => ({
+          at: payoffAt(c.__legs, c.netCash, { fees, spot: c.S, sigma: c.sigmaUse, rFree: s().rFree, divYield: s().divYield }),
+          label: compareLabel(c),
+        }));
+      chart?.destroy();
+      chart = mountPayoff(root.querySelector('#chart'), r.__legs, r.netCash, { ...chartOpt, compare });
+    }
+    function renderCmpPicker() {
+      const box = root.querySelector('#cmp-picker');
+      if (!candidates.length) { box.innerHTML = ''; return; }
+      box.innerHTML = `
+        <p class="note" style="margin:10px 0 4px">مقایسه با موقعیت‌های دیگر همین نماد — حداکثر ${fmt.int(MAX_COMPARE)} هم‌زمان</p>
+        <div class="cmp-list">
+          ${candidates.map((c) => {
+            const checked = compareIds.has(c.id);
+            const disabled = !checked && compareIds.size >= MAX_COMPARE;
+            return `<label class="cmp-row">
+              <input type="checkbox" data-id="${c.id}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+              <span>${c.strategy ? `${c.strategy} — ` : ''}${c.legsText}</span>
+            </label>`;
+          }).join('')}
+        </div>`;
+      box.querySelectorAll('input[type=checkbox]').forEach((cb) => {
+        cb.addEventListener('change', (e) => {
+          if (e.target.checked) compareIds.add(e.target.dataset.id); else compareIds.delete(e.target.dataset.id);
+          renderCmpPicker();
+          mountChart();
+        });
+      });
+    }
+    renderCmpPicker();
+    mountChart();
   }
 
   // ——— اجرا ———

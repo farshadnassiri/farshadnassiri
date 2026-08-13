@@ -20,6 +20,9 @@ import { fmt, axisNum } from '/ui/fmt.mjs';
 
 const money = fmt.money;
 const MIN_SPAN = 1e-6;
+// سبک منحنی‌های «اضافه» روی هر نموداری که از frame()/diffFrame() می‌گذرد —
+// نامزدهای رول روی نمودار تفاضل، و موقعیت‌های مقایسه‌ای روی نمودار بازده.
+const EXTRA_STYLE = ['extra1', 'extra2', 'extra3', 'extra4'];
 
 /**
  * گام خوانا: ۱ ، ۲ ، ۵ در توان ده.
@@ -58,6 +61,15 @@ function seriesFor(legs, netCash, opt) {
     rFree: opt.rFree, divYield: opt.divYield,
   });
   return { points: analysis.points.filter((_, i) => i % 3 === 0), analysis };
+}
+
+/**
+ * فقط ارزیاب سود و زیان در سررسید یک ترکیب — بدون رسم. برای منحنی‌های
+ * مقایسه‌ای مصرف می‌شود که خودشان روی نمودار موقعیت دیگری سوار می‌شوند و
+ * نیازی به نقاط شکست خودشان (برای پرشدن ناحیه رنگی) ندارند.
+ */
+export function payoffAt(legs, netCash, opt = {}) {
+  return seriesFor(legs, netCash, opt).analysis.at;
 }
 
 /**
@@ -130,6 +142,23 @@ function frame(points, analysis, opt, xMin, xMax, todayPoints) {
     }
   }
 
+  // ——— موقعیت‌های مقایسه‌ای — بازده سررسید موقعیت‌های دیگر هم‌نماد ———
+  // همان الگوی نامزدهای رول روی نمودار تفاضل (diffFrame): نمونه‌برداری یکنواخت
+  // روی بازه فعلی، مقیاس Y از منحنی اصلی همین موقعیت، نه دوباره حساب‌شده —
+  // این‌ها هم برای مقایسه شکل‌اند، نه خواندن دقیق عدد.
+  const CMP_N = 120;
+  const cmpLines = (opt.compare || []).slice(0, EXTRA_STYLE.length).map((c, i) => {
+    const raw = [];
+    for (let j = 0; j <= CMP_N; j++) {
+      const S = xMin + ((xMax - xMin) * j) / CMP_N;
+      const v = c.at(S);
+      if (Number.isFinite(v)) raw.push({ S, v });
+    }
+    if (raw.length < 2) return null;
+    const d = raw.map((p, j) => `${j ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(Math.min(Math.max(p.v, yMin), yMax)).toFixed(1)}`).join(' ');
+    return { d, cls: EXTRA_STYLE[i], label: c.label };
+  }).filter(Boolean);
+
   // ——— محور عمودی: گام گرد، برچسب سمت چپ، صفر جدا کشیده می‌شود ———
   const yTicks = ticksFor(yMin, yMax, 4).filter((v) => Math.abs(Y(v) - y0) > 9 || v === 0);
   const grid = yTicks.map((v) => `
@@ -160,13 +189,22 @@ function frame(points, analysis, opt, xMin, xMax, todayPoints) {
     ? `<line class="spot" x1="${X(spot)}" y1="${pad.t}" x2="${X(spot)}" y2="${H - pad.b}"/>
        <text class="lbl" x="${X(spot)}" y="${pad.t - 6}" text-anchor="middle" style="fill:var(--warn)">پایه ${money(spot)}</text>` : '';
 
-  const legend2 = todayLine ? `
+  // legend فقط وقتی بیش از یک منحنی روی نمودار هست معنا دارد — «امروز» و/یا
+  // هر موقعیت مقایسه‌ای انتخاب‌شده. برچسب‌ها می‌توانند طولانی باشند (نام
+  // موقعیت مقایسه‌ای)، پس عرض جعبه از حالت ثابت دوخطی به فهرست باز شد.
+  const legendItems = [
+    ...(todayLine ? [{ cls: 'curve-today', label: 'امروز' }] : []),
+    ...((todayLine || cmpLines.length) ? [{ cls: 'curve', label: 'سررسید' }] : []),
+    ...cmpLines.map((c) => ({ cls: `curve-${c.cls}`, label: c.label })),
+  ];
+  const legend2 = legendItems.length ? `
     <g class="curve2-legend">
-      <line x1="${W - pad.r - 78}" y1="${pad.t + 5}" x2="${W - pad.r - 58}" y2="${pad.t + 5}" class="curve-today"/>
-      <text x="${W - pad.r - 82}" y="${pad.t + 8}" text-anchor="end" class="lbl">امروز</text>
-      <line x1="${W - pad.r - 78}" y1="${pad.t + 18}" x2="${W - pad.r - 58}" y2="${pad.t + 18}" class="curve"/>
-      <text x="${W - pad.r - 82}" y="${pad.t + 21}" text-anchor="end" class="lbl">سررسید</text>
+      ${legendItems.map((it, i) => `
+      <line x1="${W - pad.r - 92}" y1="${pad.t + 5 + i * 13}" x2="${W - pad.r - 72}" y2="${pad.t + 5 + i * 13}" class="${it.cls}"/>
+      <text x="${W - pad.r - 96}" y="${pad.t + 8 + i * 13}" text-anchor="end" class="lbl">${it.label}</text>`).join('')}
     </g>` : '';
+
+  const cmpPaths = cmpLines.map((c) => `<path class="curve-${c.cls}" d="${c.d}"/>`).join('');
 
   const svg = `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار بازده در سررسید">
       ${grid}${areas.join('')}${strikes}${spotLine}
@@ -174,6 +212,7 @@ function frame(points, analysis, opt, xMin, xMax, todayPoints) {
       ${xTicks}
       <line class="zero" x1="${pad.l}" y1="${y0}" x2="${W - pad.r}" y2="${y0}"/>
       ${todayLine ? `<path class="curve-today" d="${todayLine}"/>` : ''}
+      ${cmpPaths}
       <path class="curve" d="${line}"/>${bes}${legend2}
       <g class="cursor" hidden>
         <line class="cur-x" y1="${pad.t}" y2="${H - pad.b}"/>
@@ -362,6 +401,10 @@ const PAYOFF_HINT = 'غلتک برای زوم ، کشیدن برای پیمای�
  * چرا زوم فقط روی محور قیمت پایه است: محور عمودی همیشه از داده همان بازه
  * دوباره حساب می‌شود، پس بزرگ‌نمایی یک ناحیه باریک، خودش قد نمودار را هم
  * پر می‌کند. زوم دوبعدی اینجا فقط نمودار را کج می‌کرد.
+ *
+ * `opt.compare` — تا ۴ موقعیت مقایسه‌ای دیگر، `[{ at, label }]`. هر `at`
+ * ارزیاب سود و زیان سررسید همان موقعیت است (از `payoffAt` بگیر)؛ روی همان
+ * محور و همان مقیاس Y منحنی اصلی رسم می‌شوند.
  */
 export function mountPayoff(host, legs, netCash, opt = {}) {
   const { points, analysis } = seriesFor(legs, netCash, opt);
@@ -412,7 +455,6 @@ function diffFrame(fn, opt, xMin, xMax) {
   // ——— نامزدهای دیگر رول، هم‌زمان روی همان محور — نه یکی‌یکی ———
   // مقیاس Y از نامزد انتخاب‌شده می‌آید، نه دوباره حساب می‌شود؛ چون این‌ها
   // فقط برای مقایسه شکل کلی‌اند، نه خواندن دقیق مقدار.
-  const EXTRA_STYLE = ['extra1', 'extra2'];
   const extraLines = (opt.extra || []).slice(0, EXTRA_STYLE.length).map((ex, i) => {
     const exPts = pts.map((p) => ({ S: p.S, v: ex.fn(p.S) })).filter((p) => Number.isFinite(p.v));
     if (exPts.length < 2) return null;

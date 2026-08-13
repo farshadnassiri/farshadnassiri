@@ -27,6 +27,7 @@ import { watchBackoffSec } from '../server/backoff.mjs';
 import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn } from '../ui/table.mjs';
 import { coverageInfo } from '../ui/fmt.mjs';
+import { sameUnderlyingCandidates, compareLabel, MAX_COMPARE } from '../ui/compare.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -1489,6 +1490,34 @@ group('۳۰. افق ارزش‌گذاری قابل‌بازنویسی');
   check('امروز با سررسید در نقطه اعمال متفاوت است — ارزش زمانی هنوز هست',
     Math.abs(today.at(K) - expiry.at(K)) > size * 1,
     `امروز ${Math.round(today.at(K))} ، سررسید ${Math.round(expiry.at(K))}`);
+}
+
+// ═══ ۳۱. مقایسه با موقعیت‌های دیگر هم‌نماد (قلم الف-۱ بک‌لاگ) ═══
+group('۳۱. مقایسه با موقعیت‌های دیگر هم‌نماد روی نمودار بازده');
+{
+  // ——— انتخاب نامزد: فقط هم‌نماد، به‌جز ردیف خودش، سقف ده‌تا ———
+  const rows31 = [
+    { id: 'a', underlying: 'خودرو', legsText: 'خرید کال ۱۰۰۰', strategy: 'اسپرد' },
+    { id: 'b', underlying: 'خودرو', legsText: 'فروش پوت ۹۰۰', strategy: 'کاورد' },
+    { id: 'c', underlying: 'فولاد', legsText: 'خرید کال ۲۰۰۰', strategy: 'اسپرد' },
+  ];
+  const cands31 = sameUnderlyingCandidates(rows31, rows31[0]);
+  check('فقط هم‌نمادها می‌آیند، به‌جز خود ردیف',
+    cands31.length === 1 && cands31[0].id === 'b', cands31.map((c) => c.id).join(','));
+  check('بدون ردیف انتخاب‌شده، فهرست خالی است', sameUnderlyingCandidates(rows31, null).length === 0);
+
+  const many31 = Array.from({ length: 15 }, (_, i) => ({ id: `x${i}`, underlying: 'خودرو', legsText: `ترکیب ${i}` }));
+  check('فهرست نامزدها سقف ده‌تا دارد', sameUnderlyingCandidates([rows31[0], ...many31], rows31[0]).length === 10);
+
+  // ——— برچسب کوتاه ———
+  check('برچسب کوتاه دست‌نخورده می‌ماند', compareLabel({ legsText: 'کوتاه' }) === 'کوتاه');
+  const longLabel = compareLabel({ strategy: 'استراتژی خیلی طولانی', legsText: 'خرید کال ۱۰۰۰۰ و فروش کال ۲۰۰۰۰ و بازهم بیشتر' });
+  check('برچسب بلند با سه‌نقطه بریده می‌شود', longLabel.length === 22 && longLabel.endsWith('…'), longLabel);
+  check('سقف مقایسه هم‌زمان ۴ است', MAX_COMPARE === 4);
+
+  // منحنی و legend مقایسه‌ای خودشان در chart.mjs رسم می‌شوند (وارد کردن مطلق
+  // `/core/...` دارد، پس در Node قابل import نیست) — رسم واقعی با Playwright
+  // در پنل جزئیات تب استراتژی/برترین موقعیت‌ها تأیید می‌شود، نه اینجا.
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════
