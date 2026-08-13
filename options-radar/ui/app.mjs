@@ -3,14 +3,20 @@
 // قاعده تب تنبل: ماژول هر تب فقط لحظه اولین کلیک وارد می‌شود و اشتراک
 // عکس لحظه‌ای هم فقط برای تب باز برقرار می‌شود. تب بسته، هیچ هزینه‌ای ندارد.
 
+import { fmt, faDigits, faAgo, faClock } from '/ui/fmt.mjs';
 import { defaults } from '/core/settings.mjs';
 import { CATALOG, GROUPS as SGROUPS } from '/strategies/catalog.mjs';
+import { strategyGlyph } from '/ui/glyph.mjs';
 
 export const state = {
   settings: defaults(),
   watch: { at: null, rows: [], byKey: new Map() },
   stream: null,
   subscribers: new Set(),
+  // وضعیت اتصال جریان، برای نوار وضعیت. «آخرین دریافت» ساعت دیواری مرورگر
+  // است نه زمان سرور، چون همان چیزی است که کاربر می‌خواهد بداند: از کی تا
+  // حالا چیزی تازه نیامده.
+  link: { status: 'idle', since: Date.now(), lastData: null, drops: 0 },
 };
 
 // ————————————————————————————————— تنظیمات —————————————————————————————————
@@ -46,11 +52,23 @@ export function subscribeWatch(fn) {
   return () => state.subscribers.delete(fn);
 }
 
+function setLink(status) {
+  if (state.link.status === status) return;
+  if (status === 'down' && state.link.status === 'live') state.link.drops += 1;
+  state.link.status = status;
+  state.link.since = Date.now();
+  paintLink();
+}
+
 function openStream() {
   if (state.stream) return;
   const es = new EventSource('/api/stream');
   state.stream = es;
+  setLink('connecting');
+  es.addEventListener('open', () => setLink('live'));
   es.addEventListener('watch', (e) => {
+    setLink('live');
+    state.link.lastData = Date.now();
     const msg = JSON.parse(e.data);
     if (msg.full) {
       state.watch.byKey = new Map(msg.rows.map((r) => [rowKey(r), r]));
@@ -63,13 +81,53 @@ function openStream() {
     for (const fn of state.subscribers) { try { fn(state.watch); } catch (err) { console.error(err); } }
   });
   es.addEventListener('trouble', (e) => console.warn('دریافت داده:', JSON.parse(e.data).message));
-  es.onerror = () => { /* مرورگر خودش دوباره وصل می‌شود */ };
+  // مرورگر خودش دوباره وصل می‌شود؛ کار ما فقط این است که قطعی را پنهان نکنیم
+  es.onerror = () => setLink(es.readyState === 2 ? 'down' : 'connecting');
 }
 
 // ————————————————————————————————— نوار سلامت —————————————————————————————————
 
 const el = (id) => document.getElementById(id);
 let lastReq = null;
+
+const LINK_TEXT = {
+  idle: ['بی‌اتصال', 'idle'],
+  connecting: ['در حال اتصال', 'wait'],
+  live: ['متصل', 'open'],
+  down: ['قطع', 'down'],
+};
+
+/**
+ * وضعیت اتصال و تازگی داده.
+ *
+ * جدا از tickHealth است چون منبعش فرق می‌کند: این یکی از جریان مرورگر
+ * می‌آید و باید فوری عوض شود، آن یکی هر چند ثانیه از سرور پرسیده می‌شود.
+ * قبلاً هیچ‌کدام از این دو نشان داده نمی‌شد و «سن عکس» تنها سرنخ بود — که
+ * وقتی اتصال می‌افتاد، بی‌حرکت می‌ماند و چیزی لو نمی‌داد.
+ */
+function paintLink() {
+  const pill = el('h-link');
+  if (!pill) return;
+  const [text, cls] = LINK_TEXT[state.link.status] || LINK_TEXT.idle;
+  pill.textContent = text;
+  pill.className = `pill link ${cls}`;
+
+  const fresh = el('h-fresh');
+  if (!fresh) return;
+  const t = state.link.lastData;
+  if (!t) {
+    fresh.textContent = '—';
+    fresh.removeAttribute('data-stale');
+    el('h-fresh-wrap').title = 'هنوز داده‌ای نرسیده';
+    return;
+  }
+  const age = Date.now() - t;
+  fresh.textContent = faClock(new Date(t));
+  // بیش از دو دقیقه سکوت، در ساعت بازار یعنی یک جای کار می‌لنگد
+  fresh.toggleAttribute('data-stale', age > 120000);
+  el('h-fresh-wrap').title = `${faAgo(age)} — ${faClock(new Date(t))}`;
+}
+setInterval(paintLink, 1000);
 
 async function tickHealth() {
   try {
@@ -79,27 +137,31 @@ async function tickHealth() {
     m.textContent = open ? 'بازار باز' : (h.market?.why || 'متوقف');
     m.className = `pill ${open ? 'open' : 'shut'}`;
 
-    el('h-age').textContent = h.watchAgeSec == null ? '—' : `${h.watchAgeSec}s`;
-    el('h-rows').textContent = h.watchRows ? h.watchRows.toLocaleString('en-US') : '—';
+    el('h-rows').textContent = h.watchRows ? fmt.int(h.watchRows) : '—';
 
-    const per = lastReq == null ? h.requests : h.requests - lastReq;
+    // خطا فقط وقتی دیده می‌شود که وجود داشته باشد. صفرِ همیشگی، جای نوار را
+    // می‌گرفت و چشم به آن عادت می‌کرد.
+    const errWrap = el('h-err-wrap');
+    errWrap.toggleAttribute('hidden', !h.errors);
+    el('h-err').textContent = fmt.int(h.errors);
+    errWrap.title = h.lastError || 'خطایی ثبت نشده';
+
+    // ——— شمارنده‌های فنی ———
+    const per = lastReq == null ? 0 : h.requests - lastReq;
     lastReq = h.requests;
-    el('h-req').textContent = `${h.requests.toLocaleString('en-US')}${per ? ` (+${per})` : ''}`;
+    el('d-req').textContent = `${fmt.int(h.requests)}${per ? ` (+${faDigits(per)})` : ''}`;
 
-    const hitRate = h.requests + h.cacheHits > 0
-      ? Math.round((h.cacheHits / (h.requests + h.cacheHits)) * 100) : 0;
-    el('h-cache').textContent = `${hitRate}%`;
-
-    const errEl = el('h-err');
-    errEl.textContent = h.errors.toLocaleString('en-US');
-    errEl.style.color = h.errors ? 'var(--loss)' : '';
-    errEl.title = h.lastError || '';
-
-    el('h-ms').textContent = h.avgUpstreamMs || '—';
+    const total = h.requests + h.cacheHits;
+    el('d-cache').textContent = total > 0 ? `${faDigits(Math.round((h.cacheHits / total) * 100))}٪` : '—';
+    el('d-ms').textContent = h.avgUpstreamMs ? `${faDigits(h.avgUpstreamMs)} ms` : '—';
+    el('d-age').textContent = h.watchAgeSec == null ? '—' : `${faDigits(h.watchAgeSec)} ثانیه`;
+    el('d-drops').textContent = faDigits(state.link.drops);
+    el('d-err').textContent = h.lastError || 'هیچ';
   } catch {
     const m = el('h-market');
     m.textContent = 'سرور در دسترس نیست';
     m.className = 'pill down';
+    setLink('down');
   }
 }
 
@@ -190,7 +252,7 @@ function buildRail() {
     head.setAttribute('aria-expanded', isFolded ? 'false' : 'true');
     head.innerHTML = `<span class="caret" aria-hidden="true"></span>
       <span class="rail-head-name">${sec}</span>
-      <span class="rail-head-n">${tabs.length}</span>`;
+      <span class="rail-head-n">${faDigits(tabs.length)}</span>`;
     head.addEventListener('click', () => {
       if (folded.has(sec)) folded.delete(sec); else folded.add(sec);
       saveFolded();
@@ -210,11 +272,19 @@ function buildRail() {
       const infeasible = t.def && !t.def.feasible;
       b.title = infeasible ? t.def.infeasibleWhy : (t.def?.note || t.def?.dir || t.title);
       const [tone, cls] = dirTone(t.def);
+      // دو سطر: نام بالا، و زیرش نشان شکل بازده کنار برچسب‌های کوتاه.
+      // نشان فقط برای تب استراتژی معنی دارد؛ تب‌های پایه شکل بازده ندارند.
+      const glyph = strategyGlyph(t.def);
       b.innerHTML = `
-        <span class="tab-name">${t.title}</span>
-        ${infeasible ? '<span class="tab-flag" title="اجرا در تابلو ممکن نیست">⃰</span>' : ''}
-        ${tone ? `<span class="tone ${cls}">${tone}</span>` : ''}
-        ${t.def?.legs?.length ? `<span class="phase">${t.def.legs.length} پا</span>` : ''}`;
+        <span class="tab-main">
+          <span class="tab-name">${t.title}</span>
+          ${infeasible ? '<span class="tab-flag" title="اجرا در تابلو ممکن نیست">⃰</span>' : ''}
+        </span>
+        <span class="tab-meta">
+          ${glyph}
+          ${tone ? `<span class="tone ${cls}">${tone}</span>` : ''}
+          ${t.def?.legs?.length ? `<span class="phase">${faDigits(t.def.legs.length)} پا</span>` : ''}
+        </span>`;
       b.addEventListener('click', () => open(t.id));
       items.appendChild(b);
     }
@@ -225,7 +295,9 @@ function buildRail() {
   if (!shown) {
     list.innerHTML = '<p class="rail-none">چیزی پیدا نشد.</p>';
   }
-  el('rail-count').textContent = q ? `${shown} از ${TABS.length}` : `${TABS.length} تب`;
+  el('rail-count').textContent = q
+    ? `${faDigits(shown)} از ${faDigits(TABS.length)}`
+    : `${faDigits(TABS.length)} تب`;
 }
 
 let current = null;
@@ -261,6 +333,13 @@ function applyTheme(name) {
 }
 el('theme-btn').addEventListener('click', () => {
   applyTheme(document.body.dataset.theme === 'ledger' ? 'board' : 'ledger');
+});
+
+el('detail-btn').addEventListener('click', (e) => {
+  const panel = el('health-detail');
+  const open = panel.hasAttribute('hidden');
+  panel.toggleAttribute('hidden', !open);
+  e.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
 });
 
 el('rail-q').addEventListener('input', (e) => {

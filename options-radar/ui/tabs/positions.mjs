@@ -105,7 +105,7 @@ export async function mount(root, { state, api }) {
     F.opt.innerHTML = ex.strikes.map((st) => {
       const q = put ? st.put : st.call;
       return `<option value="${q.ins}" data-strike="${st.strike}" data-size="${st.size}" data-days="${ex.days}" data-bid="${q.bid}" data-ask="${q.ask}" data-close="${q.close}">
-        ${q.name || q.ins} — اعمال ${Math.round(st.strike).toLocaleString('en-US')} — تقاضا ${Math.round(q.bid).toLocaleString('en-US')}</option>`;
+        ${q.name || q.ins} — اعمال ${fmt.money(st.strike)} — تقاضا ${fmt.money(q.bid)}</option>`;
     }).join('');
     const first = F.opt.selectedOptions[0];
     if (first) F.oPrice.value = Math.round(Number(first.dataset.bid) || Number(first.dataset.close) || 0);
@@ -189,7 +189,7 @@ export async function mount(root, { state, api }) {
       <tr data-i="${i}" style="cursor:pointer">
         <td>${p.title || '—'}</td>
         <td>${p.uaName || p.uaIns}</td>
-        <td>${p.legs.map((l) => `${l.side === 'sell' ? '−' : '+'}${l.kind === 'underlying' ? 'سهم' : (l.kind === 'call' ? 'کال' : 'پوت') + ' ' + Math.round(l.strike).toLocaleString('en-US')}`).join(' ')}</td>
+        <td>${p.legs.map((l) => `${l.side === 'sell' ? '−' : '+'}${l.kind === 'underlying' ? 'سهم' : (l.kind === 'call' ? 'کال' : 'پوت') + ' ' + fmt.money(l.strike)}`).join(' ')}</td>
         <td class="n">${p.qty}</td>
         <td class="n">${p.entryDate || '—'}</td>
         <td class="n">${m.daysHeld ?? '—'}</td>
@@ -281,7 +281,7 @@ export async function mount(root, { state, api }) {
           <dt>در قیمت فعلی پایه</dt><dd>${fmt.money(m.ifHeld.atSpot)}</dd>
           <dt>بیشترین سود</dt><dd>${fmt.money(m.ifHeld.maxProfit)}</dd>
           <dt>بیشترین زیان</dt><dd>${fmt.money(m.ifHeld.maxLoss)}</dd>
-          <dt>سربه‌سری</dt><dd>${m.ifHeld.breakevens.map((b) => Math.round(b).toLocaleString('en-US')).join(' , ') || '—'}</dd>
+          <dt>سربه‌سری</dt><dd>${m.ifHeld.breakevens.map((b) => fmt.money(b)).join(' , ') || '—'}</dd>
         </dl>
         <p class="note" style="margin-top:10px">برای تصمیم رول همین موقعیت، به تب تحلیل رول برو.</p>
       </div>`;

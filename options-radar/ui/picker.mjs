@@ -3,6 +3,8 @@
 // انتخاب کاملاً انتخابی است. جعبه جست‌وجو فقط فهرست را کوتاه می‌کند و
 // ورودی محاسبه نیست — چیزی که تایپ می‌کنی هیچ‌وقت مستقیم به موتور نمی‌رود.
 
+import { fmt } from '/ui/fmt.mjs';
+
 const KEY = 'picker.selected';
 
 export function makePicker(host, opts = {}) {
@@ -45,7 +47,7 @@ export function makePicker(host, opts = {}) {
         <span>${u.name || u.ins}</span>
         <span class="m">${u.contracts} قرارداد</span>
         <span class="m">${u.quoted} مظنه</span>
-        <span class="m">${u.last ? Math.round(u.last).toLocaleString('en-US') : '—'}</span>`;
+        <span class="m">${u.last ? fmt.money(u.last) : '—'}</span>`;
       row.querySelector('input').addEventListener('change', (e) => {
         if (e.target.checked) selected.add(u.ins); else selected.delete(u.ins);
         row.setAttribute('aria-selected', e.target.checked ? 'true' : 'false');
@@ -62,7 +64,7 @@ export function makePicker(host, opts = {}) {
     const picked = list.filter((u) => selected.has(u.ins));
     const contracts = picked.reduce((a, u) => a + u.contracts, 0);
     sum.textContent = selected.size
-      ? `${picked.length} نماد انتخاب شده — ${contracts.toLocaleString('en-US')} قرارداد در دامنه اسکن`
+      ? `${picked.length} نماد انتخاب شده — ${fmt.int(contracts)} قرارداد در دامنه اسکن`
       : 'هیچ نمادی انتخاب نشده. تا انتخاب نکنی، اسکنی انجام نمی‌شود.';
   }
 

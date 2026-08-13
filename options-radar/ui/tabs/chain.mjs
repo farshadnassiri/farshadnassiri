@@ -4,6 +4,7 @@
 // است، کدام نماد و کدام سررسید واقعاً مظنه دارد، و کجای بازار قابل کار است.
 // بدون این تب، خالی بودن تب‌های چندپا گیج‌کننده می‌شود.
 
+import { faNum } from '/ui/fmt.mjs';
 import { makeTable, fmt } from '/ui/table.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
@@ -66,7 +67,7 @@ export async function mount(root, { state, api }) {
     const items = [
       ['نماد پایه', fmt.int(stats.underlyings), ''],
       ['قرارداد', fmt.int(stats.contracts), `${stats.expiries} سررسید`],
-      ['دارای مظنه', fmt.int(stats.quoted), `${((stats.quoted / (stats.contracts || 1)) * 100).toFixed(0)}٪ از تابلو`],
+      ['دارای مظنه', fmt.int(stats.quoted), `${faNum(((stats.quoted / (stats.contracts || 1)) * 100).toFixed(0))}٪ از تابلو`],
       ['حجم امروز', fmt.int(stats.vol), 'قرارداد'],
       ['موقعیت باز', fmt.int(stats.oi), 'قرارداد'],
       ['ارزش معاملات', fmt.int(stats.value), 'ریال'],
@@ -81,13 +82,13 @@ export async function mount(root, { state, api }) {
       const h = await (await fetch('/api/health')).json();
       root.querySelector('#flow').innerHTML = `
         <dt>دور دیده‌بان</dt><dd>${fmt.int(h.watchTicks)}</dd>
-        <dt>زمان آخرین دور</dt><dd>${h.lastWatchMs} ms</dd>
+        <dt>زمان آخرین دور</dt><dd>${faDigits(h.lastWatchMs)} ms</dd>
         <dt>درخواست کل</dt><dd>${fmt.int(h.requests)}</dd>
         <dt>اصابت کش</dt><dd>${fmt.int(h.cacheHits)}</dd>
         <dt>خطا</dt><dd>${fmt.int(h.errors)}</dd>
         <dt>انتظار سهمیه</dt><dd>${fmt.int(h.rateWaits)}</dd>
         <dt>در صف</dt><dd>${fmt.int(h.queueDepth)}</dd>
-        <dt>میانگین پاسخ</dt><dd>${h.avgUpstreamMs} ms</dd>
+        <dt>میانگین پاسخ</dt><dd>${faDigits(h.avgUpstreamMs)} ms</dd>
         <dt>مشترک زنده</dt><dd>${fmt.int(h.clients)}</dd>`;
       root.querySelector('#gate').textContent = h.market?.open
         ? 'بازار باز است و حلقه دریافت می‌چرخد.'

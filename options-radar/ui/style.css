@@ -82,6 +82,11 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
 .metric { display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
 .metric b { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; }
 .metric i { font-style: normal; font-size: 10px; color: var(--muted); }
+/* داده کهنه باید به چشم بیاید، وگرنه ساعتِ ثابت شبیه ساعتِ درست است */
+.metric b[data-stale] { color: var(--warn); }
+.metric b[data-stale]::after { content: " ▲"; font-size: 9px; }
+.warn-metric b { color: var(--loss); }
+
 .pill {
   padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
   background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-2);
@@ -90,10 +95,37 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
 .pill.shut { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
 .pill.down { background: var(--loss-soft); border-color: var(--loss); color: var(--loss); }
 
+/* حباب اتصال: نقطه‌ای که در حالت زنده نبض می‌زند. حرکت، تنها چیزی است که
+   «الان دارد کار می‌کند» را بدون خواندن متن می‌رساند. */
+.pill.link { display: inline-flex; align-items: center; gap: 6px; }
+.pill.link::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor; flex: none;
+}
+.pill.link.open::before { animation: pulse 1.8s ease-in-out infinite; }
+.pill.link.wait { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.pill.link.wait::before { animation: pulse .7s ease-in-out infinite; }
+.pill.link.idle { color: var(--muted); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .pill.link::before { animation: none !important; } }
+
+/* شمارنده‌های فنی — حذف نشده‌اند، فقط پیش‌فرض بسته‌اند */
+.health-detail {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px 18px; padding: 12px 22px;
+  background: var(--panel-2); border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.health-detail > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.health-detail .wide { grid-column: 1 / -1; }
+.health-detail b { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.health-detail i { font-style: normal; font-size: 10.5px; color: var(--muted); }
+
 /* ——— قالب ———
    فهرست سمت راست است: در راست‌به‌چپ، ستون اول شبکه همان سمت راست است و
    چشم از همان‌جا شروع می‌کند. مرز جداکننده هم روی لبه رو به متن می‌نشیند. */
-.shell { display: grid; grid-template-columns: 264px 1fr; gap: 0; min-height: calc(100vh - 46px); }
+.shell { display: grid; grid-template-columns: 300px 1fr; gap: 0; min-height: calc(100vh - 46px); }
 .rail {
   border-inline-end: 1px solid var(--line);
   background: var(--panel); padding: 0 0 40px;
@@ -111,11 +143,11 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
   flex: 1; min-width: 0;
   background: var(--panel-2); color: var(--ink);
   border: 1px solid var(--line); border-radius: 999px;
-  padding: 6px 12px; font: inherit; font-size: 12.5px;
+  padding: 7px 13px; font: inherit; font-size: 13.5px;
 }
 .rail-search input:focus { border-color: var(--accent); outline: none; }
 .rail-search input::-webkit-search-cancel-button { cursor: pointer; }
-.rail-count { font-size: 10.5px; color: var(--muted); font-family: var(--mono); white-space: nowrap; }
+.rail-count { font-size: 11px; color: var(--muted); font-family: var(--mono); white-space: nowrap; }
 
 .rail-list { padding: 8px 8px 0; }
 .rail-none { padding: 18px 10px; color: var(--muted); font-size: 12.5px; text-align: center; }
@@ -125,8 +157,8 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
   display: flex; align-items: center; gap: 7px; width: 100%;
   padding: 6px 8px; margin: 6px 0 2px;
   background: none; border: 0; border-radius: var(--radius);
-  color: var(--muted); font: inherit; font-size: 10.5px; font-weight: 700;
-  letter-spacing: .1em; text-transform: uppercase; text-align: start; cursor: pointer;
+  color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; text-align: start; cursor: pointer;
 }
 .rail-head:hover { color: var(--ink-2); background: var(--panel-2); }
 .rail-head .caret {
@@ -137,21 +169,33 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
 }
 .rail-head-name { flex: 1; min-width: 0; }
 .rail-head-n {
-  font-family: var(--mono); font-size: 10px; letter-spacing: 0;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0;
   background: var(--panel-2); border: 1px solid var(--line-soft);
   border-radius: 999px; padding: 0 6px;
 }
 .rail-group[data-folded="0"] .caret { transform: rotate(-90deg); }
 .rail-group[data-folded="1"] .rail-items { display: none; }
 
+/* دو سطری: نام در سطر اول با قلم درشت‌تر، و سطر دوم برای نشان شکل بازده و
+   برچسب‌های کوتاه. سطر دوم کم‌رنگ است تا نام همچنان اول خوانده شود. */
 .tab-btn {
-  display: flex; align-items: center; gap: 6px; width: 100%;
-  padding: 6px 10px; margin-bottom: 1px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 3px; width: 100%;
+  padding: 8px 11px; margin-bottom: 2px;
   background: none; border: 0; border-radius: var(--radius);
-  color: var(--ink-2); font: inherit; font-size: 13px; text-align: start; cursor: pointer;
-  position: relative;
+  color: var(--ink-2); font: inherit; font-size: 14.5px; text-align: start; cursor: pointer;
+  position: relative; transition: background .12s ease, color .12s ease;
 }
 .tab-btn:hover { background: var(--panel-2); color: var(--ink); }
+.tab-btn:hover .glyph { opacity: 1; }
+.tab-main { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tab-meta { display: flex; align-items: center; gap: 6px; min-width: 0; }
+
+/* نشان شکل بازده */
+.glyph { flex: none; opacity: .75; transition: opacity .12s ease; overflow: visible; }
+.g-line { fill: none; stroke: var(--accent); stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
+.g-zero { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 2; }
+.tab-btn[aria-current="true"] .glyph { opacity: 1; }
+.tab-btn[aria-current="true"] .g-line { stroke: var(--accent); stroke-width: 1.7; }
 .tab-btn[aria-current="true"] {
   background: var(--accent-soft); color: var(--accent); font-weight: 700;
 }
@@ -162,13 +206,13 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
 }
 .tab-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tab-btn .phase {
-  flex: none; font-family: var(--mono); font-size: 10px;
+  flex: none; font-family: var(--mono); font-size: 10.5px;
   color: var(--muted); background: var(--panel-2);
   border: 1px solid var(--line-soft); border-radius: 3px; padding: 0 4px;
 }
 .tab-btn .tab-flag { flex: none; color: var(--warn); font-weight: 700; }
 .tab-btn .tone {
-  flex: none; font-size: 9.5px; font-weight: 700; padding: 0 5px;
+  flex: none; font-size: 10.5px; font-weight: 700; padding: 0 6px;
   border-radius: 999px; border: 1px solid transparent; line-height: 1.6;
 }
 .tone.up { background: var(--gain-soft); color: var(--gain); border-color: var(--gain); }
@@ -292,8 +336,11 @@ table.data td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; 
 .payoff .spot { stroke: var(--warn); stroke-width: 1.5; }
 /* عدد محور باید چپ‌به‌راست خوانده شود، وگرنه در صفحه راست‌به‌چپ علامت منفی
    به انتهای عدد می‌پرد و «−۴۰M» به شکل «۴۰M−» دیده می‌شود. */
-.payoff text { font-family: var(--mono); font-size: 10px; fill: var(--muted); direction: ltr; unicode-bidi: bidi-override; }
-/* برچسب «پایه ۱۰۰٬۰۰۰» متن فارسی دارد، پس جهت طبیعی خودش را می‌خواهد */
+/* برچسب محور «−۴۱ م» هم رقم دارد هم واژه فارسی. جهت پاراگراف چپ‌به‌راست
+   لازم است تا نشانه منفی جلوی عدد بماند، ولی «bidi-override» واژه فارسی را
+   حرف‌به‌حرف وارونه می‌کرد. «isolate» جهت را می‌بندد بی‌آنکه دستور دوسویه
+   داخل رشته را زیر پا بگذارد. */
+.payoff text { font-family: var(--mono); font-size: 10px; fill: var(--muted); direction: ltr; unicode-bidi: isolate; }
 .payoff text.lbl { font-family: var(--sans); font-size: 10.5px; unicode-bidi: plaintext; }
 .payoff text.strike-lbl { font-family: var(--mono); font-size: 9.5px; fill: var(--accent-2); }
 

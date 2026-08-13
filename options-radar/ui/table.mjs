@@ -15,16 +15,10 @@
 const ROW_H = 27;
 const OVER = 12;
 
-export const fmt = {
-  money: (v) => (Number.isFinite(v) ? Math.round(v).toLocaleString('en-US') : v === Infinity ? '∞' : v === -Infinity ? '−∞' : '—'),
-  pct: (v) => (Number.isFinite(v) ? v.toFixed(2) : '—'),
-  num: (v) => (Number.isFinite(v) ? (Math.abs(v) >= 1000 ? Math.round(v).toLocaleString('en-US') : Math.abs(v) < 1 ? v.toFixed(4) : v.toFixed(2)) : '—'),
-  int: (v) => (Number.isFinite(v) ? Math.round(v).toLocaleString('en-US') : '—'),
-  text: (v) => (v == null ? '—' : String(v)),
-  list: (v) => (Array.isArray(v)
-    ? (v.length ? v.map((x) => (typeof x === 'number' ? Math.round(x).toLocaleString('en-US') : x)).join(' , ') : '—')
-    : String(v ?? '—')),
-};
+// قالب‌بندی یک‌جا در ui/fmt.mjs است تا عدد فارسی همه‌جا یک‌شکل باشد. اینجا
+// دوباره صادر می‌شود چون تب‌ها از قدیم آن را از همین‌جا می‌گیرند.
+export { fmt } from './fmt.mjs';
+import { fmt, faDigits } from './fmt.mjs';
 
 const HEAT = {
   gain: ['--gain-soft', '--gain'],
@@ -119,7 +113,7 @@ export function makeTable(host, cols, opts = {}) {
       });
       headRow.appendChild(th);
     }
-    colsN.textContent = `${keys.length}/${all.length}`;
+    colsN.textContent = `${faDigits(keys.length)}/${faDigits(all.length)}`;
   }
 
   // ——— انتخابگر ستون ———
@@ -240,7 +234,7 @@ export function makeTable(host, cols, opts = {}) {
     }
     const col = byKey.get(k);
     sortLbl.textContent = `مرتب بر ${col?.label ?? k} ${dir < 0 ? '↓' : '↑'}`;
-    countLbl.textContent = `${view.length.toLocaleString('en-US')} ردیف`;
+    countLbl.textContent = `${fmt.int(view.length)} ردیف`;
     draw();
   }
 
@@ -342,8 +336,8 @@ export function funnelBar(host, f) {
       ${parts.map(([, v, c]) => `<span style="width:${(v / total) * 100}%;background:var(${c})"></span>`).join('')}
     </div>
     <div class="funnel-key">
-      <span><b>${f.built.toLocaleString('en-US')}</b> ترکیب ساخته شد</span>
-      ${parts.map(([k, v, c]) => `<span><i style="background:var(${c})"></i>${k}: <b>${v.toLocaleString('en-US')}</b></span>`).join('')}
+      <span><b>${fmt.int(f.built)}</b> ترکیب ساخته شد</span>
+      ${parts.map(([k, v, c]) => `<span><i style="background:var(${c})"></i>${k}: <b>${fmt.int(v)}</b></span>`).join('')}
     </div>
     ${hints.map((h) => `<p class="funnel-hint">${h}</p>`).join('')}`;
 }

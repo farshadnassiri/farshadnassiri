@@ -21,6 +21,7 @@ import { scan as scanFn, generateCombos, unexecutableReason } from '../core/scan
 import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
+import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock } from '../ui/fmt.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -1001,6 +1002,42 @@ group('۲۰. بازه سود، بیرون پنجره رسم');
   ], -200000, { spot: 1000, sigma: 0.6 });
   check('تقویمی خرید هنوز زیان کراندار دارد', cal.unlimitedLoss === false && Number.isFinite(cal.maxLoss),
         `${Math.round(cal.maxLoss)}`);
+}
+
+// ═══════════════════ ۲۱. عدد فارسی، یک‌جا و برگشت‌پذیر ═══════════════════
+group('۲۱. قالب‌بندی عدد فارسی');
+{
+  check('رقم فارسی با جداکننده هزارگان', uiFmt.money(1234567) === '۱٬۲۳۴٬۵۶۷', uiFmt.money(1234567));
+  check('منفی با نشانه ریاضی، نه خط تیره', uiFmt.money(-40500000) === '−۴۰٬۵۰۰٬۰۰۰', uiFmt.money(-40500000));
+  check('بی‌نهایت نماد خودش را دارد', uiFmt.money(Infinity) === '∞' && uiFmt.money(-Infinity) === '−∞');
+  check('ناعدد، خط تیره می‌شود', uiFmt.money(NaN) === '—' && uiFmt.int(undefined) === '—');
+  check('اعشار با ممیز فارسی', uiFmt.pct(12.3456) === '۱۲٫۳۵', uiFmt.pct(12.3456));
+  check('عدد کوچک، چهار رقم اعشار', uiFmt.num(0.0421) === '۰٫۰۴۲۱', uiFmt.num(0.0421));
+  check('عدد بزرگ در num هم گروه‌بندی می‌شود', uiFmt.num(12345) === '۱۲٬۳۴۵', uiFmt.num(12345));
+  check('فهرست عددی فارسی می‌شود', uiFmt.list([1000, 2500]) === '۱٬۰۰۰ , ۲٬۵۰۰', uiFmt.list([1000, 2500]));
+  check('فهرست خالی، خط تیره', uiFmt.list([]) === '—');
+
+  // هیچ رقم لاتینی نباید از قالب‌بند بیرون بیاید
+  const latin = /[0-9]/;
+  const samples = [uiFmt.money(-12345.6), uiFmt.pct(-0.5), uiFmt.num(999999), uiFmt.int(7),
+                   axisNum(-40500000), axisNum(2.5e9), axisNum(45000), axisNum(120)];
+  check('هیچ رقم لاتینی باقی نمی‌ماند', samples.every((s) => !latin.test(s)), samples.join(' | '));
+
+  check('محور: میلیون و میلیارد و هزار', axisNum(2.5e9) === '۲٫۵ میلیارد' && axisNum(45000) === '۴۵ هزار',
+        `${axisNum(2.5e9)} و ${axisNum(45000)}`);
+
+  // ورودی کاربر ممکن است فارسی تایپ شود؛ باید بی‌کم‌وکاست برگردد
+  check('تبدیل برگشتی، عدد قابل تجزیه می‌دهد', Number(toEnDigits('۱٬۲۳۴٫۵۶')) === 1234.56, toEnDigits('۱٬۲۳۴٫۵۶'));
+  check('منفی فارسی هم برمی‌گردد', Number(toEnDigits('−۴۲')) === -42, toEnDigits('−۴۲'));
+  check('رقم عربی هم پذیرفته می‌شود', Number(toEnDigits('٤٢')) === 42, toEnDigits('٤٢'));
+  check('رفت و برگشت، عدد را عوض نمی‌کند',
+        Number(toEnDigits(uiFmt.money(-9876543))) === -9876543, uiFmt.money(-9876543));
+
+  check('فاصله زمانی خوانا و فارسی', faAgo(4000) === 'همین الان' && faAgo(125000) === '۲ دقیقه پیش',
+        faAgo(125000));
+  check('فاصله زمانی نامعتبر، خط تیره', faAgo(NaN) === '—' && faAgo(-5) === '—');
+  check('ساعت با رقم فارسی و دو رقمی', faClock(new Date(2026, 7, 13, 9, 5, 3)) === '۰۹:۰۵:۰۳',
+        faClock(new Date(2026, 7, 13, 9, 5, 3)));
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

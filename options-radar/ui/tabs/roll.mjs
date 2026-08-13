@@ -77,7 +77,7 @@ export async function mount(root, { state, api }) {
     const p = positions[i];
     el('#leg').innerHTML = p.legs
       .map((l, j) => `<option value="${j}" ${l.kind !== 'underlying' ? '' : 'disabled'}>
-        ${l.side === 'sell' ? 'فروش' : 'خرید'} ${l.kind === 'underlying' ? 'سهم پایه' : (l.kind === 'call' ? 'کال' : 'پوت') + ' ' + Math.round(l.strike).toLocaleString('en-US')}</option>`)
+        ${l.side === 'sell' ? 'فروش' : 'خرید'} ${l.kind === 'underlying' ? 'سهم پایه' : (l.kind === 'call' ? 'کال' : 'پوت') + ' ' + fmt.money(l.strike)}</option>`)
       .join('');
     const firstOpt = p.legs.findIndex((l) => l.kind !== 'underlying');
     el('#leg').value = String(Math.max(0, firstOpt));
@@ -104,7 +104,7 @@ export async function mount(root, { state, api }) {
     const put = cur.kind === 'put';
     candidates = ex.strikes.map((st) => ({ st, q: put ? st.put : st.call, days: ex.days }));
     el('#new').innerHTML = candidates.map((c, i) => `
-      <option value="${i}">اعمال ${Math.round(c.st.strike).toLocaleString('en-US')} — تقاضا ${Math.round(c.q.bid).toLocaleString('en-US')} — موقعیت باز ${Math.round(c.q.oi).toLocaleString('en-US')}</option>`).join('');
+      <option value="${i}">اعمال ${fmt.money(c.st.strike)} — تقاضا ${fmt.money(c.q.bid)} — موقعیت باز ${fmt.money(c.q.oi)}</option>`).join('');
     const nearHigher = candidates.findIndex((c) => c.st.strike > cur.strike);
     el('#new').value = String(nearHigher >= 0 ? nearHigher : 0);
     draw();
@@ -162,7 +162,7 @@ export async function mount(root, { state, api }) {
       <dt>قیمت پایه</dt><dd>${fmt.money(spot)}</dd>
       <dt>تعداد قرارداد</dt><dd>${p.qty}</dd>
       <dt>سود و زیان جاری</dt><dd>${fmt.money(m.pnlTotal)}</dd>
-      <dt>سربه‌سری فعلی</dt><dd>${r.curBreakevens.map((b) => Math.round(b).toLocaleString('en-US')).join(' , ') || '—'}</dd>`;
+      <dt>سربه‌سری فعلی</dt><dd>${r.curBreakevens.map((b) => fmt.money(b)).join(' , ') || '—'}</dd>`;
 
     el('#newnote').textContent =
       `هزینه بستن پای فعلی از عرضه: ${fmt.money(-r.closeCash)} — بستانکار پای تازه از تقاضا: ${fmt.money(r.newCash)}`;
@@ -175,7 +175,7 @@ export async function mount(root, { state, api }) {
       ['سقف سود پس از رول', fmt.money(r.nextMaxProfit), '', ''],
       ['سربه‌سری فعلی', fmt.money(r.curBreakevens[0]), '', ''],
       ['سربه‌سری پس از رول', fmt.money(r.nextBreakevens[0]), '', ''],
-      ['مرز تصمیم', r.crossings.length ? r.crossings.map((x) => Math.round(x).toLocaleString('en-US')).join(' , ') : 'بی‌مرز', 'قیمت پایه', ''],
+      ['مرز تصمیم', r.crossings.length ? r.crossings.map((x) => fmt.money(x)).join(' , ') : 'بی‌مرز', 'قیمت پایه', ''],
     ].map(([k, v, sub, c]) => `<div class="kpi"><div class="k">${k}</div><div class="v ${c}">${v}</div><div class="s">${sub}</div></div>`).join('');
 
     const ks = [...r.curAnalysis.strikes, ...r.nextAnalysis.strikes, spot];
@@ -186,7 +186,7 @@ export async function mount(root, { state, api }) {
     el('#dtitle').textContent = `تفاضل دو موقعیت — ${r.verdict}`;
     el('#dlegend').innerHTML = `
       <span>${r.note}</span>
-      <span>مرز تصمیم: ${d.crossings.map((x) => Math.round(x).toLocaleString('en-US')).join(' , ') || 'ندارد'}</span>`;
+      <span>مرز تصمیم: ${d.crossings.map((x) => fmt.money(x)).join(' , ') || 'ندارد'}</span>`;
 
     el('#c1').innerHTML = payoffSvg(p.legs, r.curNet, { fees, spot, width: 480, height: 220 }).svg;
     el('#c2').innerHTML = payoffSvg(r.nextLegs, r.nextNet, { fees, spot, width: 480, height: 220 }).svg;

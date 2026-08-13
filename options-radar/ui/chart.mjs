@@ -16,19 +16,10 @@
 
 import { chartPoints, analyzePayoff } from '/core/payoff.mjs';
 import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
+import { fmt, axisNum } from '/ui/fmt.mjs';
 
-const money = (v) => (Number.isFinite(v) ? Math.round(v).toLocaleString('en-US') : '—');
+const money = fmt.money;
 const MIN_SPAN = 1e-6;
-
-/** عدد کوتاه محور: میلیون و هزار خلاصه می‌شوند تا برچسب‌ها روی هم نیفتند. */
-function axisNum(v) {
-  if (!Number.isFinite(v)) return '—';
-  const a = Math.abs(v);
-  if (a >= 1e9) return `${(v / 1e9).toFixed(a >= 1e10 ? 0 : 1)}G`;
-  if (a >= 1e6) return `${(v / 1e6).toFixed(a >= 1e7 ? 0 : 1)}M`;
-  if (a >= 1e4) return `${Math.round(v / 1e3)}k`;
-  return money(v);
-}
 
 /**
  * گام خوانا: ۱ ، ۲ ، ۵ در توان ده.

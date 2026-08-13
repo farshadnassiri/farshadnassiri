@@ -198,6 +198,13 @@ function firstDict(obj) {
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// کلید انگلیسی می‌ماند چون تنظیم «روزهای معاملاتی» با همین نوشته می‌شود؛
+// فقط چیزی که به کاربر نشان داده می‌شود فارسی است.
+const DAY_FA = {
+  Sat: 'شنبه', Sun: 'یک‌شنبه', Mon: 'دوشنبه', Tue: 'سه‌شنبه',
+  Wed: 'چهارشنبه', Thu: 'پنج‌شنبه', Fri: 'جمعه',
+};
+
 function tehranNow() {
   const f = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Asia/Tehran', hour12: false,
@@ -215,7 +222,7 @@ function marketOpen() {
   if (!S.gateMarketHours) return { open: true, why: 'دروازه ساعات بازار خاموش است' };
   const { weekday, minutes } = tehranNow();
   const days = String(S.tradeDays).split(',').map((x) => x.trim());
-  if (!days.includes(weekday)) return { open: false, why: `${weekday} روز معاملاتی نیست` };
+  if (!days.includes(weekday)) return { open: false, why: `${DAY_FA[weekday] || weekday}، روز معاملاتی نیست` };
   if (minutes < hhmm(S.openHHMM)) return { open: false, why: 'بازار باز نشده' };
   if (minutes > hhmm(S.closeHHMM)) return { open: false, why: 'بازار بسته شده' };
   return { open: true, why: '' };

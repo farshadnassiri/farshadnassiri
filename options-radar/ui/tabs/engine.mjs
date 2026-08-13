@@ -8,17 +8,11 @@
 // ضریب خطی هر بازه را نشان می‌دهد؛ همان چیزی که سربه‌سری و بیشترین سود از
 // آن بیرون می‌آید.
 
+import { fmt, faNum, faDigits } from '/ui/fmt.mjs';
 import { CATALOG, byId, buildLegs } from '/strategies/catalog.mjs';
 import { grossCash, entryFees, analyzePayoff, chartPoints } from '/core/payoff.mjs';
 import { mountPayoff } from '/ui/chart.mjs';
 import { evaluate, profitRegions } from '/core/evaluate.mjs';
-
-const fmt = {
-  money: (v) => (Number.isFinite(v) ? Math.round(v).toLocaleString('en-US') : v === Infinity ? '∞' : '—'),
-  pct: (v) => (Number.isFinite(v) ? `${v.toFixed(2)}` : '—'),
-  num: (v) => (Number.isFinite(v) ? (Math.abs(v) < 1 ? v.toFixed(4) : v.toFixed(2)) : '—'),
-  int: (v) => (Number.isFinite(v) ? Math.round(v).toLocaleString('en-US') : '—'),
-};
 
 export async function mount(root, { state }) {
   const S0 = 100000;
@@ -112,7 +106,7 @@ export async function mount(root, { state }) {
     add('قیمت پایه', spot, (v) => { spot = v; strikes = inputsFor(def); }, 'مبنای وجه تضمین و یونانی‌ها');
     add('روز تا سررسید', days, (v) => { days = Math.max(1, v); });
 
-    strikes.forEach((k, i) => add(`قیمت اعمال ${i + 1}`, k, (v) => { strikes[i] = v; strikes.sort((a, b) => a - b); }));
+    strikes.forEach((k, i) => add(`قیمت اعمال ${faDigits(i + 1)}`, k, (v) => { strikes[i] = v; strikes.sort((a, b) => a - b); }));
 
     for (const l of legs) {
       const key = l.key;
@@ -123,7 +117,7 @@ export async function mount(root, { state }) {
               (l.kind === 'call' ? Math.max(0, spot - l.strike) : Math.max(0, l.strike - spot)) + spot * 0.02));
       }
       const name = l.kind === 'underlying' ? 'سهم پایه'
-        : `${l.kind === 'call' ? 'کال' : 'پوت'} ${l.strike.toLocaleString('en-US')}${l.exp ? ' — سررسید دور' : ''}`;
+        : `${l.kind === 'call' ? 'کال' : 'پوت'} ${fmt.int(l.strike)}${l.exp ? ' — سررسید دور' : ''}`;
       add(`قیمت ${name} (${l.side === 'sell' ? 'فروش' : 'خرید'})`, priceState[key], (v) => { priceState[key] = v; });
     }
     return legs;
@@ -145,13 +139,13 @@ export async function mount(root, { state }) {
   function drawSegments(an) {
     const rows = an.segments.map((g, i) => `
       <tr>
-        <td class="n">${i + 1}</td>
-        <td class="n">${Math.round(g.lo).toLocaleString('en-US')}</td>
-        <td class="n">${Number.isFinite(g.hi) ? Math.round(g.hi).toLocaleString('en-US') : '∞'}</td>
-        <td class="n">${g.a.toFixed(2)}</td>
+        <td class="n">${faDigits(i + 1)}</td>
+        <td class="n">${fmt.money(g.lo)}</td>
+        <td class="n">${Number.isFinite(g.hi) ? fmt.money(g.hi) : '∞'}</td>
+        <td class="n">${faNum(g.a.toFixed(2))}</td>
         <td class="n">${fmt.money(g.b)}</td>
         <td class="n">${fmt.money(g.a * g.lo + g.b)}</td>
-        <td class="n">${g.sharesAfter.toFixed(0)}</td>
+        <td class="n">${faNum(g.sharesAfter.toFixed(0))}</td>
         <td>${Math.abs(g.a) < 1e-9 ? '<span class="tag flat">صاف</span>'
           : g.a > 0 ? '<span class="tag gain">صعودی</span>' : '<span class="tag loss">نزولی</span>'}</td>
       </tr>`).join('');
@@ -165,11 +159,11 @@ export async function mount(root, { state }) {
   function drawRow(row) {
     const groupsOrder = ['هویت', 'جریان نقد', 'سود و زیان', 'سرمایه', 'بازده', 'احتمال', 'یونانی', 'اجرا', 'سلامت'];
     const cells = {
-      'هویت': [['استراتژی', row.strategy], ['پاها', row.legsText], ['روز', fmt.int(row.days)],
+      'هویت': [['استراتژی', row.strategy], ['پاها', faDigits(row.legsText)], ['روز', fmt.int(row.days)],
         ['قیمت پایه', fmt.money(row.S)], ['مبنای قیمت', row.priceBasis], ['حالت اجرا', row.execMode]],
       'جریان نقد': [['جهت', row.cashLabel], ['نقد ناخالص', fmt.money(row.grossCash)],
         ['کارمزد ورود', fmt.money(row.entryFee)], ['نقد خالص', fmt.money(row.netCash)]],
-      'سود و زیان': [['سربه‌سری', row.breakevens.map((b) => Math.round(b).toLocaleString('en-US')).join('  ,  ') || '—'],
+      'سود و زیان': [['سربه‌سری', row.breakevens.map((b) => fmt.money(b)).join('  ,  ') || '—'],
         ['بیشترین سود', fmt.money(row.maxProfit)], ['بیشترین زیان', fmt.money(row.maxLoss)],
         ['سود اگر پایه ثابت بماند', fmt.money(row.staticPnl)]],
       'سرمایه': [['سرمایه درگیر', fmt.money(row.capital)], ['مبنای سرمایه', row.capitalLabel],
@@ -206,9 +200,9 @@ export async function mount(root, { state }) {
       ['بیشترین سود', fmt.money(row.maxProfit), row.unlimitedProfit ? 'نامحدود' : 'محدود', 'gain'],
       ['بیشترین زیان', fmt.money(row.maxLoss), row.unlimitedLoss ? 'نامحدود' : 'محدود', 'loss'],
       ['سرمایه درگیر', fmt.money(row.capital), row.capitalLabel, ''],
-      ['بازده دوره', `${fmt.pct(row.retMaxPct)}٪`, `${row.days} روز`, row.retMaxPct > 0 ? 'gain' : 'loss'],
+      ['بازده دوره', `${fmt.pct(row.retMaxPct)}٪`, `${faDigits(row.days)} روز`, row.retMaxPct > 0 ? 'gain' : 'loss'],
       ['احتمال سود', `${fmt.pct(row.popPct)}٪`, 'لگاریتم-نرمال، بدون دامنه', ''],
-      ['هزینه اجرا', fmt.money(row.execCost), `${row.legCount} پا`, 'loss'],
+      ['هزینه اجرا', fmt.money(row.execCost), `${faDigits(row.legCount)} پا`, 'loss'],
       ['وجه تضمین', fmt.money(row.margin), row.isCredit ? 'بستانکار' : 'بدهکار — صفر', ''],
     ];
     root.querySelector('#kpis').innerHTML = items.map(([k, v, s, c]) => `
@@ -249,7 +243,7 @@ export async function mount(root, { state }) {
       : `اجرا در تابلو ممکن نیست: ${def.infeasibleWhy}`;
     const reg = profitRegions(analysis);
     root.querySelector('#chart-title').textContent =
-      `بازده در سررسید — ${reg.length} بازه سود، ${analysis.breakevens.length} نقطه سربه‌سری`;
+      `بازده در سررسید — ${faDigits(reg.length)} بازه سود، ${faDigits(analysis.breakevens.length)} نقطه سربه‌سری`;
 
     drawKpis(row, analysis);
     drawChart(legs, net, fees, spot);

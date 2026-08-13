@@ -12,7 +12,8 @@ import { byId } from '/strategies/catalog.mjs';
 import { COLUMNS } from '/core/evaluate.mjs';
 import { analyzePayoff, scenarioGrid } from '/core/payoff.mjs';
 import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
-import { makeTable, funnelBar, fmt } from '/ui/table.mjs';
+import { makeTable, funnelBar } from '/ui/table.mjs';
+import { fmt, faNum } from '/ui/fmt.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { mountPayoff } from '/ui/chart.mjs';
 import { runScan, onChain, pushRows, chainState } from '/ui/scanner.mjs';
@@ -215,8 +216,8 @@ export async function mount(root, { tab, state, api }) {
         <td class="n">${l.strike ? fmt.money(l.strike) : '—'}</td>
         <td class="n">${fmt.money(l.price)}</td>
         <td class="n">${fmt.money(l.mid)}</td>
-        <td class="n">${Number.isFinite(l.spreadPct) ? l.spreadPct.toFixed(1) : '—'}</td>
-        <td class="n">${Number.isFinite(l.slipPct) ? l.slipPct.toFixed(2) : '—'}</td>
+        <td class="n">${Number.isFinite(l.spreadPct) ? faNum(l.spreadPct.toFixed(1)) : '—'}</td>
+        <td class="n">${Number.isFinite(l.slipPct) ? faNum(l.slipPct.toFixed(2)) : '—'}</td>
         <td class="n">${fmt.int(l.filled)}</td>
         <td class="n">${fmt.int(l.short)}</td>
         <td>${l.source || '—'}</td>
@@ -231,7 +232,7 @@ export async function mount(root, { tab, state, api }) {
       <td>${l.what === r.binding ? '<span class="tag warn">مقیدکننده</span>' : ''}</td></tr>`).join('');
 
     const scenRows = grid.map((g) => `
-      <tr><td class="n">${g.pct.toFixed(0)}٪</td><td class="n">${fmt.money(g.S)}</td>
+      <tr><td class="n">${faNum(g.pct.toFixed(0))}٪</td><td class="n">${fmt.money(g.S)}</td>
       <td class="n" style="color:${g.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(g.pnl)}</td></tr>`).join('');
 
     root.querySelector('#detail').innerHTML = `
@@ -239,7 +240,7 @@ export async function mount(root, { tab, state, api }) {
         <div id="chart"></div>
         <div class="legend">
           ${an.approx ? `<span style="color:var(--warn)">${an.note}</span>` : ''}
-          <span>سربه‌سری: ${an.breakevens.map((b) => Math.round(b).toLocaleString('en-US')).join(' , ') || '—'}</span>
+          <span>سربه‌سری: ${an.breakevens.map((b) => fmt.money(b)).join(' , ') || '—'}</span>
           <span>بیشترین سود: ${fmt.money(an.maxProfit)}</span>
           <span>بیشترین زیان: ${fmt.money(an.maxLoss)}</span>
         </div>
