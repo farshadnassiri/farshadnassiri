@@ -397,15 +397,30 @@ function diffFrame(fn, xMin, xMax, opt = {}) {
   }
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');
 
-  // نقاط تغییر علامت: مرز تصمیم
+  // نقاط تغییر علامت: مرز تصمیم. نامساوی محض یک لبه دارد: اگر یک نمونه
+  // دقیقاً صفر بیفتد، نه «کوچک‌تر» نه «بزرگ‌تر» است و گذر از قلم می‌افتد.
+  // نمونه‌های تخت روی صفر نادیده گرفته می‌شوند و گذر بین آخرین نمونه
+  // غیرصفر قبل و اولین نمونه غیرصفر بعد درون‌یابی می‌شود — وگرنه یک بازه
+  // تخت روی صفر (فرضی، نه واقعی با داده بازار) هر نمونه‌اش را جدا مرز
+  // حساب می‌کرد.
+  const sign = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
   const cross = [];
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1], b = pts[i];
-    if ((a.v < 0 && b.v > 0) || (a.v > 0 && b.v < 0)) {
-      const t = -a.v / (b.v - a.v);
-      const S = a.S + t * (b.S - a.S);
-      cross.push(S);
+  let prevNZ = null;
+  for (const p of pts) {
+    const s = sign(p.v);
+    if (s === 0) continue;
+    if (prevNZ && sign(prevNZ.v) !== s) {
+      const t = -prevNZ.v / (p.v - prevNZ.v);
+      cross.push(prevNZ.S + t * (p.S - prevNZ.S));
     }
+    prevNZ = p;
+  }
+  // خود لبه‌های بازه هم اگر دقیقاً صفرند مرزند، حتی اگر نمونه غیرصفر
+  // مخالفی داخل بازه نمونه‌برداری نبود که حلقه بالا با آن مقایسه کند
+  if (pts.length) {
+    if (sign(pts[0].v) === 0) cross.push(pts[0].S);
+    const last = pts[pts.length - 1];
+    if (pts.length > 1 && sign(last.v) === 0) cross.push(last.S);
   }
   const dots = cross.map((S) => `<circle class="be" cx="${X(S)}" cy="${y0}" r="4"/>
     <text class="lbl" x="${X(S)}" y="${y0 - 8}" text-anchor="middle">${money(S)}</text>`).join('');
