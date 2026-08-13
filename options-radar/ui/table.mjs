@@ -145,10 +145,14 @@ export function makeTable(host, cols, opts = {}) {
   // ——— سرستون: چسبان بالای قاب، مرتب‌شونده، و جابه‌جاشونده با کشیدن ———
   //
   // یک سرستون دو کار دارد و باید از هم تفکیک شوند: کلیک یعنی مرتب‌سازی،
-  // کشیدن یعنی جابه‌جایی. مرورگر بعد از رها کردن، گاهی کلیک هم می‌فرستد؛
-  // پرچم dragging جلوی مرتب‌سازی ناخواسته را می‌گیرد.
+  // کشیدن یعنی جابه‌جایی. مرورگر بعد از رها کردن ممکن است کلیک هم بفرستد،
+  // که مرتب‌سازی ناخواسته می‌شود.
+  //
+  // پرچم فقط تا پایان همین نوبت حلقه رویداد زنده می‌ماند و بعد خودش پاک
+  // می‌شود. نسخه اول پرچم را تا مصرف شدن نگه می‌داشت و نتیجه‌اش این بود که
+  // اولین کلیک واقعی بعد از هر کشیدن — روی هر ستونی — بلعیده می‌شد.
   let dragKey = null;
-  let dragged = false;
+  let justDropped = false;
 
   function buildHead() {
     headRow.innerHTML = '';
@@ -161,7 +165,7 @@ export function makeTable(host, cols, opts = {}) {
       if (NUM_FMT.has(c.fmt)) th.classList.add('n');
 
       th.addEventListener('click', () => {
-        if (dragged) { dragged = false; return; }
+        if (justDropped) return;
         if (sortKey === c.key) sortDir = -sortDir;
         else { sortKey = c.key; sortDir = -1; }
         apply();
@@ -169,7 +173,6 @@ export function makeTable(host, cols, opts = {}) {
 
       th.addEventListener('dragstart', (e) => {
         dragKey = c.key;
-        dragged = false;
         th.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         // بعضی مرورگرها بدون داده، کشیدن را شروع نمی‌کنند
@@ -194,7 +197,8 @@ export function makeTable(host, cols, opts = {}) {
         e.preventDefault();
         th.classList.remove('drop-into');
         if (dragKey == null || dragKey === c.key) return;
-        dragged = true;
+        justDropped = true;
+        setTimeout(() => { justDropped = false; }, 0);
         keys = moveColumn(keys, dragKey, c.key);
         savePick(opts.storeKey, keys);
         buildHead();
