@@ -418,6 +418,34 @@ group('۹. ارزیاب ردیف، سرتاسری');
   });
   check('مبنای بیشترین قیمت روز، هشدار ناهم‌زمانی می‌دهد', row3.warn.includes('قیمت ناهم‌زمان'));
   check('مبنای مرجع، اجراناپذیر علامت می‌خورد', !row3.executable || row3.quality !== 'exact');
+
+  // «اگر همین حالا بگیرم و ببندم چه می‌شود؟» و «اگر با آخرین/پایانی تسویه
+  // کنم؟» (خواسته الف-۱، سؤال‌های ۴ و ۵) — بدون کارمزد، عدد دقیق قابل
+  // پیش‌بینی است: فروش تهاجمی روی bid پر می‌شود، بستن فوری روی ask.
+  const s0 = { ...s, feeOption: 0, feeBuyStock: 0, feeSellStock: 0, feeExercise: 0 };
+  const sp = byId('naked-put');
+  const legsSp = buildLegs(sp, { strikes: [95000], size, days: [30] });
+  const qSp = [mkQuote(8000, 8400, { last: 8300, close: 8100 })];
+  const rowSp = evaluate({
+    legs: legsSp, quotes: qSp,
+    ctx: { S: 100000, Sclose: 100000, days: 30, size, qty: 1, settings: s0, def: sp, underlying: 'نمونه', sigmaHist: 0.6 },
+  });
+  check('بستن فوری بدون کارمزد، دقیقاً هزینه اسپرد (bid منهای ask)',
+    near(rowSp.instantClosePnl, (8000 - 8400) * size, 1e-6), rowSp.instantClosePnl);
+  check('تسویه با آخرین معامله، دقیقاً bid منهای last',
+    near(rowSp.settleLastPnl, (8000 - 8300) * size, 1e-6), rowSp.settleLastPnl);
+  check('تسویه با قیمت پایانی، دقیقاً bid منهای close',
+    near(rowSp.settleClosePnl, (8000 - 8100) * size, 1e-6), rowSp.settleClosePnl);
+
+  // با کارمزد واقعی، بستن فوری همیشه از تسویه با آخرین/پایانی بدتر است —
+  // چون اسپرد کامل را دو بار (ورود و خروج) می‌پردازی، آن‌ها فقط یک‌بار
+  const rowSpFee = evaluate({
+    legs: legsSp, quotes: qSp,
+    ctx: { S: 100000, Sclose: 100000, days: 30, size, qty: 1, settings: s, def: sp, underlying: 'نمونه', sigmaHist: 0.6 },
+  });
+  check('بستن فوری همیشه هزینه اسپرد کامل را می‌پردازد، بدتر از تسویه مرجع',
+    rowSpFee.instantClosePnl < rowSpFee.settleLastPnl && rowSpFee.instantClosePnl < rowSpFee.settleClosePnl,
+    `فوری ${Math.round(rowSpFee.instantClosePnl)} | آخرین ${Math.round(rowSpFee.settleLastPnl)} | پایانی ${Math.round(rowSpFee.settleClosePnl)}`);
 }
 
 group('۱۰. فهرست استراتژی‌ها');

@@ -130,6 +130,12 @@ export async function mount(root, { state, api }) {
           <dt>استراتژی</dt><dd>${r.strategy}</dd>
           <dt>جهت نقدی</dt><dd>${r.cashLabel}</dd>
           <dt>نقد خالص</dt><dd>${fmt.money(r.netCash)}</dd>
+          <dt>اگر همین حالا ببندی — دفتر سفارش</dt>
+          <dd style="color:${r.instantClosePnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(r.instantClosePnl)}</dd>
+          <dt>اگر با آخرین معامله تسویه کنی <span class="unit">مرجع</span></dt>
+          <dd style="color:${r.settleLastPnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(r.settleLastPnl)}</dd>
+          <dt>اگر با قیمت پایانی تسویه کنی <span class="unit">مرجع</span></dt>
+          <dd style="color:${r.settleClosePnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(r.settleClosePnl)}</dd>
           <dt>سرمایه درگیر</dt><dd>${fmt.money(r.capital)}</dd>
           <dt>وجه تضمین</dt><dd>${fmt.money(r.margin)}</dd>
           <dt>پوشش</dt><dd><span class="tag ${coverageInfo(r.coverage).tone}">${coverageInfo(r.coverage).label}</span></dd>

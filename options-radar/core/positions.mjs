@@ -28,6 +28,29 @@ export function closePrice(leg, quote, basis = 'BOOK') {
 }
 
 /**
+ * هزینه/بستانکار بستن هر پا با یک مبنای قیمت مشخص — بدون فرض قبلی درباره
+ * قیمت ورود. markToMarket (موقعیت واقعی، با قیمت ورود ثبت‌شده) و evaluate
+ * (ردیف غربال، «اگر همین حالا بگیرم و ببندم») هر دو از همین یک تابع
+ * می‌آیند، پس رفتار «بستن یعنی معامله در جهت مخالف» یک‌بار نوشته شده.
+ */
+export function closeValuation(legs, quotes, basis, fees) {
+  let gross = 0;
+  let fee = 0;
+  const perLeg = legs.map((l, i) => {
+    const px = closePrice(l, quotes[i], basis);
+    const units = Math.abs(signedQty(l));
+    const proceeds = l.side === 'buy' ? px * units : -px * units;
+    const feeOut = l.kind === 'underlying'
+      ? px * units * (l.side === 'buy' ? num(fees.sellStock) : num(fees.buyStock))
+      : px * units * num(fees.option);
+    gross += proceeds;
+    fee += feeOut;
+    return { price: px, proceeds, fee: feeOut };
+  });
+  return { gross, fee, net: gross - fee, perLeg };
+}
+
+/**
  * ارزش‌گذاری لحظه‌ای موقعیت.
  *
  * pos: { legs:[{kind,side,ratio,strike,size,price,ins}], qty, entryDate, uaIns }
