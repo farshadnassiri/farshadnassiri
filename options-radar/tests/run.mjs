@@ -69,6 +69,16 @@ group('۱. بلک-شولز و یونانی');
   }
   check('تلاطم ضمنی زیر ارزش ذاتی → نامعلوم', !Number.isFinite(impliedVol('call', 1, 20000, 10000, 0.5, 0.3, 0, {})));
 
+  // نیوتن روی وگا باید در چند گام همگرا شود، نه ۱۲۰ گام تنصیف. با سقف
+  // گام کم (۸) تنصیف محض به تلاطم دقیق نمی‌رسد — خطایش این‌جا حدود
+  // (۵−۰٫۰۱)/۲⁸ ≈ ۰٫۰۲ می‌ماند — ولی نیوتن در همین سقف به دقت کامل می‌رسد.
+  {
+    const mkt = bsPrice('call', S, K, T, r, q, 0.87);
+    const ivFast = impliedVol('call', mkt, S, K, T, r, q, { lo: 0.01, hi: 5, iters: 8 });
+    check('تلاطم ضمنی با نیوتن، در ۸ گام به دقت بالا می‌رسد',
+      Math.abs(ivFast - 0.87) < 1e-4, `${ivFast.toFixed(8)}`);
+  }
+
   const closes = Array.from({ length: 60 }, (_, i) => 1000 * Math.exp(0.01 * Math.sin(i)));
   check('تلاطم تاریخی عدد متناهی می‌دهد', Number.isFinite(histVol(closes, 240)));
 }

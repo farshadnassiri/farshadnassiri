@@ -118,9 +118,14 @@ export function bsGreeks(kind, S, K, T, r, q, sigma) {
 }
 
 /**
- * تلاطم ضمنی با تنصیف.
+ * تلاطم ضمنی با نیوتن روی وگا، تنصیف به‌عنوان تور ایمنی.
  * اگر قیمت بازار زیر کف نظری یا بالای سقف نظری باشد عدد بی‌معنی نمی‌سازد و
  * مقدار نامعتبر برمی‌گرداند. ستون جدول در این حالت خط تیره نشان می‌دهد.
+ *
+ * در اسکن کامل این تابع برای هر پای هر ترکیب صدا زده می‌شود. تنصیف محض
+ * هر بار خطا را نصف می‌کند؛ نیوتن نزدیک ریشه به‌مراتب سریع‌تر همگرا
+ * می‌شود. وگا مشتق قیمت به تلاطم است، نه صدم آن — همان محاسبه npdf(d1)
+ * که در bsGreeks هست، این‌جا مستقیم بدون بقیه یونانی‌ها.
  */
 export function impliedVol(kind, mktPrice, S, K, T, r, q, opt = {}) {
   let lo = num(opt.lo, 0.01);
@@ -136,12 +141,20 @@ export function impliedVol(kind, mktPrice, S, K, T, r, q, opt = {}) {
   if (fLo > 0) return NaN; // زیر کف نظری، ارزش ذاتی نقض شده
   if (fHi < 0) return NaN; // بالای سقف نظری
 
+  const sqrtT = Math.sqrt(T);
+  const dq = Math.exp(-q * T);
+  let x = 0.5 * (lo + hi);
   for (let i = 0; i < iters; i++) {
-    const mid = 0.5 * (lo + hi);
-    const fm = f(mid);
-    if (Math.abs(fm) < tol * Math.max(1, mktPrice)) return mid;
-    if (fm < 0) lo = mid;
-    else hi = mid;
+    const fx = f(x);
+    if (Math.abs(fx) < tol * Math.max(1, mktPrice)) return x;
+    if (fx < 0) lo = x;
+    else hi = x;
+
+    const [a] = d1d2(S, K, T, r, q, x);
+    const vega = S * dq * npdf(a) * sqrtT;
+    let next = vega > 1e-10 ? x - fx / vega : NaN;
+    if (!Number.isFinite(next) || next <= lo || next >= hi) next = 0.5 * (lo + hi);
+    x = next;
   }
   return 0.5 * (lo + hi);
 }
