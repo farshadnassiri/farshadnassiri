@@ -134,7 +134,7 @@ export async function mount(root, { tab, state, api }) {
   const statusEl = root.querySelector('#status');
   const setStatus = (t) => {
     statusEl.textContent = t || (picker.count()
-      ? `${picker.count()} نماد انتخاب شده${rows.length ? ` — ${rows.length} ردیف` : ''}`
+      ? `${fmt.int(picker.count())} نماد انتخاب شده${rows.length ? ` — ${fmt.int(rows.length)} ردیف` : ''}`
       : 'نمادی انتخاب نشده');
   };
 
@@ -174,11 +174,11 @@ export async function mount(root, { tab, state, api }) {
     const best = ok[0];
     const med = (arr) => (arr.length ? arr.slice().sort((a, b) => a - b)[Math.floor(arr.length / 2)] : NaN);
     const items = [
-      ['ردیف قابل اجرا', fmt.int(rows.filter((r) => r.executable).length), `از ${rows.length}`],
+      ['ردیف قابل اجرا', fmt.int(rows.filter((r) => r.executable).length), `از ${fmt.int(rows.length)}`],
       ['بهترین بازده ماهانه', best ? `${fmt.pct(best.retMonthPct)}٪` : '—', best?.underlying || ''],
       ['میانه بازده ماهانه', `${fmt.pct(med(ok.map((r) => r.retMonthPct)))}٪`, ''],
       ['میانه احتمال سود', `${fmt.pct(med(rows.map((r) => r.popPct).filter(Number.isFinite)))}٪`, ''],
-      ['میانه هزینه اجرا', fmt.money(med(rows.map((r) => r.execCost).filter(Number.isFinite))), `${def.legs.length} پا`],
+      ['میانه هزینه اجرا', fmt.money(med(rows.map((r) => r.execCost).filter(Number.isFinite))), `${fmt.int(def.legs.length)} پا`],
       ['زیان نامحدود', fmt.int(rows.filter((r) => r.unlimitedLoss).length), 'ردیف'],
       ['عمق کامل', fmt.int(rows.filter((r) => r.quality === 'exact').length), 'ردیف مرحله دو'],
       ['بستانکار', fmt.int(rows.filter((r) => r.isCredit).length), 'ردیف'],
@@ -314,7 +314,7 @@ export async function mount(root, { tab, state, api }) {
           funnelBar(root.querySelector('#funnel'), res.funnel);
           table.set(rows);
           drawKpis();
-          setStatus(`مرحله یک در ${res.ms} میلی‌ثانیه — ${res.total} ردیف، ${rows.length} نمایش. مرحله دو…`);
+          setStatus(`مرحله یک در ${fmt.int(res.ms)} میلی‌ثانیه — ${fmt.int(res.total)} ردیف، ${fmt.int(rows.length)} نمایش. مرحله دو…`);
         } else {
           const byId2 = new Map(res.rows.map((r) => [r.id, r]));
           rows = rows.map((r) => byId2.get(r.id) || r);
@@ -323,7 +323,7 @@ export async function mount(root, { tab, state, api }) {
           table.sortBy(s().rankBy);
           drawKpis();
           if (picked) { const f = byId2.get(picked.id); if (f) showDetail(f); }
-          setStatus(`مرحله دو کامل — عمق ${res.asked || 0} نماد گرفته شد. ${rows.length} ردیف.`);
+          setStatus(`مرحله دو کامل — عمق ${fmt.int(res.asked || 0)} نماد گرفته شد. ${fmt.int(rows.length)} ردیف.`);
         }
       },
     });

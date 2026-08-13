@@ -4,7 +4,7 @@
 // است، کدام نماد و کدام سررسید واقعاً مظنه دارد، و کجای بازار قابل کار است.
 // بدون این تب، خالی بودن تب‌های چندپا گیج‌کننده می‌شود.
 
-import { faNum } from '/ui/fmt.mjs';
+import { faNum, faDigits, faAgo } from '/ui/fmt.mjs';
 import { makeTable, fmt } from '/ui/table.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
@@ -69,12 +69,12 @@ export async function mount(root, { state, api }) {
     if (!stats) return;
     const items = [
       ['نماد پایه', fmt.int(stats.underlyings), ''],
-      ['قرارداد', fmt.int(stats.contracts), `${stats.expiries} سررسید`],
+      ['قرارداد', fmt.int(stats.contracts), `${fmt.int(stats.expiries)} سررسید`],
       ['دارای مظنه', fmt.int(stats.quoted), `${faNum(((stats.quoted / (stats.contracts || 1)) * 100).toFixed(0))}٪ از تابلو`],
       ['حجم امروز', fmt.int(stats.vol), 'قرارداد'],
       ['موقعیت باز', fmt.int(stats.oi), 'قرارداد'],
       ['ارزش معاملات', fmt.int(stats.value), 'ریال'],
-      ['سن عکس لحظه‌ای', at ? `${Math.max(0, Math.round((Date.now() - at) / 1000))}s` : '—', ''],
+      ['سن عکس لحظه‌ای', at ? faAgo(Date.now() - at) : '—', ''],
     ];
     root.querySelector('#kpis').innerHTML = items.map(([k, v, s2]) => `
       <div class="kpi"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s2}</div></div>`).join('');
@@ -85,13 +85,13 @@ export async function mount(root, { state, api }) {
       const h = await (await fetch('/api/health')).json();
       root.querySelector('#flow').innerHTML = `
         <dt>دور دیده‌بان</dt><dd>${fmt.int(h.watchTicks)}</dd>
-        <dt>زمان آخرین دور</dt><dd>${faDigits(h.lastWatchMs)} ms</dd>
+        <dt>زمان آخرین دور</dt><dd>${faDigits(h.lastWatchMs)} میلی‌ثانیه</dd>
         <dt>درخواست کل</dt><dd>${fmt.int(h.requests)}</dd>
         <dt>اصابت کش</dt><dd>${fmt.int(h.cacheHits)}</dd>
         <dt>خطا</dt><dd>${fmt.int(h.errors)}</dd>
         <dt>انتظار سهمیه</dt><dd>${fmt.int(h.rateWaits)}</dd>
         <dt>در صف</dt><dd>${fmt.int(h.queueDepth)}</dd>
-        <dt>میانگین پاسخ</dt><dd>${faDigits(h.avgUpstreamMs)} ms</dd>
+        <dt>میانگین پاسخ</dt><dd>${faDigits(h.avgUpstreamMs)} میلی‌ثانیه</dd>
         <dt>مشترک زنده</dt><dd>${fmt.int(h.clients)}</dd>`;
       root.querySelector('#gate').textContent = h.market?.open
         ? 'بازار باز است و حلقه دریافت می‌چرخد.'
@@ -112,7 +112,7 @@ export async function mount(root, { state, api }) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'chip';
-      b.textContent = `${ex.days} روز`;
+      b.textContent = `${faDigits(ex.days)} روز`;
       b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
       b.addEventListener('click', () => {
         expIdx = i;

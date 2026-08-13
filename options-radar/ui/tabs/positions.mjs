@@ -7,6 +7,7 @@ import { markToMarket, blankPosition } from '/core/positions.mjs';
 import { todayJalali } from '/core/jalali.mjs';
 import { mountPayoff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
+import { faDigits } from '/ui/fmt.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
 const KINDS = [
@@ -91,7 +92,7 @@ export async function mount(root, { state, api }) {
     const res = await chainDetail(F.ua.value);
     if (res.error) return;
     detail = res.ua;
-    F.exp.innerHTML = detail.expiries.map((ex, i) => `<option value="${i}">${ex.days} روز</option>`).join('');
+    F.exp.innerHTML = detail.expiries.map((ex, i) => `<option value="${i}">${faDigits(ex.days)} روز</option>`).join('');
     F.sPrice.value = Math.round(detail.last || detail.close || 0);
     fillOptions();
   });
@@ -193,9 +194,9 @@ export async function mount(root, { state, api }) {
         <td>${p.title || '—'}</td>
         <td>${p.uaName || p.uaIns}</td>
         <td>${p.legs.map((l) => `${l.side === 'sell' ? '−' : '+'}${l.kind === 'underlying' ? 'سهم' : (l.kind === 'call' ? 'کال' : 'پوت') + ' ' + fmt.money(l.strike)}`).join(' ')}</td>
-        <td class="n">${p.qty}</td>
-        <td class="n">${p.entryDate || '—'}</td>
-        <td class="n">${m.daysHeld ?? '—'}</td>
+        <td class="n">${fmt.int(p.qty)}</td>
+        <td class="n">${p.entryDate ? faDigits(p.entryDate) : '—'}</td>
+        <td class="n">${m.daysHeld == null ? '—' : fmt.int(m.daysHeld)}</td>
         <td class="n">${fmt.money(m.capital * p.qty)}</td>
         <td class="n" style="color:${m.pnlTotal >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(m.pnlTotal)}</td>
         <td class="n">${fmt.pct(m.retPct)}</td>
@@ -230,7 +231,7 @@ export async function mount(root, { state, api }) {
       ['سرمایه درگیر', fmt.money(cap), 'ریال'],
       ['سود و زیان جاری', fmt.money(tot), tot >= 0 ? 'در سود' : 'در زیان'],
       ['بازده روی سرمایه', `${fmt.pct(cap > 0 ? (tot / cap) * 100 : NaN)}٪`, ''],
-      ['قیمت‌گیری', quotesByIns.size ? `${quotesByIns.size} نماد` : 'بی‌قیمت — اسکن نشده', ''],
+      ['قیمت‌گیری', quotesByIns.size ? `${fmt.int(quotesByIns.size)} نماد` : 'بی‌قیمت — اسکن نشده', ''],
     ].map(([k, v, sub]) => `<div class="kpi"><div class="k">${k}</div>
       <div class="v ${k.includes('سود') ? (tot >= 0 ? 'gain' : 'loss') : ''}">${v}</div><div class="s">${sub}</div></div>`).join('');
 
@@ -282,7 +283,7 @@ export async function mount(root, { state, api }) {
           <dt>مبنای سرمایه</dt><dd>${m.capitalLabel}</dd>
           <dt>وجه تضمین</dt><dd>${fmt.money(m.margin)}</dd>
           <dt>تضمین شرطی</dt><dd>${fmt.money(m.conditionalMargin)}</dd>
-          <dt>روز نگه‌داری</dt><dd>${m.daysHeld ?? '—'}</dd>
+          <dt>روز نگه‌داری</dt><dd>${m.daysHeld == null ? '—' : fmt.int(m.daysHeld)}</dd>
           <dt>بازده</dt><dd>${fmt.pct(m.retPct)}٪</dd>
           <dt>بازده ماهانه</dt><dd>${fmt.pct(m.retMonthPct)}٪</dd>
         </dl>

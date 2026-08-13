@@ -45,8 +45,8 @@ export function makePicker(host, opts = {}) {
       row.innerHTML = `
         <input type="checkbox" ${selected.has(u.ins) ? 'checked' : ''}>
         <span>${u.name || u.ins}</span>
-        <span class="m">${u.contracts} قرارداد</span>
-        <span class="m">${u.quoted} مظنه</span>
+        <span class="m">${fmt.int(u.contracts)} قرارداد</span>
+        <span class="m">${fmt.int(u.quoted)} مظنه</span>
         <span class="m">${u.last ? fmt.money(u.last) : '—'}</span>`;
       row.querySelector('input').addEventListener('change', (e) => {
         if (e.target.checked) selected.add(u.ins); else selected.delete(u.ins);
@@ -64,7 +64,7 @@ export function makePicker(host, opts = {}) {
     const picked = list.filter((u) => selected.has(u.ins));
     const contracts = picked.reduce((a, u) => a + u.contracts, 0);
     sum.textContent = selected.size
-      ? `${picked.length} نماد انتخاب شده — ${fmt.int(contracts)} قرارداد در دامنه اسکن`
+      ? `${fmt.int(picked.length)} نماد انتخاب شده — ${fmt.int(contracts)} قرارداد در دامنه اسکن`
       : 'هیچ نمادی انتخاب نشده. تا انتخاب نکنی، اسکنی انجام نمی‌شود.';
   }
 

@@ -160,7 +160,7 @@ export async function mount(root, { state, api }) {
     funnelBar(root.querySelector('#funnel'), res.funnel);
     table.set(rows);
     drawKpis();
-    setStatus(`${res.ms} میلی‌ثانیه — از ${res.total} ردیف کل، ${rows.length} نمایش.`);
+    setStatus(`${fmt.int(res.ms)} میلی‌ثانیه — از ${fmt.int(res.total)} ردیف کل، ${fmt.int(rows.length)} نمایش.`);
     busy = false;
   }
 

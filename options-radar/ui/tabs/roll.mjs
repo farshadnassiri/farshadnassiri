@@ -10,6 +10,7 @@
 import { rollAnalysis, markToMarket } from '/core/positions.mjs';
 import { mountPayoff, mountDiff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
+import { faDigits } from '/ui/fmt.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
 export async function mount(root, { state, api }) {
@@ -88,7 +89,7 @@ export async function mount(root, { state, api }) {
     const res = await chainDetail(p.uaIns);
     detail = res.error ? null : res.ua;
     if (detail) {
-      el('#exp').innerHTML = detail.expiries.map((ex, k) => `<option value="${k}">${ex.days} روز</option>`).join('');
+      el('#exp').innerHTML = detail.expiries.map((ex, k) => `<option value="${k}">${faDigits(ex.days)} روز</option>`).join('');
       // پیش‌فرض: سررسید دورتر از پای فعلی
       const cur = p.legs[Number(el('#leg').value)];
       const idx = detail.expiries.findIndex((ex) => ex.days > (cur?.days || 0));
@@ -173,7 +174,7 @@ export async function mount(root, { state, api }) {
     el('#cur').innerHTML = `
       <dt>پایه</dt><dd>${p.uaName || p.uaIns}</dd>
       <dt>قیمت پایه</dt><dd>${fmt.money(spot)}</dd>
-      <dt>تعداد قرارداد</dt><dd>${p.qty}</dd>
+      <dt>تعداد قرارداد</dt><dd>${fmt.int(p.qty)}</dd>
       <dt>سود و زیان جاری</dt><dd>${fmt.money(m.pnlTotal)}</dd>
       <dt>سربه‌سری فعلی</dt><dd>${r.curBreakevens.map((b) => fmt.money(b)).join(' , ') || '—'}</dd>`;
 
