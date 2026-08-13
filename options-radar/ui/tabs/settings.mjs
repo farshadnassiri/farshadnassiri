@@ -156,8 +156,13 @@ export async function mount(root, { state, api }) {
   });
 
   root.querySelector('#clear-cache').addEventListener('click', async () => {
-    await fetch('/api/cache', { method: 'DELETE' });
-    flash('کش سرور خالی شد. درخواست بعدی از بازار می‌آید.');
+    try {
+      const r = await fetch('/api/cache', { method: 'DELETE' });
+      if (!r.ok) throw new Error('خالی نشد');
+      flash('کش سرور خالی شد. درخواست بعدی از بازار می‌آید.');
+    } catch (e) {
+      flash(`خالی نشد: ${e.message}`, true);
+    }
   });
 
   return () => {};

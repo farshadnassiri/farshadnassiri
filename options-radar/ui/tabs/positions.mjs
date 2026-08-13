@@ -231,7 +231,7 @@ export async function mount(root, { state, api }) {
       ['سرمایه درگیر', fmt.money(cap), 'ریال'],
       ['سود و زیان جاری', fmt.money(tot), tot >= 0 ? 'در سود' : 'در زیان'],
       ['بازده روی سرمایه', `${fmt.pct(cap > 0 ? (tot / cap) * 100 : NaN)}٪`, ''],
-      ['قیمت‌گیری', quotesByIns.size ? `${fmt.int(quotesByIns.size)} نماد` : 'بی‌قیمت — اسکن نشده', ''],
+      ['قیمت‌گیری', quotesByIns.size ? `${fmt.int(quotesByIns.size)} نماد` : 'بی‌قیمت — قیمت‌گیری نشد', ''],
     ].map(([k, v, sub]) => `<div class="kpi"><div class="k">${k}</div>
       <div class="v ${k.includes('سود') ? (tot >= 0 ? 'gain' : 'loss') : ''}">${v}</div><div class="s">${sub}</div></div>`).join('');
 
