@@ -670,12 +670,42 @@ group('۱۳. موقعیت واقعی و تحلیل رول');
   check('سربه‌سری موقعیت جدید بالاتر است، چون هزینه بستن پرداخت شد',
     roll.nextBreakevens[0] > roll.curBreakevens[0],
     `${roll.curBreakevens[0].toFixed(0)} → ${roll.nextBreakevens[0].toFixed(0)}`);
-  check('تفاضل در قیمت پایین منفی و در قیمت بالا مثبت است',
-    roll.diff(90000) < 0 && roll.diff(130000) > 0,
-    `${Math.round(roll.diff(90000)).toLocaleString()} در برابر ${Math.round(roll.diff(130000)).toLocaleString()}`);
+  check('تفاضل در قیمت پایین منفی و در قیمت بالا (فراتر از مرز تصمیم) مثبت است',
+    roll.diff(90000) < 0 && roll.diff(200000) > 0,
+    `${Math.round(roll.diff(90000)).toLocaleString()} در برابر ${Math.round(roll.diff(200000)).toLocaleString()}`);
   check('مرز تصمیم پیدا شد', roll.crossings.length >= 1,
     roll.crossings.map((x) => Math.round(x).toLocaleString()).join(' , '));
   check('جمع‌بندی بر مبنای قیمت فعلی داده شد', !!roll.verdict, roll.verdict);
+
+  // ——— رول چند-سررسیدی: پای تازه سررسید دیگری دارد (قلم الف-۵ بک‌لاگ) ———
+  // ۱۱۰/۳۰روزه بسته می‌شود، ۱۲۰/۹۰روزه جای آن می‌نشیند — پس موقعیت پس از رول
+  // دیگر تک‌سررسیدی نیست. analyzePayoff دیگر معنا ندارد (هر پا سررسید خودش
+  // را می‌خواهد)، پس مسیر analyzeMixed با افق مشترک «امروز» باید فعال شود.
+  check('رول چند-سررسیدی، approx=true را علامت می‌زند', roll.approx === true);
+  check('یادداشت رول چند-سررسیدی، تقریبی‌بودن را می‌گوید', roll.note.includes('تقریبی'));
+
+  // هویت جبری: diff همین رول باید دقیقاً از تفاضل دو analyzeMixed مستقل،
+  // با همان افق و همان netCash های برگشتی، به دست بیاید — نه یک تقریب دیگر.
+  const mixOpt13 = { fees, spot: 104500, horizonDays: 0 };
+  const curCheck13 = analyzeMixed(pos.legs, roll.curNet, mixOpt13);
+  const nextCheck13 = analyzeMixed(roll.nextLegs, roll.nextNet, mixOpt13);
+  const identityAt = 115000;
+  check('diff رول چند-سررسیدی دقیقاً از دو analyzeMixed مستقل می‌آید (هویت جبری)',
+    near(roll.diff(identityAt), nextCheck13.at(identityAt) - curCheck13.at(identityAt), 1e-9),
+    `${roll.diff(identityAt)} ~ ${nextCheck13.at(identityAt) - curCheck13.at(identityAt)}`);
+
+  // رول هم‌سررسید (اکثریت رول‌های واقعی — فقط قیمت اعمال عوض می‌شود، نه
+  // سررسید) باید دست‌نخورده از همان موتور دقیق تکه‌ای-خطی قبلی بماند —
+  // approx ست نمی‌شود، جبر دقیق است نه تقریب بلک-شولز.
+  const rollSameExpiry = rollAnalysis({
+    pos, quotes: [q(104000, 105000), q(7000, 7400)],
+    closeIdx: 1,
+    newLeg: { kind: 'call', side: 'sell', ratio: 1, size, strike: 120000, days: 30 },
+    newQuote: q(6000, 6400),
+    opt: { fees, spot: 104500 },
+  });
+  check('رول هم‌سررسید هنوز از موتور دقیق تکه‌ای-خطی می‌آید، نه تقریبی',
+    !rollSameExpiry.approx);
 }
 
 group('۱۴. تاریخ شمسی');

@@ -64,6 +64,11 @@ export async function mount(root, { state, api }) {
     sortKey: 'volume',
     onPick: (r) => openChain(r.ins),
   });
+  // پیام پیش‌فرض جدول («نوار تشخیص بالا می‌گوید...») برای این تب غلط است —
+  // اینجا نوار تشخیص اصلاً وجود ندارد، فقط یک عکس لحظه‌ای زنجیره‌ست.
+  const LOADING_MSG = 'در حال دریافت داده زنجیره اختیار…';
+  const NO_CHAIN_MSG = 'این عکس لحظه‌ای هیچ نمادی ندارد.';
+  table.setEmptyMessage(LOADING_MSG);
 
   function drawKpis(stats, at) {
     if (!stats) return;
@@ -177,12 +182,14 @@ export async function mount(root, { state, api }) {
   const offChain = onChain((cs) => {
     list = cs.list.map(withDerived);
     table.set(list);
+    table.setEmptyMessage(NO_CHAIN_MSG);
     picker.setList(cs.list);
     drawKpis(cs.stats, cs.at);
   });
   if (chainState.list.length) {
     list = chainState.list.map(withDerived);
     table.set(list);
+    table.setEmptyMessage(NO_CHAIN_MSG);
     picker.setList(chainState.list);
     drawKpis(chainState.stats, chainState.at);
   }
