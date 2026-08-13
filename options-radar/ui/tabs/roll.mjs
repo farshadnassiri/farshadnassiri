@@ -8,7 +8,7 @@
 // می‌گیرد و از همان موتور بازده مشترک می‌آید.
 
 import { rollAnalysis, markToMarket } from '/core/positions.mjs';
-import { payoffSvg, diffSvg } from '/ui/chart.mjs';
+import { mountPayoff, mountDiff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
@@ -19,6 +19,9 @@ export async function mount(root, { state, api }) {
   let quotesByIns = new Map();
   let detail = null;
   let candidates = [];
+  let dChart = null, c1Chart = null, c2Chart = null;
+  let dRange = null, c1Range = null, c2Range = null;
+  let chartKey = null;
 
   root.innerHTML = `
     <div class="page-head">
@@ -139,8 +142,18 @@ export async function mount(root, { state, api }) {
     const p = positions[sel];
     if (!p || !candidates.length) return;
     const closeIdx = Number(el('#leg').value);
-    const cand = candidates[Number(el('#new').value) || 0];
+    const candIdx = Number(el('#new').value) || 0;
+    const cand = candidates[candIdx];
     if (!cand) return;
+
+    // قیمت‌گیری هر پانزده ثانیه دوباره draw را صدا می‌زند؛ اگر همان سناریوی
+    // رول است (همان موقعیت، همان پای بسته‌شونده، همان نامزد تازه) زوم سه
+    // نمودار باید بماند، نه هر بار به نمای اول برگردد
+    const sameScenario = chartKey === `${sel}:${closeIdx}:${candIdx}`;
+    chartKey = `${sel}:${closeIdx}:${candIdx}`;
+    if (dChart) dRange = dChart.view();
+    if (c1Chart) c1Range = c1Chart.view();
+    if (c2Chart) c2Range = c2Chart.view();
 
     const fees = { buyStock: s().feeBuyStock, sellStock: s().feeSellStock, option: s().feeOption, exercise: s().feeExercise };
     const uaQ = quotesByIns.get(p.uaIns) || {};
@@ -181,15 +194,24 @@ export async function mount(root, { state, api }) {
     const ks = [...r.curAnalysis.strikes, ...r.nextAnalysis.strikes, spot];
     const lo = Math.max(1, Math.min(...ks) * 0.75);
     const hi = Math.max(...ks) * 1.3;
-    const d = diffSvg((S) => r.diff(S) * p.qty, lo, hi, { spot, width: 760, height: 240 });
-    el('#dchart').innerHTML = d.svg;
+
+    dChart?.destroy();
+    dChart = mountDiff(el('#dchart'), (S) => r.diff(S) * p.qty, lo, hi, {
+      spot, width: 760, height: 240, ...(sameScenario && dRange ? { initRange: dRange } : {}),
+    });
     el('#dtitle').textContent = `تفاضل دو موقعیت — ${r.verdict}`;
     el('#dlegend').innerHTML = `
       <span>${r.note}</span>
-      <span>مرز تصمیم: ${d.crossings.map((x) => fmt.money(x)).join(' , ') || 'ندارد'}</span>`;
+      <span>مرز تصمیم: ${dChart.crossings.map((x) => fmt.money(x)).join(' , ') || 'ندارد'}</span>`;
 
-    el('#c1').innerHTML = payoffSvg(p.legs, r.curNet, { fees, spot, width: 480, height: 220 }).svg;
-    el('#c2').innerHTML = payoffSvg(r.nextLegs, r.nextNet, { fees, spot, width: 480, height: 220 }).svg;
+    c1Chart?.destroy();
+    c1Chart = mountPayoff(el('#c1'), p.legs, r.curNet, {
+      fees, spot, width: 480, height: 220, ...(sameScenario && c1Range ? { initRange: c1Range } : {}),
+    });
+    c2Chart?.destroy();
+    c2Chart = mountPayoff(el('#c2'), r.nextLegs, r.nextNet, {
+      fees, spot, width: 480, height: 220, ...(sameScenario && c2Range ? { initRange: c2Range } : {}),
+    });
   }
 
   el('#pos').addEventListener('change', () => pickPos(Number(el('#pos').value)));
@@ -201,5 +223,5 @@ export async function mount(root, { state, api }) {
   const offWatch = api.subscribeWatch((w) => pushRows(w, !w.changed));
   await load();
   const timer = setInterval(priceAll, 15000);
-  return () => { offChain(); offWatch(); clearInterval(timer); };
+  return () => { offChain(); offWatch(); clearInterval(timer); dChart?.destroy(); c1Chart?.destroy(); c2Chart?.destroy(); };
 }

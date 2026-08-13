@@ -163,30 +163,22 @@ export function payoffSvg(legs, netCash, opt = {}) {
 }
 
 /**
- * نمودار تعامل‌پذیر.
+ * زیرساخت مشترک نمودار تعامل‌پذیر: زوم با غلتک، کشیدن، خط راهنما، دکمه‌های
+ * زوم و نمای اول. mountPayoff و mountDiff هر دو از همین عبور می‌کنند و فقط
+ * `frameOf` (رسم روی یک بازه) و `valueAt` (مقدار زیر نشانگر) را عوض می‌کنند.
  *
  *   غلتک          زوم حول همان نقطه‌ای که نشانگر رویش است
  *   کشیدن         پیمایش افقی
- *   حرکت نشانگر   خط راهنما و خواندن سود و زیان سر همان قیمت پایه
+ *   حرکت نشانگر   خط راهنما و خواندن مقدار سر همان قیمت پایه
  *   دوبار کلیک    برگشت به نمای اول
  *
  * `opt.initRange` بازه شروع را به‌جای نمای اول می‌نشاند — برای وقتی که
  * نمودار قبلی برای همان موقعیت نابود و از نو ساخته می‌شود (اسکن پیوسته)
  * و کاربر وسط زوم یا پن بوده.
- *
- * برمی‌گرداند { analysis, view, reset, destroy }.
  */
-export function mountPayoff(host, legs, netCash, opt = {}) {
-  const { points, analysis } = seriesFor(legs, netCash, opt);
-  const ys = points.map((p) => p.pnl).filter(Number.isFinite);
-  if (!ys.length) {
-    host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
-    return { analysis, view: () => null, reset() {}, destroy() {} };
-  }
-
-  const [homeLo, homeHi] = homeRange(points, analysis, opt);
+function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, readLabel, hint }) {
   let lo = homeLo, hi = homeHi;
-  const [initLo, initHi] = Array.isArray(opt.initRange) ? opt.initRange : [];
+  const [initLo, initHi] = Array.isArray(initRange) ? initRange : [];
   if (Number.isFinite(initLo) && Number.isFinite(initHi) && initLo >= 0 && initHi - initLo > MIN_SPAN) {
     lo = initLo; hi = initHi;
   }
@@ -196,7 +188,7 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
     <div class="chart-box">
       <div class="chart-canvas"></div>
       <div class="chart-tools">
-        <span class="chart-read">غلتک برای زوم ، کشیدن برای پیمایش ، دوبار کلیک برای نمای اول</span>
+        <span class="chart-read">${hint}</span>
         <span class="sp"></span>
         <button type="button" class="ghost" data-act="out">−</button>
         <button type="button" class="ghost" data-act="in">+</button>
@@ -208,7 +200,7 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   const read = host.querySelector('.chart-read');
 
   function render() {
-    geo = frame(points, analysis, opt, lo, hi);
+    geo = frameOf(lo, hi);
     canvas.innerHTML = geo ? geo.svg : '<div class="note">بازه بیش از حد باریک است.</div>';
   }
   render();
@@ -277,21 +269,21 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
     const svg = canvas.querySelector('svg');
     const g = svg?.querySelector('.cursor');
     if (!g || !geo || !Number.isFinite(S)) return;
-    const pnl = analysis.at(S);
-    if (!Number.isFinite(pnl)) { g.setAttribute('hidden', ''); return; }
+    const v = valueAt(S);
+    if (!Number.isFinite(v)) { g.setAttribute('hidden', ''); return; }
     const x = geo.X(S);
-    const y = Math.min(Math.max(geo.Y(pnl), geo.pad.t), geo.H - geo.pad.b);
+    const y = Math.min(Math.max(geo.Y(v), geo.pad.t), geo.H - geo.pad.b);
     g.removeAttribute('hidden');
     g.querySelector('.cur-x').setAttribute('x1', x);
     g.querySelector('.cur-x').setAttribute('x2', x);
     g.querySelector('.cur-dot').setAttribute('cx', x);
     g.querySelector('.cur-dot').setAttribute('cy', y);
-    read.innerHTML = `پایه <b>${money(S)}</b> — سود و زیان `
-      + `<b style="color:${pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(pnl)}</b>`;
+    read.innerHTML = `پایه <b>${money(S)}</b> — ${readLabel} `
+      + `<b style="color:${v >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(v)}</b>`;
   }
   function hideCursor() {
     canvas.querySelector('.cursor')?.setAttribute('hidden', '');
-    read.textContent = 'غلتک برای زوم ، کشیدن برای پیمایش ، دوبار کلیک برای نمای اول';
+    read.textContent = hint;
   }
 
   const reset = () => { lo = homeLo; hi = homeHi; render(); };
@@ -308,7 +300,6 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   host.querySelector('[data-act="out"]').addEventListener('click', () => zoomAt(NaN, 1.3));
 
   return {
-    analysis,
     view: () => [lo, hi],
     reset,
     destroy() {
@@ -323,8 +314,34 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   };
 }
 
-/** نمودار تفاضل دو موقعیت — ورودی تصمیم رول. */
-export function diffSvg(fn, xMin, xMax, opt = {}) {
+const PAYOFF_HINT = 'غلتک برای زوم ، کشیدن برای پیمایش ، دوبار کلیک برای نمای اول';
+
+/**
+ * نمودار بازده تعامل‌پذیر. برمی‌گرداند { analysis, view, reset, destroy }.
+ * چرا زوم فقط روی محور قیمت پایه است: محور عمودی همیشه از داده همان بازه
+ * دوباره حساب می‌شود، پس بزرگ‌نمایی یک ناحیه باریک، خودش قد نمودار را هم
+ * پر می‌کند. زوم دوبعدی اینجا فقط نمودار را کج می‌کرد.
+ */
+export function mountPayoff(host, legs, netCash, opt = {}) {
+  const { points, analysis } = seriesFor(legs, netCash, opt);
+  const ys = points.map((p) => p.pnl).filter(Number.isFinite);
+  if (!ys.length) {
+    host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
+    return { analysis, view: () => null, reset() {}, destroy() {} };
+  }
+  const [homeLo, homeHi] = homeRange(points, analysis, opt);
+  const api = mountInteractive(host, {
+    homeLo, homeHi, initRange: opt.initRange,
+    frameOf: (lo, hi) => frame(points, analysis, opt, lo, hi),
+    valueAt: (S) => analysis.at(S),
+    readLabel: 'سود و زیان',
+    hint: PAYOFF_HINT,
+  });
+  return { analysis, ...api };
+}
+
+/** بدنه رسم نمودار تفاضل، روی یک بازه دلخواه — همان نقش frame() برای بازده. */
+function diffFrame(fn, opt, xMin, xMax) {
   const W = opt.width ?? 760, H = opt.height ?? 240;
   const pad = { t: 16, r: 14, b: 30, l: 14 };
   const N = 160;
@@ -334,6 +351,7 @@ export function diffSvg(fn, xMin, xMax, opt = {}) {
     pts.push({ S, v: fn(S) });
   }
   const vs = pts.map((p) => p.v).filter(Number.isFinite);
+  if (vs.length < 2) return null;
   let yMin = Math.min(...vs, 0), yMax = Math.max(...vs, 0);
   const py = (yMax - yMin) * 0.12 || 1;
   yMin -= py; yMax += py;
@@ -355,8 +373,7 @@ export function diffSvg(fn, xMin, xMax, opt = {}) {
     const a = pts[i - 1], b = pts[i];
     if ((a.v < 0 && b.v > 0) || (a.v > 0 && b.v < 0)) {
       const t = -a.v / (b.v - a.v);
-      const S = a.S + t * (b.S - a.S);
-      cross.push(S);
+      cross.push(a.S + t * (b.S - a.S));
     }
   }
   const dots = cross.map((S) => `<circle class="be" cx="${X(S)}" cy="${y0}" r="4"/>
@@ -364,12 +381,42 @@ export function diffSvg(fn, xMin, xMax, opt = {}) {
   const spotLine = Number.isFinite(opt.spot) && opt.spot >= xMin && opt.spot <= xMax
     ? `<line class="spot" x1="${X(opt.spot)}" y1="${pad.t}" x2="${X(opt.spot)}" y2="${H - pad.b}"/>` : '';
 
-  return {
-    crossings: cross,
-    svg: `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار تفاضل دو موقعیت">
+  const svg = `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار تفاضل دو موقعیت">
       ${areas.join('')}${spotLine}
       <line class="zero" x1="${pad.l}" y1="${y0}" x2="${W - pad.r}" y2="${y0}"/>
       <path class="curve" d="${line}"/>${dots}
-    </svg>`,
-  };
+      <g class="cursor" hidden>
+        <line class="cur-x" y1="${pad.t}" y2="${H - pad.b}"/>
+        <circle class="cur-dot" r="3.5"/>
+      </g>
+    </svg>`;
+
+  return { svg, W, H, pad, X, Y, y0, crossings: cross };
+}
+
+/** نمودار تفاضل دو موقعیت — ورودی تصمیم رول. رشته SVG ایستا. */
+export function diffSvg(fn, xMin, xMax, opt = {}) {
+  const f = diffFrame(fn, opt, xMin, xMax);
+  return f ? { svg: f.svg, crossings: f.crossings } : { svg: '<div class="note">نمودار قابل رسم نیست.</div>', crossings: [] };
+}
+
+/**
+ * نمودار تفاضل تعامل‌پذیر — همان diffSvg با زوم، پیمایش و خط راهنما.
+ * برمی‌گرداند { crossings, view, reset, destroy }. crossings مرز تصمیم را
+ * روی نمای اول می‌دهد؛ اگر بعد از زوم لازم شد، از frame بازگشتی view خواند.
+ */
+export function mountDiff(host, fn, xMin, xMax, opt = {}) {
+  const home = diffFrame(fn, opt, xMin, xMax);
+  if (!home) {
+    host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
+    return { crossings: [], view: () => null, reset() {}, destroy() {} };
+  }
+  const api = mountInteractive(host, {
+    homeLo: xMin, homeHi: xMax, initRange: opt.initRange,
+    frameOf: (lo, hi) => diffFrame(fn, opt, lo, hi),
+    valueAt: fn,
+    readLabel: 'تفاضل',
+    hint: PAYOFF_HINT,
+  });
+  return { crossings: home.crossings, ...api };
 }

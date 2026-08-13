@@ -5,7 +5,7 @@
 
 import { markToMarket, blankPosition } from '/core/positions.mjs';
 import { todayJalali } from '/core/jalali.mjs';
-import { payoffSvg } from '/ui/chart.mjs';
+import { mountPayoff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
@@ -23,6 +23,9 @@ export async function mount(root, { state, api }) {
   let quotesByIns = new Map();
   let uaList = [];
   let expanded = null;
+  let chart = null;
+  let chartRange = null;
+  let chartFor = null;
 
   root.innerHTML = `
     <div class="page-head">
@@ -236,11 +239,18 @@ export async function mount(root, { state, api }) {
 
   function drawDetail() {
     const p = positions[expanded];
-    if (!p) { root.querySelector('#det-card').style.display = 'none'; return; }
+    if (!p) {
+      root.querySelector('#det-card').style.display = 'none';
+      chart?.destroy(); chart = null; chartFor = null;
+      return;
+    }
     const { m, spot, fees } = evalPos(p);
+    // قیمت‌گیری هر پانزده ثانیه دوباره صدا می‌زند؛ اگر همان موقعیت باز است
+    // نه یک موقعیت دیگر، زوم/پن چارت باید بماند نه هر بار به نمای اول برگردد
+    const sameRow = chartFor === expanded;
+    if (chart) chartRange = chart.view();
     root.querySelector('#det-card').style.display = '';
     root.querySelector('#det-title').textContent = `${p.title} — ${p.uaName || p.uaIns}`;
-    const { svg } = payoffSvg(p.legs, m.entryNet, { fees, spot, width: 720, height: 250 });
 
     const legRows = m.perLeg.map((l) => `
       <tr>
@@ -254,7 +264,7 @@ export async function mount(root, { state, api }) {
 
     root.querySelector('#det').innerHTML = `
       <div>
-        ${svg}
+        <div id="det-chart"></div>
         <h4 style="margin:14px 0 4px;font-size:12px">تفکیک هر پا — برای یک دست قرارداد</h4>
         <table class="mini">
           <thead><tr><th>پا</th><th>قیمت ورود</th><th>قیمت بستن</th><th>سهم درگیر</th><th>کارمزد رفت و برگشت</th><th>سود و زیان</th></tr></thead>
@@ -285,6 +295,13 @@ export async function mount(root, { state, api }) {
         </dl>
         <p class="note" style="margin-top:10px">برای تصمیم رول همین موقعیت، به تب تحلیل رول برو.</p>
       </div>`;
+
+    chart?.destroy();
+    chart = mountPayoff(root.querySelector('#det-chart'), p.legs, m.entryNet, {
+      fees, spot, width: 720, height: 250,
+      ...(sameRow && chartRange ? { initRange: chartRange } : {}),
+    });
+    chartFor = expanded;
   }
 
   // ——————————————— داده ———————————————
@@ -329,5 +346,5 @@ export async function mount(root, { state, api }) {
   await load();
   await priceAll();
   const timer = setInterval(priceAll, 15000);
-  return () => { offChain(); offWatch(); clearInterval(timer); };
+  return () => { offChain(); offWatch(); clearInterval(timer); chart?.destroy(); };
 }
