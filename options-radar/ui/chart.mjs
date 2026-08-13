@@ -409,6 +409,17 @@ function diffFrame(fn, opt, xMin, xMax) {
   }
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');
 
+  // ——— نامزدهای دیگر رول، هم‌زمان روی همان محور — نه یکی‌یکی ———
+  // مقیاس Y از نامزد انتخاب‌شده می‌آید، نه دوباره حساب می‌شود؛ چون این‌ها
+  // فقط برای مقایسه شکل کلی‌اند، نه خواندن دقیق مقدار.
+  const EXTRA_STYLE = ['extra1', 'extra2'];
+  const extraLines = (opt.extra || []).slice(0, EXTRA_STYLE.length).map((ex, i) => {
+    const exPts = pts.map((p) => ({ S: p.S, v: ex.fn(p.S) })).filter((p) => Number.isFinite(p.v));
+    if (exPts.length < 2) return null;
+    const d = exPts.map((p, j) => `${j ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(Math.min(Math.max(p.v, yMin), yMax)).toFixed(1)}`).join(' ');
+    return { d, cls: EXTRA_STYLE[i], label: ex.label };
+  }).filter(Boolean);
+
   // نقاط تغییر علامت: مرز تصمیم
   const cross = [];
   for (let i = 1; i < pts.length; i++) {
@@ -423,10 +434,21 @@ function diffFrame(fn, opt, xMin, xMax) {
   const spotLine = Number.isFinite(opt.spot) && opt.spot >= xMin && opt.spot <= xMax
     ? `<line class="spot" x1="${X(opt.spot)}" y1="${pad.t}" x2="${X(opt.spot)}" y2="${H - pad.b}"/>` : '';
 
+  const extraPaths = extraLines.map((ex) => `<path class="curve-${ex.cls}" d="${ex.d}"/>`).join('');
+  const extraLegend = extraLines.length ? `
+    <g class="curve2-legend">
+      <line x1="${W - pad.r - 92}" y1="${pad.t + 5}" x2="${W - pad.r - 72}" y2="${pad.t + 5}" class="curve"/>
+      <text x="${W - pad.r - 96}" y="${pad.t + 8}" text-anchor="end" class="lbl">انتخاب‌شده</text>
+      ${extraLines.map((ex, i) => `
+      <line x1="${W - pad.r - 92}" y1="${pad.t + 18 + i * 13}" x2="${W - pad.r - 72}" y2="${pad.t + 18 + i * 13}" class="curve-${ex.cls}"/>
+      <text x="${W - pad.r - 96}" y="${pad.t + 21 + i * 13}" text-anchor="end" class="lbl">${ex.label}</text>`).join('')}
+    </g>` : '';
+
   const svg = `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار تفاضل دو موقعیت">
       ${areas.join('')}${spotLine}
       <line class="zero" x1="${pad.l}" y1="${y0}" x2="${W - pad.r}" y2="${y0}"/>
-      <path class="curve" d="${line}"/>${dots}
+      ${extraPaths}
+      <path class="curve" d="${line}"/>${dots}${extraLegend}
       <g class="cursor" hidden>
         <line class="cur-x" y1="${pad.t}" y2="${H - pad.b}"/>
         <circle class="cur-dot" r="3.5"/>

@@ -229,9 +229,19 @@ export async function mount(root, { state, api }) {
     const lo = Math.max(1, Math.min(...ks) * 0.75);
     const hi = Math.max(...ks) * 1.3;
 
+    // دو نامزد دیگر رتبه اول جدول مقایسه (به‌جز انتخاب‌شده) هم‌زمان روی همان
+    // نمودار تفاضل — تا شکل کلی چند گزینه با هم دیده شود، نه فقط عددشان
+    // در جدول بالا
+    const otherCands = candRows.filter((x) => x.i !== candIdx)
+      .sort((a, b) => b.r.atSpot - a.r.atSpot).slice(0, 2);
+    const extra = otherCands.map((x) => ({
+      fn: (S) => x.r.diff(S) * p.qty,
+      label: `اعمال ${fmt.money(x.strike)}`,
+    }));
+
     dChart?.destroy();
     dChart = mountDiff(el('#dchart'), (S) => r.diff(S) * p.qty, lo, hi, {
-      spot, width: 760, height: 240, ...(sameScenario && dRange ? { initRange: dRange } : {}),
+      spot, width: 760, height: 240, extra, ...(sameScenario && dRange ? { initRange: dRange } : {}),
     });
     el('#dtitle').textContent = `تفاضل دو موقعیت — ${r.verdict}`;
     el('#dlegend').innerHTML = `
