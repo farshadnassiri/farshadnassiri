@@ -171,6 +171,7 @@ const TABS = [
   { id: 'settings', title: 'تنظیمات', section: 'پایه', mod: '/ui/tabs/settings.mjs', phase: 1 },
   { id: 'engine', title: 'موتور و نمودار بازده', section: 'پایه', mod: '/ui/tabs/engine.mjs', phase: 2 },
   { id: 'chain', title: 'دیده‌بان زنجیره اختیار', section: 'پایه', mod: '/ui/tabs/chain.mjs', phase: 3 },
+  { id: 'top', title: 'برترین موقعیت‌ها', section: 'پایه', mod: '/ui/tabs/top.mjs', phase: 3 },
 ];
 
 // تب هر استراتژی از همان فهرست ساخته می‌شود و همه یک ماژول دارند. این نتیجه

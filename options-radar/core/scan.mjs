@@ -230,4 +230,34 @@ export function scan({ def, chain, uaKeys, settings, sigmaByUa = {}, qty }) {
   return { rows: rows.slice(0, s.topN), funnel, ms: Date.now() - t0, total: rows.length };
 }
 
+/**
+ * غربال روی کل کاتالوگ یک‌جا — «برترین موقعیت‌ها». فقط مرحله یک، بدون عمق
+ * دفتر سفارش؛ برای عدد اجرایی هنوز باید همان تب استراتژی را باز کرد و اسکن
+ * دومرحله‌ای کامل زد. اجرای عمق برای ۳۱ استراتژی یک‌جا یعنی ۳۱ درخواست
+ * دفتر سفارش پیاپی — هزینه‌ای که این نمای کلی اولیه توجیهش نمی‌کند.
+ *
+ * رتبه‌بندی مشترک همان `s.rankBy` است، دقیقاً همان معیاری که هر تب استراتژی
+ * تنها روی خودش اعمال می‌کند؛ اینجا همان معیار روی همه ردیف‌های همه
+ * استراتژی‌ها با هم اعمال می‌شود.
+ */
+export function scanAll({ defs, chain, uaKeys, settings, sigmaByUa = {}, qty, limit = 50 }) {
+  const t0 = Date.now();
+  const funnel = emptyFunnel();
+  const rows = [];
+  for (const def of defs) {
+    const res = scan({ def, chain, uaKeys, settings, sigmaByUa, qty });
+    for (const k of FUNNEL_KEYS) funnel[k] += res.funnel[k] || 0;
+    rows.push(...res.rows);
+  }
+
+  const by = settings.rankBy || 'retMonthPct';
+  rows.sort((a, b) => {
+    const xf = Number.isFinite(a[by]) ? a[by] : -Infinity;
+    const yf = Number.isFinite(b[by]) ? b[by] : -Infinity;
+    return yf - xf;
+  });
+
+  return { rows: rows.slice(0, limit), total: rows.length, funnel, ms: Date.now() - t0 };
+}
+
 export { FUNNEL_KEYS };

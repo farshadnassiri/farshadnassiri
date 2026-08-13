@@ -8,6 +8,8 @@
 // چون افت مظنه اغلب رتبه‌ها را زیر و رو می‌کند، ردیف‌های مرحله دو بعد از
 // دریافت عمق دوباره مرتب می‌شوند.
 
+import { CATALOG } from '/strategies/catalog.mjs';
+
 let worker = null;
 let seq = 0;
 const waiting = new Map();
@@ -130,3 +132,14 @@ export async function runScan({ defId, uaKeys, settings, qty, onStage }) {
 }
 
 export const clearOverlay = () => ask({ type: 'clear-overlay' });
+
+/**
+ * غربال روی کل کاتالوگ — «برترین موقعیت‌ها». فقط مرحله یک؛ استراتژی‌های
+ * غیرشدنی (`feasible: false`) اصلاً وارد نمی‌شوند چون در تابلو اجرا ندارند.
+ */
+export async function runScanAll({ uaKeys, settings, qty, limit = 50 }) {
+  if (!uaKeys.length) return { rows: [], total: 0, funnel: null };
+  const sigmaByUa = await sigmas(uaKeys, settings);
+  const defIds = CATALOG.filter((d) => d.feasible).map((d) => d.id);
+  return ask({ type: 'scan-all', defIds, uaKeys, settings, sigmaByUa, qty, limit });
+}

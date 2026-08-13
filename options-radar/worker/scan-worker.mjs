@@ -7,7 +7,7 @@
 // لحظه‌ای را می‌فرستد و ساخت زنجیره اینجا، بیرون از مسیر رسم، انجام می‌شود.
 
 import { buildChain, underlyingList, chainStats } from '../core/chain.mjs';
-import { scan } from '../core/scan.mjs';
+import { scan, scanAll } from '../core/scan.mjs';
 import { byId } from '../strategies/catalog.mjs';
 
 let rowsByKey = new Map();
@@ -98,6 +98,24 @@ self.onmessage = (e) => {
     self.postMessage({
       type: 'scan', id: m.id, rows, funnel: res.funnel, ms: res.ms, total: res.total,
       refine: !!m.onlyIds,
+    });
+    return;
+  }
+
+  if (m.type === 'scan-all') {
+    const ch = ensureChain();
+    const defs = m.defIds.map((id) => byId(id)).filter(Boolean);
+    const res = scanAll({
+      defs, chain: ch, uaKeys: m.uaKeys, settings: m.settings,
+      sigmaByUa: m.sigmaByUa || {}, qty: m.qty, limit: m.limit,
+    });
+    // شیء payoff تابع دارد و کلون نمی‌شود؛ فقط داده رسم را می‌فرستیم
+    for (const r of res.rows) {
+      r.chart = { legs: r.__legs, netCash: r.netCash };
+      delete r.payoff;
+    }
+    self.postMessage({
+      type: 'scan-all', id: m.id, rows: res.rows, funnel: res.funnel, ms: res.ms, total: res.total,
     });
     return;
   }
