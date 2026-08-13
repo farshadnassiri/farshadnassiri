@@ -7,7 +7,7 @@ import { markToMarket, blankPosition } from '/core/positions.mjs';
 import { todayJalali } from '/core/jalali.mjs';
 import { mountPayoff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
-import { faDigits } from '/ui/fmt.mjs';
+import { faDigits, kpiTone } from '/ui/fmt.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
 const KINDS = [
@@ -233,7 +233,7 @@ export async function mount(root, { state, api }) {
       ['بازده روی سرمایه', `${fmt.pct(cap > 0 ? (tot / cap) * 100 : NaN)}٪`, ''],
       ['قیمت‌گیری', quotesByIns.size ? `${fmt.int(quotesByIns.size)} نماد` : 'بی‌قیمت — قیمت‌گیری نشد', ''],
     ].map(([k, v, sub]) => `<div class="kpi"><div class="k">${k}</div>
-      <div class="v ${k.includes('سود') ? (tot >= 0 ? 'gain' : 'loss') : ''}">${v}</div><div class="s">${sub}</div></div>`).join('');
+      <div class="v ${kpiTone(k, tot >= 0)}">${v}</div><div class="s">${sub}</div></div>`).join('');
 
     if (expanded != null) drawDetail();
   }

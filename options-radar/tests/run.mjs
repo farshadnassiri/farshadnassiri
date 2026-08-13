@@ -24,9 +24,8 @@ import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
 import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
-import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError } from '../ui/fmt.mjs';
+import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn } from '../ui/table.mjs';
-import { coverageInfo } from '../ui/fmt.mjs';
 import { sameUnderlyingCandidates, compareLabel, MAX_COMPARE } from '../ui/compare.mjs';
 
 let pass = 0, fail = 0;
@@ -1133,6 +1132,16 @@ group('۲۱. قالب‌بندی عدد فارسی');
   check('پوشش ناقص، فارسی و هشدار', !latin2.test(coverageInfo('partial').label) && coverageInfo('partial').tone === 'warn');
   check('بدون پای فروش، خنثی', !latin2.test(coverageInfo('none').label) && coverageInfo('none').tone === 'flat');
   check('حالت ناشناس، سقوط نمی‌کند و تن پیش‌فرض می‌دهد', coverageInfo('چیز-عجیب').tone === 'flat');
+
+  // رنگ کارت KPI (تب موقعیت‌های من): «بازده روی سرمایه» همان علامت «سود و
+  // زیان جاری» را دارد، پس باید همان رنگ را هم بگیرد — قبلاً فقط برچسبی که
+  // شامل «سود» بود رنگ می‌گرفت و بازده بی‌رنگ می‌ماند، برخلاف مرز رنگی کارت
+  // (style.css .kpi:has(.v.gain/.loss)) که برای همین قرار بود چشم را ببرد.
+  check('کارت سود و زیان، سبز وقتی مثبت است', kpiTone('سود و زیان جاری', true) === 'gain');
+  check('کارت سود و زیان، قرمز وقتی منفی است', kpiTone('سود و زیان جاری', false) === 'loss');
+  check('کارت بازده روی سرمایه هم رنگ می‌گیرد، نه فقط برچسب سود', kpiTone('بازده روی سرمایه', false) === 'loss');
+  check('کارت خنثی (سرمایه درگیر) بی‌رنگ می‌ماند', kpiTone('سرمایه درگیر', true) === '');
+  check('کارت خنثی (موقعیت باز) بی‌رنگ می‌ماند', kpiTone('موقعیت باز', false) === '');
 
   // پیام خام سرور (پ-۷ بک‌لاگ): «آخرین خطا» متن خام جاوااسکریپت بود، مثل
   // server/server.mjs:171 `${e.name}: ${e.message}` — کاربر فارسی‌زبان چیزی

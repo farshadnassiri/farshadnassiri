@@ -107,6 +107,16 @@ const COVERAGE_INFO = {
 export const coverageInfo = (state) => COVERAGE_INFO[state] || { label: state || '—', tone: 'flat' };
 
 /**
+ * کلاس رنگ کارت KPI برای برچسبی که علامت سود/زیان دارد — مبلغ («سود و زیان
+ * جاری») یا نسبتش («بازده روی سرمایه»). بقیه کارت‌ها (سرمایه درگیر، تعداد
+ * موقعیت) خنثی می‌مانند. اینجاست تا با style.css (.kpi:has(.v.gain/.loss))
+ * هم‌قرارداد و در بیش از یک تب قابل‌استفاده و آزمون‌پذیر باشد.
+ */
+export function kpiTone(label, isGain) {
+  return /سود|بازده/.test(label) ? (isGain ? 'gain' : 'loss') : '';
+}
+
+/**
  * پیام خام `stat.lastError` سرور (server/server.mjs) از `${e.name}: ${e.message}`
  * جاوااسکریپت می‌آید — مثل «TypeError: fetch failed» یا «AbortError: The
  * operation was aborted» — که برای کاربر فارسی‌زبان چیزی نمی‌گوید. این تابع
