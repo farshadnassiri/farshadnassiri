@@ -380,38 +380,46 @@ export async function mount(root, { tab, state, api }) {
 
   // ——— اجرای اسکن ———
   let timer = null;
+  const runBtn = root.querySelector('#run');
   async function run() {
     if (busy) return;
     const keys = picker.selected();
     if (!keys.length) { setStatus('نمادی انتخاب نشده'); return; }
     busy = true;
+    runBtn.disabled = true;
+    runBtn.textContent = 'در حال اسکن…';
     setStatus('مرحله یک — غربال روی سطح اول…');
-    await runScan({
-      defId: def.id, uaKeys: keys, settings: s(), qty,
-      onStage: (stage, res) => {
-        if (res.error) { setStatus(`خطا: ${res.error}`); return; }
-        if (stage === 'one') {
-          rows = res.rows;
-          funnelBar(root.querySelector('#funnel'), res.funnel);
-          table.set(rows);
-          drawKpis();
-          setStatus(`مرحله یک در ${fmt.int(res.ms)} میلی‌ثانیه — ${fmt.int(res.total)} ردیف، ${fmt.int(rows.length)} نمایش. مرحله دو…`);
-        } else {
-          const byId2 = new Map(res.rows.map((r) => [r.id, r]));
-          rows = rows.map((r) => byId2.get(r.id) || r);
-          // افت مظنه رتبه‌ها را زیر و رو می‌کند، پس دوباره مرتب می‌شود
-          table.set(rows);
-          table.sortBy(s().rankBy);
-          drawKpis();
-          if (picked) { const f = byId2.get(picked.id); if (f) showDetail(f); }
-          setStatus(`مرحله دو کامل — عمق ${fmt.int(res.asked || 0)} نماد گرفته شد. ${fmt.int(rows.length)} ردیف.`);
-        }
-      },
-    });
-    busy = false;
+    try {
+      await runScan({
+        defId: def.id, uaKeys: keys, settings: s(), qty,
+        onStage: (stage, res) => {
+          if (res.error) { setStatus(`خطا: ${res.error}`); return; }
+          if (stage === 'one') {
+            rows = res.rows;
+            funnelBar(root.querySelector('#funnel'), res.funnel);
+            table.set(rows);
+            drawKpis();
+            setStatus(`مرحله یک در ${fmt.int(res.ms)} میلی‌ثانیه — ${fmt.int(res.total)} ردیف، ${fmt.int(rows.length)} نمایش. مرحله دو…`);
+          } else {
+            const byId2 = new Map(res.rows.map((r) => [r.id, r]));
+            rows = rows.map((r) => byId2.get(r.id) || r);
+            // افت مظنه رتبه‌ها را زیر و رو می‌کند، پس دوباره مرتب می‌شود
+            table.set(rows);
+            table.sortBy(s().rankBy);
+            drawKpis();
+            if (picked) { const f = byId2.get(picked.id); if (f) showDetail(f); }
+            setStatus(`مرحله دو کامل — عمق ${fmt.int(res.asked || 0)} نماد گرفته شد. ${fmt.int(rows.length)} ردیف.`);
+          }
+        },
+      });
+    } finally {
+      busy = false;
+      runBtn.disabled = false;
+      runBtn.textContent = 'اسکن';
+    }
   }
 
-  root.querySelector('#run').addEventListener('click', run);
+  runBtn.addEventListener('click', run);
   auto.addEventListener('change', () => {
     clearInterval(timer);
     if (auto.checked) { run(); timer = setInterval(run, Math.max(10, s().watchIntervalSec * 3) * 1000); }

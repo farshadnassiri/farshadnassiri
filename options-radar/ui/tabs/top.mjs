@@ -154,23 +154,31 @@ export async function mount(root, { state, api }) {
   }
 
   // ——— اجرا ———
+  const runBtn = root.querySelector('#run');
   async function run() {
     if (busy) return;
     const keys = picker.selected();
     if (!keys.length) { setStatus('نمادی انتخاب نشده'); return; }
     busy = true;
+    runBtn.disabled = true;
+    runBtn.textContent = 'در حال اسکن…';
     setStatus('در حال غربال کل کاتالوگ…');
-    const res = await runScanAll({ uaKeys: keys, settings: s(), qty: s().qtyDefault, limit: s().topN });
-    if (res.error) { setStatus(`خطا: ${res.error}`); busy = false; return; }
-    rows = res.rows;
-    funnelBar(root.querySelector('#funnel'), res.funnel);
-    table.set(rows);
-    drawKpis();
-    setStatus(`${fmt.int(res.ms)} میلی‌ثانیه — از ${fmt.int(res.total)} ردیف کل، ${fmt.int(rows.length)} نمایش.`);
-    busy = false;
+    try {
+      const res = await runScanAll({ uaKeys: keys, settings: s(), qty: s().qtyDefault, limit: s().topN });
+      if (res.error) { setStatus(`خطا: ${res.error}`); return; }
+      rows = res.rows;
+      funnelBar(root.querySelector('#funnel'), res.funnel);
+      table.set(rows);
+      drawKpis();
+      setStatus(`${fmt.int(res.ms)} میلی‌ثانیه — از ${fmt.int(res.total)} ردیف کل، ${fmt.int(rows.length)} نمایش.`);
+    } finally {
+      busy = false;
+      runBtn.disabled = false;
+      runBtn.textContent = 'اسکن';
+    }
   }
 
-  root.querySelector('#run').addEventListener('click', run);
+  runBtn.addEventListener('click', run);
   let timer = null;
   auto.addEventListener('change', () => {
     clearInterval(timer);

@@ -287,6 +287,7 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
 }
 .btn:hover { filter: brightness(1.08); }
 .btn:active { filter: brightness(.92); }
+.btn:disabled { opacity: .6; cursor: not-allowed; filter: none; }
 .btn.sec { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); }
 .ghost {
   background: none; border: 1px solid var(--line); color: var(--ink-2);
@@ -391,10 +392,6 @@ table.data td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; 
 dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0; font-size: 12.5px; }
 dl.kv dt { color: var(--muted); }
 dl.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; direction: ltr; text-align: start; }
-
-@media (prefers-reduced-motion: no-preference) {
-  .card { transition: border-color .15s ease; }
-}
 
 /* ——— جدول مجازی‌سازی‌شده ———
    سرستون باید روی لبه بالای همین قاب پیمایش بچسبد. قاعده عمومی
