@@ -13,6 +13,7 @@ import { COLUMNS } from '/core/evaluate.mjs';
 import { analyzePayoff, scenarioGrid } from '/core/payoff.mjs';
 import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
 import { timeMachine } from '/core/timemachine.mjs';
+import { priceQuantile } from '/core/bs.mjs';
 import { gregorianToJalali } from '/core/jalali.mjs';
 import { makeTable, funnelBar } from '/ui/table.mjs';
 import { fmt, faNum, faDigits, coverageInfo } from '/ui/fmt.mjs';
@@ -251,6 +252,18 @@ export async function mount(root, { tab, state, api }) {
       <tr><td class="n">${faNum(g.pct.toFixed(0))}٪</td><td class="n">${fmt.money(g.S)}</td>
       <td class="n" style="color:${g.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(g.pnl)}</td></tr>`).join('');
 
+    // تصویر آینده — ریسک و ریوارد بر اساس صدک‌های محتمل قیمت پایه (قلم
+    // الف-۱، سؤال ۳). همان مدل لگاریتم-نرمال با روند صفر که popPct هم
+    // از آن می‌آید؛ مسیر واقعی قیمت نیست، توزیع آماری است.
+    const horizonT = (r.horizonDays ?? r.days) / 365;
+    const riskRows = [5, 25, 50, 75, 95].map((pct) => {
+      const level = priceQuantile(r.S, pct / 100, horizonT, r.sigmaUse);
+      return { pct, level, pnl: Number.isFinite(level) ? an.at(level) : NaN };
+    }).filter((x) => Number.isFinite(x.level));
+    const riskTableRows = riskRows.map((x) => `
+      <tr><td class="n">${faNum(x.pct)}٪</td><td class="n">${fmt.money(x.level)}</td>
+      <td class="n" style="color:${x.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(x.pnl)}</td></tr>`).join('');
+
     root.querySelector('#detail').innerHTML = `
       <div>
         <div id="chart"></div>
@@ -308,6 +321,15 @@ export async function mount(root, { tab, state, api }) {
           <thead><tr><th>تغییر پایه</th><th>قیمت پایه</th><th>سود و زیان</th></tr></thead>
           <tbody>${scenRows}</tbody>
         </table>
+
+        ${riskTableRows ? `
+        <h4 style="margin:14px 0 4px;font-size:12px">تصویر آینده — ریسک و ریوارد احتمالاتی</h4>
+        <p class="note" style="color:var(--warn)">توزیع لگاریتم-نرمال با روند صفر — همان مدلی که «احتمال سود» از آن
+          می‌آید. مسیر واقعی قیمت نیست: دامنه نوسان روزانه، توقف نماد، و پرش‌های بازار ایران این مدل را نمی‌بیند.</p>
+        <table class="mini">
+          <thead><tr><th>احتمال زیر این قیمت ماندن</th><th>قیمت پایه</th><th>سود و زیان</th></tr></thead>
+          <tbody>${riskTableRows}</tbody>
+        </table>` : ''}
       </div>`;
 
     // نمودار بعد از نشستن قالب سوار می‌شود، چون به اندازه واقعی قاب نیاز دارد
