@@ -270,10 +270,26 @@ export function makeTable(host, cols, opts = {}) {
     apply();
   }
 
+  // بستن با کلیک بیرون یا Escape — رفتار استاندارد هر پنل شناور در وب،
+  // که پنل انتخاب ستون تا امروز نداشت (فقط دکمه «بستن» خودش کار می‌کرد).
+  function closeOnOutside(e) {
+    if (panel.contains(e.target) || e.target === colsBtn || colsBtn?.contains(e.target)) return;
+    togglePanel();
+  }
+  function closeOnEscape(e) {
+    if (e.key === 'Escape') togglePanel();
+  }
   function togglePanel() {
     const open = panel.hasAttribute('hidden');
     panel.toggleAttribute('hidden', !open);
     colsBtn?.setAttribute('aria-pressed', open ? 'true' : 'false');
+    if (open) {
+      document.addEventListener('mousedown', closeOnOutside);
+      document.addEventListener('keydown', closeOnEscape);
+    } else {
+      document.removeEventListener('mousedown', closeOnOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    }
   }
   colsBtn?.addEventListener('click', togglePanel);
 
