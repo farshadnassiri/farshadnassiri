@@ -49,6 +49,13 @@ export async function mount(root, { state, api }) {
     <div class="kpis" id="kpis"></div>
 
     <section class="card">
+      <h3>مقایسه نامزدهای رول — همه قیمت‌های اعمال موجود در همان سررسید</h3>
+      <p class="note">هر ردیف یعنی «اگر پای تازه دقیقاً همین قیمت اعمال بود». روی هر ردیف کلیک کن تا آن را
+        در نمودارهای پایین انتخاب کنی. رتبه‌بندی بر مبنای تفاضل در قیمت فعلی است، نه بستانکاری تنها.</p>
+      <div class="scroll" style="max-height:40vh"><table class="data" id="cand"></table></div>
+    </section>
+
+    <section class="card">
       <h3 id="dtitle">تفاضل دو موقعیت</h3>
       <p class="note">بالای صفر یعنی رول بهتر است، پایین صفر یعنی نگه داشتن. دایره‌ها مرز تصمیم‌اند.</p>
       <div id="dchart"></div>
@@ -191,6 +198,32 @@ export async function mount(root, { state, api }) {
       ['سربه‌سری پس از رول', fmt.money(r.nextBreakevens[0]), '', ''],
       ['مرز تصمیم', r.crossings.length ? r.crossings.map((x) => fmt.money(x)).join(' , ') : 'بی‌مرز', 'قیمت پایه', ''],
     ].map(([k, v, sub, c]) => `<div class="kpi"><div class="k">${k}</div><div class="v ${c}">${v}</div><div class="s">${sub}</div></div>`).join('');
+
+    // ——— مقایسه همه نامزدهای رول در همان سررسید، نه فقط یکی‌یکی ———
+    const candRows = candidates.map((c2, i) => {
+      const nl = { kind: cur.kind, side: cur.side, ratio: cur.ratio, size: cur.size, strike: c2.st.strike, days: c2.days, ins: c2.q.ins };
+      const nq = quotesByIns.get(c2.q.ins) || { bid: c2.q.bid, ask: c2.q.ask, close: c2.q.close, last: c2.q.last };
+      const r2 = rollAnalysis({ pos: p, quotes, closeIdx, newLeg: nl, newQuote: nq, opt: { fees, spot, basis: 'BOOK' } });
+      return { i, strike: c2.st.strike, r: r2 };
+    });
+    const bestIdx = candRows.reduce((best, x) => (x.r.atSpot > candRows[best].r.atSpot ? x.i : best), 0);
+    root.querySelector('#cand').innerHTML = `
+      <thead><tr>
+        <th>اعمال</th><th>خالص نقدی رول</th><th>تفاضل در قیمت فعلی</th>
+        <th>سقف سود پس از رول</th><th>سربه‌سری پس از رول</th><th></th>
+      </tr></thead>
+      <tbody>${candRows.map((x) => `
+        <tr data-i="${x.i}" style="cursor:pointer;${x.i === candIdx ? 'background:var(--accent-soft)' : ''}">
+          <td class="n">${fmt.money(x.strike)}</td>
+          <td class="n">${fmt.money(x.r.netCashChange)}</td>
+          <td class="n" style="color:${x.r.atSpot >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(x.r.atSpotTotal)}</td>
+          <td class="n">${fmt.money(x.r.nextMaxProfit)}</td>
+          <td class="n">${fmt.money(x.r.nextBreakevens[0])}</td>
+          <td>${x.i === bestIdx ? '<span class="tag gain">بهترین تفاضل</span>' : ''}${x.i === candIdx ? '<span class="tag flat">انتخاب‌شده</span>' : ''}</td>
+        </tr>`).join('')}</tbody>`;
+    for (const tr of root.querySelectorAll('#cand tbody tr')) {
+      tr.addEventListener('click', () => { el('#new').value = tr.dataset.i; draw(); });
+    }
 
     const ks = [...r.curAnalysis.strikes, ...r.nextAnalysis.strikes, spot];
     const lo = Math.max(1, Math.min(...ks) * 0.75);
