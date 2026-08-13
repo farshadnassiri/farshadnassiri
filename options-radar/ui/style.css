@@ -267,6 +267,16 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
 .field.row input[type="checkbox"] { width: auto; accent-color: var(--accent); }
 .unit { font-size: 11px; color: var(--muted); font-family: var(--mono); }
 
+.num-ctl { display: flex; align-items: center; gap: 4px; }
+.num-ctl input[type="number"] { text-align: center; }
+.step-btn {
+  flex: none; width: 26px; height: 28px; padding: 0;
+  background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); border-radius: 4px;
+  font: inherit; font-size: 15px; line-height: 1; cursor: pointer;
+}
+.step-btn:hover { background: var(--accent-soft); border-color: var(--accent); }
+.num-range { width: 100%; margin-top: 2px; accent-color: var(--accent); }
+
 .btn {
   background: var(--accent); color: #fff; border: 0; border-radius: 4px;
   padding: 8px 16px; font: inherit; font-weight: 700; font-size: 13px; cursor: pointer;

@@ -60,16 +60,47 @@ export async function mount(root, { state, api }) {
         control = `<label for="${id}">${f.label}</label>
                    <input type="text" id="${id}" value="${s[f.key] ?? ''}">`;
       } else {
+        // اسلایدر و دکمه گام به‌جای فیلد خام (خواسته پ-۵): min/max/step از
+        // قبل در SCHEMA آماده است، همان دادهٔ لازم برای input[type=range].
+        // فیلد عددی هم می‌ماند چون برای مقدار دقیق (مثل کارمزد با شش رقم
+        // اعشار) اسلایدر به‌تنهایی کافی نیست.
         const unit = f.unit ? `<span class="unit">${f.unit}</span>` : '';
+        const bounded = f.min != null && f.max != null;
         control = `<label for="${id}">${f.label} ${unit}</label>
-          <input type="number" id="${id}" value="${s[f.key]}"
-            ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''}
-            step="${f.step ?? 'any'}">`;
+          <div class="num-ctl">
+            <button type="button" class="step-btn" data-dir="-1" tabindex="-1" aria-label="کم کردن یک گام">−</button>
+            <input type="number" id="${id}" value="${s[f.key]}"
+              ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''}
+              step="${f.step ?? 'any'}">
+            <button type="button" class="step-btn" data-dir="1" tabindex="-1" aria-label="زیاد کردن یک گام">+</button>
+          </div>
+          ${bounded ? `<input type="range" class="num-range" id="${id}-r" tabindex="-1"
+              min="${f.min}" max="${f.max}" step="${f.step ?? (f.max - f.min) / 100}" value="${s[f.key]}">` : ''}`;
       }
 
       wrap.innerHTML = control + (f.hint ? `<span class="hint">${f.hint}</span>` : '');
       grid.appendChild(wrap);
-      inputs.set(f.key, { field: f, node: wrap.querySelector(`#${id}`) });
+      const node = wrap.querySelector(`#${id}`);
+      const rangeNode = wrap.querySelector(`#${id}-r`);
+      inputs.set(f.key, { field: f, node, rangeNode });
+
+      if (f.kind === 'num' || f.kind === 'pct') {
+        const clamp = (v) => Math.min(f.max ?? Infinity, Math.max(f.min ?? -Infinity, v));
+        node.addEventListener('input', () => {
+          const v = Number(node.value);
+          if (rangeNode && Number.isFinite(v)) rangeNode.value = clamp(v);
+        });
+        rangeNode?.addEventListener('input', () => { node.value = rangeNode.value; });
+        for (const btn of wrap.querySelectorAll('.step-btn')) {
+          btn.addEventListener('click', () => {
+            const step = f.step || 1;
+            const cur = Number(node.value) || 0;
+            const next = clamp(cur + Number(btn.dataset.dir) * step);
+            node.value = next;
+            if (rangeNode) rangeNode.value = next;
+          });
+        }
+      }
     }
     holder.appendChild(card);
   }
@@ -85,9 +116,10 @@ export async function mount(root, { state, api }) {
   };
 
   const write = (next) => {
-    for (const [key, { field, node }] of inputs) {
+    for (const [key, { field, node, rangeNode }] of inputs) {
       if (field.kind === 'bool') node.checked = !!next[key];
       else node.value = next[key];
+      if (rangeNode) rangeNode.value = next[key];
     }
   };
 
