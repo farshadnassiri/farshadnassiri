@@ -4,11 +4,12 @@
 // جدا رنگ می‌شوند، قیمت‌های اعمال خط‌چین می‌خورند و نقاط سربه‌سری دایره
 // می‌گیرند. قیمت پایه فعلی خط نارنجی است.
 //
-// دو سطح دارد:
+// دو سطح دارد، برای هم بازده در سررسید هم تفاضل دو موقعیت (تصمیم رول):
 //
-//   payoffSvg   یک رشته SVG ایستا. برای چاپ و جایی که تعامل لازم نیست.
-//   mountPayoff نمودار تعامل‌پذیر: زوم با غلتک، پیمایش با کشیدن، و خط
-//               راهنمای متحرک که سود و زیان را سر هر قیمت پایه می‌خواند.
+//   payoffSvg / diffSvg     رشته SVG ایستا. برای چاپ و جایی که تعامل لازم نیست.
+//   mountPayoff / mountDiff نمودار تعامل‌پذیر: زوم با غلتک، پیمایش با کشیدن، و خط
+//                           راهنمای متحرک که مقدار را سر هر قیمت پایه می‌خواند.
+//                           هر دو روی همان موتور مشترک mountInteractive ساخته می‌شوند.
 //
 // چرا زوم فقط روی محور قیمت پایه است: محور عمودی همیشه از داده همان بازه
 // دوباره حساب می‌شود، پس بزرگ‌نمایی یک ناحیه باریک، خودش قد نمودار را هم
@@ -161,35 +162,21 @@ function homeRange(points, analysis, opt) {
   return [lo, hi];
 }
 
-/** رشته SVG ایستا — همان امضای قبلی، برای جاهایی که تعامل لازم نیست. */
-export function payoffSvg(legs, netCash, opt = {}) {
-  const { points, analysis } = seriesFor(legs, netCash, opt);
-  const ys = points.map((p) => p.pnl).filter(Number.isFinite);
-  if (!ys.length) return { svg: '<div class="note">نمودار قابل رسم نیست.</div>', analysis };
-  const [lo, hi] = homeRange(points, analysis, opt);
-  const f = frame(points, analysis, opt, lo, hi);
-  return { analysis, svg: f ? f.svg : '<div class="note">نمودار قابل رسم نیست.</div>' };
-}
-
 /**
- * نمودار تعامل‌پذیر.
+ * موتور مشترک نمودار تعامل‌پذیر — زوم با غلتک، پیمایش با کشیدن، خط
+ * راهنما، دکمه‌های +/−/نمای اول. هم `mountPayoff` هم `mountDiff` روی
+ * همین ساخته می‌شوند تا رفتار تعامل هر دو یکی بماند.
  *
- *   غلتک          زوم حول همان نقطه‌ای که نشانگر رویش است
- *   کشیدن         پیمایش افقی
- *   حرکت نشانگر   خط راهنما و خواندن سود و زیان سر همان قیمت پایه
- *   دوبار کلیک    برگشت به نمای اول
+ *   renderFrame(lo, hi)   قاب SVG را برای همان بازه می‌سازد؛ null یعنی
+ *                         بازه بیش از حد باریک است
+ *   atFn(S)               مقداری که زیر خط راهنما خوانده می‌شود
+ *   pnlLabel               برچسب آن مقدار در نوار خواندن (پیش‌فرض «سود و زیان»)
  *
- * برمی‌گرداند { analysis, reset, destroy }.
+ * برمی‌گرداند { reset, setHome, rerender, destroy } — caller حالت داده
+ * (points/analysis یا fn) را خودش نگه می‌دارد و بعد از هر تغییر
+ * `setHome` و `rerender` را صدا می‌زند.
  */
-export function mountPayoff(host, legs, netCash, opt = {}) {
-  let { points, analysis } = seriesFor(legs, netCash, opt);
-  let ys = points.map((p) => p.pnl).filter(Number.isFinite);
-  if (!ys.length) {
-    host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
-    return { analysis, reset() {}, destroy() {}, update: () => false };
-  }
-
-  let [homeLo, homeHi] = homeRange(points, analysis, opt);
+function mountInteractive(host, { homeLo, homeHi, renderFrame, atFn, pnlLabel = 'سود و زیان' }) {
   let lo = homeLo, hi = homeHi;
   let geo = null;
 
@@ -209,7 +196,7 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   const read = host.querySelector('.chart-read');
 
   function render() {
-    geo = frame(points, analysis, opt, lo, hi);
+    geo = renderFrame(lo, hi);
     canvas.innerHTML = geo ? geo.svg : '<div class="note">بازه بیش از حد باریک است.</div>';
   }
   render();
@@ -278,17 +265,17 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
     const svg = canvas.querySelector('svg');
     const g = svg?.querySelector('.cursor');
     if (!g || !geo || !Number.isFinite(S)) return;
-    const pnl = analysis.at(S);
-    if (!Number.isFinite(pnl)) { g.setAttribute('hidden', ''); return; }
+    const v = atFn(S);
+    if (!Number.isFinite(v)) { g.setAttribute('hidden', ''); return; }
     const x = geo.X(S);
-    const y = Math.min(Math.max(geo.Y(pnl), geo.pad.t), geo.H - geo.pad.b);
+    const y = Math.min(Math.max(geo.Y(v), geo.pad.t), geo.H - geo.pad.b);
     g.removeAttribute('hidden');
     g.querySelector('.cur-x').setAttribute('x1', x);
     g.querySelector('.cur-x').setAttribute('x2', x);
     g.querySelector('.cur-dot').setAttribute('cx', x);
     g.querySelector('.cur-dot').setAttribute('cy', y);
-    read.innerHTML = `پایه <b>${money(S)}</b> — سود و زیان `
-      + `<b style="color:${pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(pnl)}</b>`;
+    read.innerHTML = `پایه <b>${money(S)}</b> — ${pnlLabel} `
+      + `<b style="color:${v >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(v)}</b>`;
   }
   function hideCursor() {
     canvas.querySelector('.cursor')?.setAttribute('hidden', '');
@@ -296,20 +283,7 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   }
 
   const reset = () => { lo = homeLo; hi = homeHi; render(); };
-
-  // داده تازه بدون از دست دادن زوم و پیمایش کاربر. در اسکن پیوسته هر
-  // مرحله دو همین ترکیب را دوباره می‌آورد؛ ساختن نمودار از نو هر بار
-  // بازه‌ای که کاربر باز کرده بود را می‌پراند. بازه فعلی (lo/hi) دست
-  // نخورده می‌ماند مگر دیگر داخل بازه معنی‌دار داده نو نباشد.
-  function update(nextLegs, nextNetCash, nextOpt) {
-    const s = seriesFor(nextLegs, nextNetCash, nextOpt);
-    const nextYs = s.points.map((p) => p.pnl).filter(Number.isFinite);
-    if (!nextYs.length) return false;
-    points = s.points; analysis = s.analysis; ys = nextYs; opt = nextOpt;
-    [homeLo, homeHi] = homeRange(points, analysis, opt);
-    render();
-    return true;
-  }
+  const setHome = (nextHomeLo, nextHomeHi) => { homeLo = nextHomeLo; homeHi = nextHomeHi; };
 
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('pointerdown', onDown);
@@ -323,9 +297,9 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   host.querySelector('[data-act="out"]').addEventListener('click', () => zoomAt(NaN, 1.3));
 
   return {
-    get analysis() { return analysis; },
     reset,
-    update,
+    setHome,
+    rerender: render,
     destroy() {
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('pointerdown', onDown);
@@ -338,8 +312,67 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   };
 }
 
-/** نمودار تفاضل دو موقعیت — ورودی تصمیم رول. */
-export function diffSvg(fn, xMin, xMax, opt = {}) {
+/** رشته SVG ایستا — همان امضای قبلی، برای جاهایی که تعامل لازم نیست. */
+export function payoffSvg(legs, netCash, opt = {}) {
+  const { points, analysis } = seriesFor(legs, netCash, opt);
+  const ys = points.map((p) => p.pnl).filter(Number.isFinite);
+  if (!ys.length) return { svg: '<div class="note">نمودار قابل رسم نیست.</div>', analysis };
+  const [lo, hi] = homeRange(points, analysis, opt);
+  const f = frame(points, analysis, opt, lo, hi);
+  return { analysis, svg: f ? f.svg : '<div class="note">نمودار قابل رسم نیست.</div>' };
+}
+
+/**
+ * نمودار تعامل‌پذیر.
+ *
+ *   غلتک          زوم حول همان نقطه‌ای که نشانگر رویش است
+ *   کشیدن         پیمایش افقی
+ *   حرکت نشانگر   خط راهنما و خواندن سود و زیان سر همان قیمت پایه
+ *   دوبار کلیک    برگشت به نمای اول
+ *
+ * برمی‌گرداند { analysis, reset, update, destroy }.
+ */
+export function mountPayoff(host, legs, netCash, opt = {}) {
+  let { points, analysis } = seriesFor(legs, netCash, opt);
+  let ys = points.map((p) => p.pnl).filter(Number.isFinite);
+  if (!ys.length) {
+    host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
+    return { analysis, reset() {}, destroy() {}, update: () => false };
+  }
+
+  const [homeLo, homeHi] = homeRange(points, analysis, opt);
+
+  const engine = mountInteractive(host, {
+    homeLo, homeHi,
+    renderFrame: (lo, hi) => frame(points, analysis, opt, lo, hi),
+    atFn: (S) => analysis.at(S),
+  });
+
+  // داده تازه بدون از دست دادن زوم و پیمایش کاربر. در اسکن پیوسته هر
+  // مرحله دو همین ترکیب را دوباره می‌آورد؛ ساختن نمودار از نو هر بار
+  // بازه‌ای که کاربر باز کرده بود را می‌پراند. بازه فعلی زوم دست
+  // نخورده می‌ماند، فقط بازه نمای اول به‌روز می‌شود.
+  function update(nextLegs, nextNetCash, nextOpt) {
+    const s = seriesFor(nextLegs, nextNetCash, nextOpt);
+    const nextYs = s.points.map((p) => p.pnl).filter(Number.isFinite);
+    if (!nextYs.length) return false;
+    points = s.points; analysis = s.analysis; ys = nextYs; opt = nextOpt;
+    const [hLo, hHi] = homeRange(points, analysis, opt);
+    engine.setHome(hLo, hHi);
+    engine.rerender();
+    return true;
+  }
+
+  return {
+    get analysis() { return analysis; },
+    reset: engine.reset,
+    update,
+    destroy: engine.destroy,
+  };
+}
+
+/** بدنه رسم نمودار تفاضل روی یک بازه دلخواه — هم برای نمای ایستا هم تعامل‌پذیر. */
+function diffFrame(fn, xMin, xMax, opt = {}) {
   const W = opt.width ?? 760, H = opt.height ?? 240;
   const pad = { t: 16, r: 14, b: 30, l: 14 };
   const N = 160;
@@ -380,11 +413,57 @@ export function diffSvg(fn, xMin, xMax, opt = {}) {
     ? `<line class="spot" x1="${X(opt.spot)}" y1="${pad.t}" x2="${X(opt.spot)}" y2="${H - pad.b}"/>` : '';
 
   return {
-    crossings: cross,
+    crossings: cross, X, Y, pad, W, H, y0, xMin, xMax,
     svg: `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار تفاضل دو موقعیت">
       ${areas.join('')}${spotLine}
+      <g class="cursor" hidden>
+        <line class="cur-x" y1="${pad.t}" y2="${H - pad.b}"/>
+        <circle class="cur-dot" r="3.5"/>
+      </g>
       <line class="zero" x1="${pad.l}" y1="${y0}" x2="${W - pad.r}" y2="${y0}"/>
       <path class="curve" d="${line}"/>${dots}
     </svg>`,
+  };
+}
+
+/** نمودار تفاضل دو موقعیت — ورودی تصمیم رول. رشته SVG ایستا. */
+export function diffSvg(fn, xMin, xMax, opt = {}) {
+  const f = diffFrame(fn, xMin, xMax, opt);
+  return { crossings: f.crossings, svg: f.svg };
+}
+
+/**
+ * نمودار تفاضل تعامل‌پذیر — همان زوم، پیمایش و خط راهنمای `mountPayoff`
+ * روی `diffFrame`. برچسب خط راهنما «تفاضل» است چون مقدار رسم‌شده سود و
+ * زیان یک موقعیت نیست، تفاضل دو موقعیت است.
+ *
+ * برمی‌گرداند { crossings, reset, update, destroy }.
+ */
+export function mountDiff(host, fn, xMin, xMax, opt = {}) {
+  let curFn = fn, curOpt = opt;
+  let crossings = diffFrame(curFn, xMin, xMax, curOpt).crossings;
+
+  const engine = mountInteractive(host, {
+    homeLo: xMin, homeHi: xMax,
+    renderFrame: (lo, hi) => diffFrame(curFn, lo, hi, curOpt),
+    atFn: (S) => curFn(S),
+    pnlLabel: 'تفاضل',
+  });
+
+  // مثل mountPayoff.update: زوم فعلی دست نمی‌خورد، فقط داده و بازه نمای
+  // اول به‌روز می‌شوند
+  function update(nextFn, nextXMin, nextXMax, nextOpt) {
+    curFn = nextFn; curOpt = nextOpt;
+    crossings = diffFrame(curFn, nextXMin, nextXMax, curOpt).crossings;
+    engine.setHome(nextXMin, nextXMax);
+    engine.rerender();
+    return true;
+  }
+
+  return {
+    get crossings() { return crossings; },
+    reset: engine.reset,
+    update,
+    destroy: engine.destroy,
   };
 }

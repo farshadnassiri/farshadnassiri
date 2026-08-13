@@ -5,7 +5,7 @@
 
 import { markToMarket, blankPosition } from '/core/positions.mjs';
 import { todayJalali } from '/core/jalali.mjs';
-import { payoffSvg } from '/ui/chart.mjs';
+import { mountPayoff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
@@ -212,6 +212,12 @@ export async function mount(root, { state, api }) {
       b.addEventListener('click', async (e) => {
         e.stopPropagation();
         positions.splice(Number(b.dataset.del), 1);
+        // اندیس‌ها جابه‌جا شدند؛ پانل باز را می‌بندد تا نمودار به موقعیت
+        // نامرتبط دیگری نچسبد
+        expanded = null;
+        posChart?.destroy();
+        posChart = null;
+        posChartFor = null;
         await save();
         render();
       });
@@ -234,13 +240,17 @@ export async function mount(root, { state, api }) {
     if (expanded != null) drawDetail();
   }
 
+  // هر ۱۵ ثانیه priceAll دوباره صدا می‌زند و همین موقعیت باز شاید همچنان
+  // باز باشد؛ اگر همانی است که آخرین بار بود، فقط مقدارها جای‌گذاری
+  // می‌شوند و chart.update صدا زده می‌شود — وگرنه زوم نمودار هر ۱۵ ثانیه
+  // می‌پرید.
+  let posChart = null;
+  let posChartFor = null;
   function drawDetail() {
     const p = positions[expanded];
     if (!p) { root.querySelector('#det-card').style.display = 'none'; return; }
     const { m, spot, fees } = evalPos(p);
-    root.querySelector('#det-card').style.display = '';
-    root.querySelector('#det-title').textContent = `${p.title} — ${p.uaName || p.uaIns}`;
-    const { svg } = payoffSvg(p.legs, m.entryNet, { fees, spot, width: 720, height: 250 });
+    const chartOpt = { fees, spot, width: 720, height: 250 };
 
     const legRows = m.perLeg.map((l) => `
       <tr>
@@ -252,39 +262,59 @@ export async function mount(root, { state, api }) {
         <td class="n" style="color:${l.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(l.pnl)}</td>
       </tr>`).join('');
 
-    root.querySelector('#det').innerHTML = `
+    const kv1 = `
+      <dt>جریان نقد ورود</dt><dd>${fmt.money(m.entryNet)}</dd>
+      <dt>ارزش بستن الان</dt><dd>${fmt.money(m.closeNet)}</dd>
+      <dt>سود و زیان یک دست</dt><dd>${fmt.money(m.pnl)}</dd>
+      <dt>سود و زیان کل</dt><dd>${fmt.money(m.pnlTotal)}</dd>
+      <dt>سرمایه درگیر</dt><dd>${fmt.money(m.capital)}</dd>
+      <dt>مبنای سرمایه</dt><dd>${m.capitalLabel}</dd>
+      <dt>وجه تضمین</dt><dd>${fmt.money(m.margin)}</dd>
+      <dt>تضمین شرطی</dt><dd>${fmt.money(m.conditionalMargin)}</dd>
+      <dt>روز نگه‌داری</dt><dd>${m.daysHeld ?? '—'}</dd>
+      <dt>بازده</dt><dd>${fmt.pct(m.retPct)}٪</dd>
+      <dt>بازده ماهانه</dt><dd>${fmt.pct(m.retMonthPct)}٪</dd>`;
+
+    const kv2 = `
+      <dt>در قیمت فعلی پایه</dt><dd>${fmt.money(m.ifHeld.atSpot)}</dd>
+      <dt>بیشترین سود</dt><dd>${fmt.money(m.ifHeld.maxProfit)}</dd>
+      <dt>بیشترین زیان</dt><dd>${fmt.money(m.ifHeld.maxLoss)}</dd>
+      <dt>سربه‌سری</dt><dd>${m.ifHeld.breakevens.map((b) => Math.round(b).toLocaleString('en-US')).join(' , ') || '—'}</dd>`;
+
+    const refreshing = posChartFor === expanded && root.querySelector('#det').dataset.built === '1';
+    if (refreshing && posChart?.update(p.legs, m.entryNet, chartOpt)) {
+      root.querySelector('#det-title').textContent = `${p.title} — ${p.uaName || p.uaIns}`;
+      root.querySelector('#pos-leg-rows').innerHTML = legRows;
+      root.querySelector('#pos-kv1').innerHTML = kv1;
+      root.querySelector('#pos-kv2').innerHTML = kv2;
+      return;
+    }
+
+    root.querySelector('#det-card').style.display = '';
+    root.querySelector('#det-title').textContent = `${p.title} — ${p.uaName || p.uaIns}`;
+    const det = root.querySelector('#det');
+    det.dataset.built = '1';
+    det.innerHTML = `
       <div>
-        ${svg}
+        <div id="pos-chart"></div>
         <h4 style="margin:14px 0 4px;font-size:12px">تفکیک هر پا — برای یک دست قرارداد</h4>
         <table class="mini">
           <thead><tr><th>پا</th><th>قیمت ورود</th><th>قیمت بستن</th><th>سهم درگیر</th><th>کارمزد رفت و برگشت</th><th>سود و زیان</th></tr></thead>
-          <tbody>${legRows}</tbody>
+          <tbody id="pos-leg-rows">${legRows}</tbody>
         </table>
         <p class="note" style="margin-top:10px">قیمت بستن، مظنه مخالف است: موقعیت خرید روی تقاضا بسته می‌شود و موقعیت فروش روی عرضه بازخرید می‌شود.</p>
       </div>
       <div>
-        <dl class="kv">
-          <dt>جریان نقد ورود</dt><dd>${fmt.money(m.entryNet)}</dd>
-          <dt>ارزش بستن الان</dt><dd>${fmt.money(m.closeNet)}</dd>
-          <dt>سود و زیان یک دست</dt><dd>${fmt.money(m.pnl)}</dd>
-          <dt>سود و زیان کل</dt><dd>${fmt.money(m.pnlTotal)}</dd>
-          <dt>سرمایه درگیر</dt><dd>${fmt.money(m.capital)}</dd>
-          <dt>مبنای سرمایه</dt><dd>${m.capitalLabel}</dd>
-          <dt>وجه تضمین</dt><dd>${fmt.money(m.margin)}</dd>
-          <dt>تضمین شرطی</dt><dd>${fmt.money(m.conditionalMargin)}</dd>
-          <dt>روز نگه‌داری</dt><dd>${m.daysHeld ?? '—'}</dd>
-          <dt>بازده</dt><dd>${fmt.pct(m.retPct)}٪</dd>
-          <dt>بازده ماهانه</dt><dd>${fmt.pct(m.retMonthPct)}٪</dd>
-        </dl>
+        <dl class="kv" id="pos-kv1">${kv1}</dl>
         <h4 style="margin:14px 0 4px;font-size:12px">اگر تا سررسید نگه داری</h4>
-        <dl class="kv">
-          <dt>در قیمت فعلی پایه</dt><dd>${fmt.money(m.ifHeld.atSpot)}</dd>
-          <dt>بیشترین سود</dt><dd>${fmt.money(m.ifHeld.maxProfit)}</dd>
-          <dt>بیشترین زیان</dt><dd>${fmt.money(m.ifHeld.maxLoss)}</dd>
-          <dt>سربه‌سری</dt><dd>${m.ifHeld.breakevens.map((b) => Math.round(b).toLocaleString('en-US')).join(' , ') || '—'}</dd>
-        </dl>
+        <dl class="kv" id="pos-kv2">${kv2}</dl>
         <p class="note" style="margin-top:10px">برای تصمیم رول همین موقعیت، به تب تحلیل رول برو.</p>
       </div>`;
+
+    // نمودار بعد از نشستن قالب سوار می‌شود، چون به اندازه واقعی قاب نیاز دارد
+    posChart?.destroy();
+    posChart = mountPayoff(root.querySelector('#pos-chart'), p.legs, m.entryNet, chartOpt);
+    posChartFor = expanded;
   }
 
   // ——————————————— داده ———————————————
@@ -329,5 +359,5 @@ export async function mount(root, { state, api }) {
   await load();
   await priceAll();
   const timer = setInterval(priceAll, 15000);
-  return () => { offChain(); offWatch(); clearInterval(timer); };
+  return () => { offChain(); offWatch(); clearInterval(timer); posChart?.destroy(); };
 }
