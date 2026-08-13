@@ -22,6 +22,7 @@ import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
 import { resolveSafe } from '../server/safepath.mjs';
 import { isValidIns } from '../server/validate.mjs';
+import { readBody, BodyTooLargeError } from '../server/body.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -818,6 +819,26 @@ group('۱۹. صحت‌سنجی کد ابزار');
   check('کد با حرف رد شد', !isValidIns('123abc'));
   check('کد با اسلش رد شد', !isValidIns('123/456'));
   check('عدد جاوااسکریپتی رد شد', !isValidIns(123));
+}
+
+// ═══════════════════════════ ۲۰. سقف اندازه بدنه درخواست ═══════════════════════════
+group('۲۰. سقف اندازه بدنه درخواست');
+{
+  const small = await readBody([Buffer.from('{"a":1}')], 100);
+  check('بدنه کوچک کامل خوانده شد', small === '{"a":1}');
+
+  const empty = await readBody([], 100);
+  check('بدنه خالی رشته خالی می‌دهد', empty === '');
+
+  let threw = null;
+  try { await readBody([Buffer.alloc(60), Buffer.alloc(60)], 100); }
+  catch (e) { threw = e; }
+  check('بدنه بزرگ‌تر از سقف پرتاب می‌شود', threw instanceof BodyTooLargeError);
+
+  let notThrown = true;
+  try { await readBody([Buffer.alloc(100)], 100); }
+  catch { notThrown = false; }
+  check('بدنه دقیقاً هم‌اندازه سقف پذیرفته شد', notThrown);
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════
