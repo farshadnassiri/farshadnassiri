@@ -10,8 +10,50 @@
 // بیشترین قیمت روز، مرحله دو است و فقط برای کاندیداهای برتر گرفته می‌شود.
 
 import { num } from './num.mjs';
+import { impliedVol } from './bs.mjs';
 
 const n = (x) => num(x, 0);
+
+/** نزدیک‌ترین قیمت اعمال به قیمت پایه، در یک سررسید. */
+function nearestStrike(ex, spot) {
+  let best = null, bestDiff = Infinity;
+  for (const row of ex.strikeList) {
+    const diff = Math.abs(row.strike - spot);
+    if (diff < bestDiff) { bestDiff = diff; best = row; }
+  }
+  return best;
+}
+
+/**
+ * تلاطم ضمنی نزدیک‌ترین قیمت اعمال، نزدیک‌ترین سررسید — یک نگاه کلی برای
+ * فهرست نمادها، نه ورودی محاسبه اجرایی. قیمت پایانی مبناست چون بیرون از
+ * ساعت بازار هم موجود است؛ تقاضا/عرضه نیست چون آن‌ها فقط داخل بازار زنده‌اند.
+ */
+function atmIv(ua, rFree, divYield) {
+  const spot = ua.last || ua.close;
+  const ex = ua.expiryList[0];
+  if (!(spot > 0) || !ex || !(ex.days > 0)) return NaN;
+  const row = nearestStrike(ex, spot);
+  if (!row) return NaN;
+  const T = ex.days / 365;
+  for (const q of [row.call, row.put]) {
+    const mkt = q.close || q.last;
+    if (mkt > 0) {
+      const iv = impliedVol(q.kind, mkt, spot, row.strike, T, rFree, divYield, {});
+      if (Number.isFinite(iv)) return iv;
+    }
+  }
+  return NaN;
+}
+
+/** نسبت موقعیت باز پوت به کال، روی کل زنجیره — سنجه سنتی احساس بازار. */
+function pcOpenInterestRatio(ua) {
+  let callOi = 0, putOi = 0;
+  for (const ex of ua.expiryList) {
+    for (const row of ex.strikeList) { callOi += row.call.oi; putOi += row.put.oi; }
+  }
+  return callOi > 0 ? putOi / callOi : NaN;
+}
 
 // سنتینل «عمق نامعلوم». متناهی است چون num هر مقدار نامتناهی را صفر می‌کند،
 // و به‌اندازه‌ای بزرگ که هیچ‌وقت قید مقیدکننده نشود.
@@ -92,19 +134,32 @@ export function buildChain(rows) {
   return byUa;
 }
 
-/** فهرست نماد پایه برای منوی انتخابی — انتخابی، نه تایپی. */
-export function underlyingList(chain) {
+/**
+ * فهرست نماد پایه برای منوی انتخابی — انتخابی، نه تایپی. همان فهرست، تب
+ * دیده‌بان زنجیره را هم پر می‌کند، پس نمای بازار (تلاطم ضمنی، نسبت پوت به
+ * کال، نزدیک‌ترین سررسید) هم همین‌جاست، نه در یک تابع یا تب جدا.
+ *
+ * `opt.rFree`/`opt.divYield` برای تلاطم ضمنی؛ چون این فهرست جدا از تنظیمات
+ * کاربر ساخته می‌شود (در ریسه اسکن، مستقل از هر تب)، اگر داده نشود پیش‌فرض
+ * معقول همان پیش‌فرض `core/settings.mjs` است — عددی نمایشی، نه اجرایی.
+ */
+export function underlyingList(chain, opt = {}) {
+  const rFree = Number.isFinite(opt.rFree) ? opt.rFree : 0.30;
+  const divYield = Number.isFinite(opt.divYield) ? opt.divYield : 0;
   return [...chain.values()]
     .map((u) => ({
       ins: u.ins, name: u.name, last: u.last || u.close,
       contracts: u.contracts,
       expiries: u.expiryList.length,
+      nearestDays: u.expiryList[0]?.days ?? null,
       volume: u.expiryList.reduce((a, ex) => a
         + ex.strikeList.reduce((b, s) => b + s.call.vol + s.put.vol, 0), 0),
       oi: u.expiryList.reduce((a, ex) => a
         + ex.strikeList.reduce((b, s) => b + s.call.oi + s.put.oi, 0), 0),
       quoted: u.expiryList.reduce((a, ex) => a
         + ex.strikeList.reduce((b, s) => b + (s.call.bid > 0 ? 1 : 0) + (s.put.bid > 0 ? 1 : 0), 0), 0),
+      pcRatio: pcOpenInterestRatio(u),
+      atmIv: atmIv(u, rFree, divYield),
     }))
     .sort((a, b) => b.volume - a.volume || b.contracts - a.contracts);
 }

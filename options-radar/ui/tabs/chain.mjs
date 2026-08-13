@@ -16,8 +16,11 @@ const COLS = [
   { key: 'quoted', label: 'دارای مظنه', fmt: 'int', heat: 'prob' },
   { key: 'quotedPct', label: 'نسبت مظنه ٪', fmt: 'pct', heat: 'prob' },
   { key: 'expiries', label: 'سررسید', fmt: 'int' },
+  { key: 'nearestDays', label: 'نزدیک‌ترین سررسید', fmt: 'int' },
   { key: 'volume', label: 'حجم اختیار', fmt: 'int', heat: 'gain' },
   { key: 'oi', label: 'موقعیت باز', fmt: 'int', heat: 'gain' },
+  { key: 'pcRatio', label: 'نسبت پوت به کال', fmt: 'num' },
+  { key: 'atmIvPct', label: 'تلاطم ضمنی ٪ — نزدیک‌ترین پول', fmt: 'pct' },
 ];
 
 export async function mount(root, { state, api }) {
@@ -163,14 +166,22 @@ export async function mount(root, { state, api }) {
       <tbody>${body}</tbody>`;
   }
 
+  // atmIv و pcRatio از موتور خالص فراکشن/نسبت خام برمی‌گردند؛ درصد و برچسب
+  // نمایش، کار همین تب است، نه موتور
+  const withDerived = (u) => ({
+    ...u,
+    quotedPct: (u.quoted / (u.contracts || 1)) * 100,
+    atmIvPct: Number.isFinite(u.atmIv) ? u.atmIv * 100 : NaN,
+  });
+
   const offChain = onChain((cs) => {
-    list = cs.list.map((u) => ({ ...u, quotedPct: (u.quoted / (u.contracts || 1)) * 100 }));
+    list = cs.list.map(withDerived);
     table.set(list);
     picker.setList(cs.list);
     drawKpis(cs.stats, cs.at);
   });
   if (chainState.list.length) {
-    list = chainState.list.map((u) => ({ ...u, quotedPct: (u.quoted / (u.contracts || 1)) * 100 }));
+    list = chainState.list.map(withDerived);
     table.set(list);
     picker.setList(chainState.list);
     drawKpis(chainState.stats, chainState.at);
