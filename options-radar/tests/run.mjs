@@ -25,6 +25,7 @@ import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
 import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn } from '../ui/table.mjs';
+import { coverageInfo } from '../ui/fmt.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -1041,6 +1042,15 @@ group('۲۱. قالب‌بندی عدد فارسی');
   check('فاصله زمانی نامعتبر، خط تیره', faAgo(NaN) === '—' && faAgo(-5) === '—');
   check('ساعت با رقم فارسی و دو رقمی', faClock(new Date(2026, 7, 13, 9, 5, 3)) === '۰۹:۰۵:۰۳',
         faClock(new Date(2026, 7, 13, 9, 5, 3)));
+
+  // برچسب حالت پوشش (خواسته ۵): چهار حالت خام core/margin.mjs باید فارسی
+  // شوند و ریسک‌دار از کم‌ریسک با رنگ جدا شود، نه فقط با متن
+  const latin2 = /[a-zA-Z]/;
+  check('پوشش کامل، فارسی و کم‌ریسک', !latin2.test(coverageInfo('full').label) && coverageInfo('full').tone === 'gain');
+  check('پوشش لخت، فارسی و ریسک‌دار', !latin2.test(coverageInfo('naked').label) && coverageInfo('naked').tone === 'loss');
+  check('پوشش ناقص، فارسی و هشدار', !latin2.test(coverageInfo('partial').label) && coverageInfo('partial').tone === 'warn');
+  check('بدون پای فروش، خنثی', !latin2.test(coverageInfo('none').label) && coverageInfo('none').tone === 'flat');
+  check('حالت ناشناس، سقوط نمی‌کند و تن پیش‌فرض می‌دهد', coverageInfo('چیز-عجیب').tone === 'flat');
 }
 
 // ═══════════════ ۲۲. چیدمان ستون: جابه‌جایی و افزودن ═══════════════

@@ -13,7 +13,7 @@ import { COLUMNS } from '/core/evaluate.mjs';
 import { analyzePayoff, scenarioGrid } from '/core/payoff.mjs';
 import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
 import { makeTable, funnelBar } from '/ui/table.mjs';
-import { fmt, faNum } from '/ui/fmt.mjs';
+import { fmt, faNum, coverageInfo } from '/ui/fmt.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { mountPayoff } from '/ui/chart.mjs';
 import { runScan, onChain, pushRows, chainState } from '/ui/scanner.mjs';
@@ -246,7 +246,7 @@ export async function mount(root, { tab, state, api }) {
           ${an.approx ? `<span style="color:var(--warn)">${an.note}</span>` : ''}
           <span>سربه‌سری: ${an.breakevens.map((b) => fmt.money(b)).join(' , ') || '—'}</span>
           <span>بیشترین سود: ${fmt.money(an.maxProfit)}</span>
-          <span>بیشترین زیان: ${fmt.money(an.maxLoss)}</span>
+          <span>بیشترین زیان: <b style="color:${Number.isFinite(an.maxLoss) ? 'inherit' : 'var(--loss)'}">${fmt.money(an.maxLoss)}</b></span>
         </div>
         <h4 style="margin:14px 0 4px;font-size:12px">قیمت و عمق هر پا</h4>
         <table class="mini">
@@ -262,7 +262,8 @@ export async function mount(root, { tab, state, api }) {
           <dt>مبنای سرمایه</dt><dd>${r.capitalLabel}</dd>
           <dt>وجه تضمین</dt><dd>${fmt.money(r.margin)}</dd>
           <dt>تضمین شرطی</dt><dd>${fmt.money(r.conditionalMargin)}</dd>
-          <dt>پوشش</dt><dd>${r.coverage}</dd>
+          <dt>پوشش</dt><dd><span class="tag ${coverageInfo(r.coverage).tone}">${coverageInfo(r.coverage).label}</span></dd>
+          <dt>سقف زیان</dt><dd><span class="tag ${r.unlimitedLoss ? 'loss' : 'gain'}">${r.unlimitedLoss ? 'نامحدود — ریسک‌دار' : 'محدود'}</span></dd>
           <dt>بازده دوره</dt><dd>${fmt.pct(r.retMaxPct)}٪</dd>
           <dt>بازده ماهانه</dt><dd>${fmt.pct(r.retMonthPct)}٪</dd>
           <dt>احتمال سود</dt><dd>${fmt.pct(r.popPct)}٪</dd>

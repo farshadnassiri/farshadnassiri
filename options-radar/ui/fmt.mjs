@@ -90,3 +90,18 @@ export function faClock(d = new Date()) {
   const p = (n) => faDigits(String(n).padStart(2, '0'));
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
+
+/**
+ * برچسب و رنگ حالت پوشش (core/margin.mjs → coverage().state). خام موتور
+ * انگلیسی است («full» ، «naked» ...) و به‌تنهایی نمی‌گوید کدام حالت واقعاً
+ * ریسک‌دار است؛ این نگاشت آن تفکیک را صریح می‌کند — پوشش کامل کم‌ریسک است،
+ * لخت و ناقص ریسک‌دارند. اینجاست نه در یک تب خاص، چون تابع خالص و
+ * آزمون‌پذیر است و ممکن است بیش از یک صفحه به آن نیاز داشته باشد.
+ */
+const COVERAGE_INFO = {
+  full: { label: 'کامل — همه پای فروش پوشش دارد', tone: 'gain' },
+  partial: { label: 'ناقص — بخشی از پای فروش لخت است', tone: 'warn' },
+  naked: { label: 'لخت — بدون پوشش', tone: 'loss' },
+  none: { label: 'بدون پای فروش', tone: 'flat' },
+};
+export const coverageInfo = (state) => COVERAGE_INFO[state] || { label: state || '—', tone: 'flat' };
