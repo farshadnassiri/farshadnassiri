@@ -133,6 +133,17 @@ export function signTone(value) {
  * علت محتمل را می‌گوید؛ متن خام برای کسی که بخواهد جزئیات فنی را ببیند در
  * title/tooltip همان عنصر می‌ماند، نه اینجا حذف می‌شود.
  */
+const BRAND = 'رصد استراتژی آپشن';
+
+/**
+ * عنوان تب مرورگر برای تب باز. کاربری که چند تب مرورگر کنار هم باز دارد
+ * (مثلاً یکی زنجیره اختیار، یکی موقعیت‌های من) با نگاه به نوار تب مرورگر
+ * می‌فهمد کدام‌یک این است، بدون کلیک روی هرکدام.
+ */
+export function pageTitle(tabTitle) {
+  return tabTitle ? `${tabTitle} — ${BRAND}` : BRAND;
+}
+
 export function humanizeUpstreamError(raw) {
   if (!raw) return null;
   const s = String(raw);

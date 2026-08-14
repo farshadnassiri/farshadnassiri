@@ -24,7 +24,7 @@ import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
 import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
-import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone } from '../ui/fmt.mjs';
+import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone, pageTitle } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn } from '../ui/table.mjs';
 import { sameUnderlyingCandidates, compareLabel, compareFullLabel, MAX_COMPARE } from '../ui/compare.mjs';
 
@@ -1167,6 +1167,15 @@ group('۲۱. قالب‌بندی عدد فارسی');
   check('بدون خطا، مقدار خالی می‌دهد', humanizeUpstreamError(null) === null && humanizeUpstreamError('') === null);
   check('خطای ناشناس هم سقوط نمی‌کند و فارسی می‌ماند',
         !latin3.test(humanizeUpstreamError('some odd unmapped message')));
+
+  // عنوان تب مرورگر (پ-۶ بک‌لاگ، دور بیست‌ودوم): قبلاً عنوان همیشه ثابت بود
+  // و با هیچ تبی عوض نمی‌شد؛ کاربری که چند تب مرورگر باز دارد نمی‌توانست
+  // از روی نوار تب بفهمد کدام‌یک زنجیره اختیار است و کدام موقعیت‌های من.
+  check('عنوان تب، نام تب را جلوی برند می‌آورد',
+        pageTitle('دیده‌بان زنجیره اختیار') === 'دیده‌بان زنجیره اختیار — رصد استراتژی آپشن',
+        pageTitle('دیده‌بان زنجیره اختیار'));
+  check('بدون تب باز، فقط برند تنها می‌ماند', pageTitle('') === 'رصد استراتژی آپشن');
+  check('بدون تب باز (undefined)، فقط برند تنها می‌ماند', pageTitle() === 'رصد استراتژی آپشن');
 }
 
 // ═══════════════ ۲۲. چیدمان ستون: جابه‌جایی و افزودن ═══════════════

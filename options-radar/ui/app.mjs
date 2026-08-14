@@ -3,7 +3,7 @@
 // قاعده تب تنبل: ماژول هر تب فقط لحظه اولین کلیک وارد می‌شود و اشتراک
 // عکس لحظه‌ای هم فقط برای تب باز برقرار می‌شود. تب بسته، هیچ هزینه‌ای ندارد.
 
-import { fmt, faDigits, faAgo, faClock, humanizeUpstreamError } from '/ui/fmt.mjs';
+import { fmt, faDigits, faAgo, faClock, humanizeUpstreamError, pageTitle } from '/ui/fmt.mjs';
 import { defaults } from '/core/settings.mjs';
 import { CATALOG, GROUPS as SGROUPS } from '/strategies/catalog.mjs';
 
@@ -330,6 +330,7 @@ async function open(id) {
   const stage = el('stage');
   stage.innerHTML = '<div class="empty"><p>در حال باز کردن…</p></div>';
   location.hash = id;
+  document.title = pageTitle(t.title);
 
   try {
     const mod = t.mod ? await import(t.mod) : await import('/ui/tabs/soon.mjs');
