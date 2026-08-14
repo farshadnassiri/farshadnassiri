@@ -190,17 +190,25 @@ export function payoffSvg(legs, netCash, opt = {}) {
  */
 export function mountPayoff(host, legs, netCash, opt = {}) {
   const { points, analysis } = seriesFor(legs, netCash, opt);
-  return mountFromSeries(host, points, analysis, opt);
+  const inst = mountFromSeries(host, points, analysis, opt);
+  return {
+    ...inst,
+    /** همان صفحه، داده تازه — زوم و پیمایش فعلی کاربر دست‌نخورده می‌ماند. */
+    update(nextLegs, nextNetCash, nextOpt = opt) {
+      const s = seriesFor(nextLegs, nextNetCash, nextOpt);
+      inst.updateSeries(s.points, s.analysis, nextOpt);
+    },
+  };
 }
 
 function mountFromSeries(host, points, analysis, opt = {}) {
   const ys = points.map((p) => p.pnl).filter(Number.isFinite);
   if (!ys.length) {
     host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
-    return { analysis, reset() {}, destroy() {} };
+    return { analysis, reset() {}, updateSeries() {}, destroy() {} };
   }
 
-  const [homeLo, homeHi] = homeRange(points, analysis, opt);
+  let [homeLo, homeHi] = homeRange(points, analysis, opt);
   let lo = homeLo, hi = homeHi;
   let geo = null;
 
@@ -308,6 +316,19 @@ function mountFromSeries(host, points, analysis, opt = {}) {
 
   const reset = () => { lo = homeLo; hi = homeHi; render(); };
 
+  /**
+   * همان نمودار سوار، داده تازه. اسکن پیوسته هر چند ثانیه همین ردیف را
+   * دوباره ارزیابی می‌کند؛ بدون این، هر بار باید `destroy` و از نو
+   * `mount` می‌شد و زوم/پیمایش کاربر به نمای اول برمی‌گشت.
+   */
+  function updateSeries(nextPoints, nextAnalysis, nextOpt = opt) {
+    const nextYs = nextPoints.map((p) => p.pnl).filter(Number.isFinite);
+    if (!nextYs.length) return; // داده بی‌معنی، نمای فعلی دست‌نخورده می‌ماند
+    points = nextPoints; analysis = nextAnalysis; opt = nextOpt;
+    [homeLo, homeHi] = homeRange(points, analysis, opt);
+    render();
+  }
+
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointermove', onMove);
@@ -320,8 +341,9 @@ function mountFromSeries(host, points, analysis, opt = {}) {
   host.querySelector('[data-act="out"]').addEventListener('click', () => zoomAt(NaN, 1.3));
 
   return {
-    analysis,
+    get analysis() { return analysis; },
     reset,
+    updateSeries,
     destroy() {
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('pointerdown', onDown);
@@ -341,23 +363,35 @@ function mountFromSeries(host, points, analysis, opt = {}) {
  * `analyzePayoff` بازه‌شان را از قیمت‌های اعمال می‌سازند، ولی تفاضل دو
  * موقعیت قیمت اعمال خودش را ندارد.
  */
-export function mountDiff(host, fn, xMin, xMax, opt = {}) {
+function diffSeries(fn, xMin, xMax) {
   const N = 240;
   const points = [];
   for (let i = 0; i <= N; i++) {
     const S = xMin + ((xMax - xMin) * i) / N;
     points.push({ S, pnl: fn(S) });
   }
-
   const crossings = zeroCrossings(points, (p) => p.pnl);
-
   const analysis = { at: fn, breakevens: crossings, strikes: [] };
+  return { points, analysis, crossings };
+}
+
+export function mountDiff(host, fn, xMin, xMax, opt = {}) {
+  const { points, analysis, crossings } = diffSeries(fn, xMin, xMax);
   const inst = mountFromSeries(host, points, analysis, {
     ...opt,
     pnlLabel: opt.pnlLabel || 'تفاضل',
     ariaLabel: opt.ariaLabel || 'نمودار تفاضل دو موقعیت',
   });
-  return { ...inst, crossings };
+  return {
+    ...inst,
+    crossings,
+    /** همان صفحه، تابع تفاضل تازه — زوم و پیمایش فعلی کاربر دست‌نخورده می‌ماند. */
+    update(nextFn, nextXMin, nextXMax, nextOpt = opt) {
+      const s = diffSeries(nextFn, nextXMin, nextXMax);
+      inst.updateSeries(s.points, s.analysis, { ...nextOpt, pnlLabel: nextOpt.pnlLabel || 'تفاضل', ariaLabel: nextOpt.ariaLabel || 'نمودار تفاضل دو موقعیت' });
+      this.crossings = s.crossings;
+    },
+  };
 }
 
 /** نمودار تفاضل دو موقعیت — ورودی تصمیم رول. برای چاپ؛ نسخه تعامل‌پذیر `mountDiff` است. */

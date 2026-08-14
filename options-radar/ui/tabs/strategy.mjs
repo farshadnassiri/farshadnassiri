@@ -82,7 +82,13 @@ export async function mount(root, { tab, state, api }) {
 
     <section class="card" id="detail-card" style="margin-top:16px;display:none">
       <h3 id="detail-title">جزئیات ردیف</h3>
-      <div class="detail" id="detail"></div>
+      <div class="detail" id="detail">
+        <div>
+          <div id="chart"></div>
+          <div id="detail-left"></div>
+        </div>
+        <div id="detail-right"></div>
+      </div>
     </section>`;
 
   // ——— انتخابگر ———
@@ -187,8 +193,15 @@ export async function mount(root, { tab, state, api }) {
   }
 
   // ——— پانل جزئیات ———
+  //
+  // در اسکن پیوسته، مرحله دو همین ردیف باز را دوباره ارزیابی می‌کند. اگر
+  // هر بار کل `#detail` از نو ساخته شود، ظرف نمودار هم با آن عوض می‌شود و
+  // نمونه تعامل‌پذیرش با DOM قدیمی جدا می‌افتد — زوم و پیمایش کاربر به نمای
+  // اول برمی‌گردد. `#chart` بیرون از قالب هربارساز نگه داشته می‌شود؛ همان
+  // ردیف که تازه شود، `chart.update` صدا زده می‌شود نه `mountPayoff` از نو.
   let chart = null;
   function showDetail(r) {
+    const sameRow = picked?.id === r.id && !!chart;
     picked = r;
     const card = root.querySelector('#detail-card');
     card.style.display = '';
@@ -234,22 +247,20 @@ export async function mount(root, { tab, state, api }) {
       <tr><td class="n">${g.pct.toFixed(0)}٪</td><td class="n">${fmt.money(g.S)}</td>
       <td class="n" style="color:${g.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(g.pnl)}</td></tr>`).join('');
 
-    root.querySelector('#detail').innerHTML = `
-      <div>
-        <div id="chart"></div>
-        <div class="legend">
-          ${an.approx ? `<span style="color:var(--warn)">${an.note}</span>` : ''}
-          <span>سربه‌سری: ${an.breakevens.map((b) => Math.round(b).toLocaleString('en-US')).join(' , ') || '—'}</span>
-          <span>بیشترین سود: ${fmt.money(an.maxProfit)}</span>
-          <span>بیشترین زیان: ${fmt.money(an.maxLoss)}</span>
-        </div>
-        <h4 style="margin:14px 0 4px;font-size:12px">قیمت و عمق هر پا</h4>
-        <table class="mini">
-          <thead><tr><th>پا</th><th>اعمال</th><th>قیمت اجرا</th><th>میانه</th><th>اسپرد ٪</th><th>افت ٪</th><th>پرشده</th><th>کمبود</th><th>منبع</th></tr></thead>
-          <tbody>${legRows}</tbody>
-        </table>
+    root.querySelector('#detail-left').innerHTML = `
+      <div class="legend">
+        ${an.approx ? `<span style="color:var(--warn)">${an.note}</span>` : ''}
+        <span>سربه‌سری: ${an.breakevens.map((b) => Math.round(b).toLocaleString('en-US')).join(' , ') || '—'}</span>
+        <span>بیشترین سود: ${fmt.money(an.maxProfit)}</span>
+        <span>بیشترین زیان: ${fmt.money(an.maxLoss)}</span>
       </div>
-      <div>
+      <h4 style="margin:14px 0 4px;font-size:12px">قیمت و عمق هر پا</h4>
+      <table class="mini">
+        <thead><tr><th>پا</th><th>اعمال</th><th>قیمت اجرا</th><th>میانه</th><th>اسپرد ٪</th><th>افت ٪</th><th>پرشده</th><th>کمبود</th><th>منبع</th></tr></thead>
+        <tbody>${legRows}</tbody>
+      </table>`;
+
+    root.querySelector('#detail-right').innerHTML = `
         <dl class="kv">
           <dt>جهت نقدی</dt><dd>${r.cashLabel}</dd>
           <dt>نقد خالص</dt><dd>${fmt.money(r.netCash)}</dd>
@@ -283,12 +294,14 @@ export async function mount(root, { tab, state, api }) {
         <table class="mini">
           <thead><tr><th>تغییر پایه</th><th>قیمت پایه</th><th>سود و زیان</th></tr></thead>
           <tbody>${scenRows}</tbody>
-        </table>
-      </div>`;
+        </table>`;
 
-    // نمودار بعد از نشستن قالب سوار می‌شود، چون به اندازه واقعی قاب نیاز دارد
-    chart?.destroy();
-    chart = mountPayoff(root.querySelector('#chart'), r.__legs, r.netCash, chartOpt);
+    if (sameRow) {
+      chart.update(r.__legs, r.netCash, chartOpt);
+    } else {
+      chart?.destroy();
+      chart = mountPayoff(root.querySelector('#chart'), r.__legs, r.netCash, chartOpt);
+    }
   }
 
   // ——— اجرای اسکن ———
