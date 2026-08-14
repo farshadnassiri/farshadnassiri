@@ -351,6 +351,17 @@ group('۷. دفتر سفارش و حجم');
   check('میانه مظنه، ادعای اجرا ندارد',
     resolvePrice(q, 'sell', { basis: 'BOOK', execMode: 'MID', qty: 5 }).price === 102.5
     && !resolvePrice(q, 'sell', { basis: 'BOOK', execMode: 'MID', qty: 5 }).executable);
+
+  // بازبینی هدفمند شانزدهم: شاخه MID زودتر از parse شدن دفتر برمی‌گشت،
+  // پس capacity هرگز ست نمی‌شد و maxSize() همیشه سقف صفر می‌داد — با
+  // همان دفتر، در حالت تهاجمی سقف واقعی از عمق می‌آمد.
+  const rpMid = resolvePrice({ bid: 100, ask: 105, book }, 'sell', { basis: 'BOOK', execMode: 'MID', qty: 2 });
+  check('حالت میانه هم ظرفیت دفتر را حساب می‌کند، نه صفر',
+    rpMid.capacity === 35, `ظرفیت ${rpMid.capacity}`);
+  const capMid = maxSize([{ kind: 'call', side: 'sell', ratio: 1, exec: rpMid }]);
+  check('سقف قرارداد در حالت میانه صفر نمی‌ماند',
+    capMid.max === 35, `سقف ${capMid.max}`);
+
   check('بی‌مظنه، قیمت صفر و کیفیت هیچ',
     resolvePrice({ bid: 0, ask: 0, book: [] }, 'sell', { basis: 'BOOK', qty: 1 }).quality === 'none');
 }

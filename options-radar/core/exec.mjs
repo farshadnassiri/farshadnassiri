@@ -103,18 +103,22 @@ export function resolvePrice(quote, side, opt = {}) {
   if (basis === 'HIGH') return ref(q.high, 'بیشترین قیمت روز', false);
 
   // ——— مبنای دفتر سفارش ———
+  const book = Array.isArray(q.book) && q.book.length
+    ? q.book
+    : [{ bid: num(q.bid), bidQty: num(q.bidQty), ask: num(q.ask), askQty: num(q.askQty) }];
+
   if (mode === 'MID') {
     const m = midOf(q);
     return {
       price: m, source: 'میانه مظنه', quality: 'level1', executable: false, simultaneous: true,
       filled: 0, short: qty, levels: 0, slipPct: NaN, top: m, full: false,
+      // ظرفیت دفتر، مستقل از مبنای قیمت است — قیمت میانه هم به همان اندازه
+      // عمق واقعی سطوح، قابل اجراست؛ بدون این، maxSize() همیشه صفر می‌داد.
+      capacity: bookCapacity(book, side, 0, num(opt.maxSlipPct, Infinity)),
     };
   }
 
   const skip = mode === 'CONSERVATIVE' ? 1 : 0;
-  const book = Array.isArray(q.book) && q.book.length
-    ? q.book
-    : [{ bid: num(q.bid), bidQty: num(q.bidQty), ask: num(q.ask), askQty: num(q.askQty) }];
   const hasDepth = Array.isArray(q.book) && q.book.length > 1;
   const w = walkBook(book, qty, side, skip);
   const capacity = bookCapacity(book, side, skip, num(opt.maxSlipPct, Infinity));
