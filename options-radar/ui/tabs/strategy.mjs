@@ -16,7 +16,7 @@ import { timeMachine } from '/core/timemachine.mjs';
 import { priceQuantile } from '/core/bs.mjs';
 import { gregorianToJalali } from '/core/jalali.mjs';
 import { makeTable, funnelBar, changedIds } from '/ui/table.mjs';
-import { fmt, faNum, faDigits, coverageInfo, signTone } from '/ui/fmt.mjs';
+import { fmt, faNum, faDigits, coverageInfo, signTone, signColor } from '/ui/fmt.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { mountPayoff, payoffAt } from '/ui/chart.mjs';
 import { sameUnderlyingCandidates, compareLabel, compareFullLabel, MAX_COMPARE } from '/ui/compare.mjs';
@@ -268,7 +268,7 @@ export async function mount(root, { tab, state, api }) {
 
     const scenRows = grid.map((g) => `
       <tr><td class="n">${faNum(g.pct.toFixed(0))}٪</td><td class="n">${fmt.money(g.S)}</td>
-      <td class="n" style="color:${g.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(g.pnl)}</td></tr>`).join('');
+      <td class="n" style="color:${signColor(g.pnl)}">${fmt.money(g.pnl)}</td></tr>`).join('');
 
     // تصویر آینده — ریسک و ریوارد بر اساس صدک‌های محتمل قیمت پایه (قلم
     // الف-۱، سؤال ۳). همان مدل لگاریتم-نرمال با روند صفر که popPct هم

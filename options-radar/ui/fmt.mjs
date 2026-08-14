@@ -186,6 +186,16 @@ export function signTone(value) {
 }
 
 /**
+ * همان signTone، برای جاهایی که رنگ به‌صورت style="color:..." این‌لاین
+ * روی سلول جدول می‌نشیند نه کلاس — عدد نامتناهی (مثلاً NaN از تحلیل
+ * چند-سررسیدی روی سناریوی حدی) به‌جای قرمز نادرست، رنگ متن معمولی می‌گیرد.
+ */
+export function signColor(value) {
+  const tone = signTone(value);
+  return tone === 'gain' ? 'var(--gain)' : tone === 'loss' ? 'var(--loss)' : 'inherit';
+}
+
+/**
  * پیام خام `stat.lastError` سرور (server/server.mjs) از `${e.name}: ${e.message}`
  * جاوااسکریپت می‌آید — مثل «TypeError: fetch failed» یا «AbortError: The
  * operation was aborted» — که برای کاربر فارسی‌زبان چیزی نمی‌گوید. این تابع

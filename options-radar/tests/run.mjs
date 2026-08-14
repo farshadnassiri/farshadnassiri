@@ -24,7 +24,7 @@ import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
 import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
-import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone, pageTitle, normFa } from '../ui/fmt.mjs';
+import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone, signColor, pageTitle, normFa } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn, changedIds } from '../ui/table.mjs';
 import { sameUnderlyingCandidates, compareLabel, compareFullLabel, MAX_COMPARE } from '../ui/compare.mjs';
 
@@ -1200,6 +1200,14 @@ group('۲۱. قالب‌بندی عدد فارسی');
   check('بازده منفی، قرمز', signTone(-3.2) === 'loss');
   check('صفر هم سبز حساب می‌شود (نه زیان)', signTone(0) === 'gain');
   check('بدون ردیف (NaN)، بی‌رنگ می‌ماند', signTone(NaN) === '');
+
+  // همان signTone برای سلول جدولی که رنگ را با style این‌لاین می‌گیرد
+  // (سلول شوک سناریو تب استراتژی) — قبلاً g.pnl>=0 دستی چک می‌شد، پس
+  // NaN (تحلیل چند-سررسیدی روی سناریوی حدی) قرمز نادرست می‌گرفت.
+  check('signColor مثبت، رنگ سود', signColor(12.5) === 'var(--gain)');
+  check('signColor منفی، رنگ زیان', signColor(-3.2) === 'var(--loss)');
+  check('signColor صفر، رنگ سود', signColor(0) === 'var(--gain)');
+  check('signColor روی NaN دیگر قرمز نادرست نمی‌دهد', signColor(NaN) === 'inherit');
 
   // پیام خام سرور (پ-۷ بک‌لاگ): «آخرین خطا» متن خام جاوااسکریپت بود، مثل
   // server/server.mjs:171 `${e.name}: ${e.message}` — کاربر فارسی‌زبان چیزی
