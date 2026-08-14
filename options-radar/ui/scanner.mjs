@@ -31,7 +31,14 @@ function ensureWorker() {
     const w = waiting.get(m.id);
     if (w) { waiting.delete(m.id); w(m); }
   };
-  worker.onerror = (err) => console.error('ریسه اسکن:', err.message);
+  worker.onerror = (err) => {
+    console.error('ریسه اسکن:', err.message);
+    // نگهبان آخر — اگر خطا هرگز به یک id مشخص نرسید (مثلاً خرابی سطح
+    // ماژول، پیش از رسیدن به try/catch داخل ریسه)، همه منتظرها آزاد
+    // می‌شوند تا دکمه اسکن برای همیشه «در حال اسکن…» قفل نماند
+    for (const [id, resolve] of waiting) resolve({ id, error: err.message || 'خطای ریسه اسکن' });
+    waiting.clear();
+  };
   return worker;
 }
 
@@ -123,6 +130,10 @@ export async function runScan({ defId, uaKeys, settings, qty, onStage }) {
       type: 'scan', defId, uaKeys: [...new Set(top.map((r) => r.uaIns))],
       settings, sigmaByUa, qty, onlyIds: top.map((r) => r.id),
     });
+    // خطای ریسه (نه فقط خطای شبکه که catch زیر می‌گیرد) هم از همین راه
+    // برمی‌گردد؛ بدون این بررسی، two.rows نبود و onStage مصرف‌کننده‌اش
+    // (strategy.mjs) روی res.rows.map می‌ترکید
+    if (two.error) { onStage?.('two', { rows: [], error: two.error }); return one; }
     onStage?.('two', { ...two, asked: list.length });
     return two;
   } catch (e) {

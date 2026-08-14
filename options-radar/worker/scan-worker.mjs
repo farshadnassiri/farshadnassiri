@@ -47,9 +47,21 @@ function ensureChain() {
   return chain;
 }
 
+// نخ اصلی روی هر پیام یک Promise معلق نگه می‌دارد (ui/scanner.mjs) که فقط
+// resolve دارد، نه reject — پس اگر همین‌جا خطایی بی‌نگهبان پرتاب شود، آن
+// Promise هرگز نمی‌شکند و دکمه اسکن تا آخر عمر «در حال اسکن…» می‌ماند.
+// بلوک try/catch دور کل بدنه، تضمین می‌کند هر پیام همیشه یک جواب می‌گیرد —
+// موفق یا خطا، هرگز بی‌جواب نمی‌ماند.
 self.onmessage = (e) => {
   const m = e.data;
+  try {
+    handleMessage(m);
+  } catch (err) {
+    self.postMessage({ type: 'error', id: m.id, error: String(err?.message || err) });
+  }
+};
 
+function handleMessage(m) {
   if (m.type === 'rows') {
     if (m.full) rowsByKey = new Map(m.rows.map((r) => [rowKey(r), r]));
     else for (const r of m.rows) rowsByKey.set(rowKey(r), r);
@@ -138,4 +150,4 @@ self.onmessage = (e) => {
     self.postMessage({ type: 'chain-detail', id: m.id, ua: out });
     return;
   }
-};
+}
