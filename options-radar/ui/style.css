@@ -3,6 +3,20 @@
    رنگ‌ها فقط از همین متغیرها می‌آیند تا افزودن پوسته سوم یک بلوک باشد.
    ———————————————————————————————————————————————— */
 
+/* قلم کنار پروژه است، نه از cdn.jsdelivr.net — ابزار محلی که ادعای «هیچ
+   بسته‌ای نصب نمی‌شود» دارد نباید برای قلمش به اینترنت وصل شود. یک فایل
+   متغیر (وزن ۱۰۰ تا ۹۰۰) به‌جای نه فایل ایستا — هم کوچک‌تر است، هم هر وزنی
+   که جدول از آن استفاده می‌کند (۵۰۰ تا ۸۰۰) دقیق رسم می‌شود. مجوز OFL در
+   fonts/OFL.txt کنارش است. */
+@font-face {
+  font-family: Vazirmatn;
+  src: url('fonts/Vazirmatn-Variable.woff2') format('woff2 supports variations'),
+       url('fonts/Vazirmatn-Variable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --ground: #edf0f4;
   --panel: #ffffff;
