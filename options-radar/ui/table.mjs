@@ -141,6 +141,11 @@ export function makeTable(host, cols, opts = {}) {
   let sortKey = opts.sortKey && byKey.has(opts.sortKey) ? opts.sortKey : keys[0];
   let sortDir = -1;
   const ranges = new Map();
+  // ردیف برجسته صفحه‌کلید — قبلاً جدول فقط با کلیک ماوس باز می‌شد؛ کاربر
+  // صفحه‌کلیدی که با Tab به تب‌ها.tbl-body می‌رسید (از قبل tabindex="0" دارد)
+  // هیچ راهی برای باز کردن جزئیات یک ردیف نداشت. اندیس، نه شناسه ردیف، چون
+  // با هر مرتب‌سازی/اسکن تازه لیست از نو می‌چیند.
+  let activeIdx = -1;
 
   const active = () => keys.map((k) => byKey.get(k)).filter(Boolean);
 
@@ -340,6 +345,7 @@ export function makeTable(host, cols, opts = {}) {
       return String(x ?? '').localeCompare(String(y ?? ''), 'fa') * dir;
     });
     computeRanges();
+    if (activeIdx >= view.length) activeIdx = view.length - 1;
     for (const th of headRow.children) {
       th.dataset.sorted = th.dataset.key === k ? (dir < 0 ? 'desc' : 'asc') : '';
     }
@@ -362,6 +368,7 @@ export function makeTable(host, cols, opts = {}) {
       const tr = document.createElement('tr');
       tr.className = rowClass(r);
       tr.dataset.i = i;
+      tr.setAttribute('data-kbd-active', i === activeIdx ? '1' : '0');
       for (const c of shown) {
         const td = document.createElement('td');
         const v = r[c.key];
@@ -372,7 +379,7 @@ export function makeTable(host, cols, opts = {}) {
         if (isNum && Number.isFinite(v) && v < 0) td.style.color = 'var(--loss)';
         tr.appendChild(td);
       }
-      tr.addEventListener('click', () => opts.onPick?.(r));
+      tr.addEventListener('click', () => { activeIdx = i; opts.onPick?.(r); });
       frag.appendChild(tr);
     }
     tbody.innerHTML = '';
@@ -402,6 +409,27 @@ export function makeTable(host, cols, opts = {}) {
   }
 
   body.addEventListener('scroll', () => requestAnimationFrame(draw), { passive: true });
+
+  /** activeIdx را جابه‌جا می‌کند و مطمئن می‌شود ردیف تازه داخل دید بماند. */
+  function moveActive(delta) {
+    if (!view.length) return;
+    activeIdx = activeIdx < 0
+      ? (delta > 0 ? 0 : view.length - 1)
+      : Math.min(view.length - 1, Math.max(0, activeIdx + delta));
+    const top = activeIdx * ROW_H;
+    if (top < body.scrollTop) body.scrollTop = top;
+    else if (top + ROW_H > body.scrollTop + body.clientHeight) body.scrollTop = top + ROW_H - body.clientHeight;
+    draw();
+  }
+
+  body.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); moveActive(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); moveActive(-1); }
+    else if ((e.key === 'Enter' || e.key === ' ') && activeIdx >= 0 && view[activeIdx]) {
+      e.preventDefault();
+      opts.onPick?.(view[activeIdx]);
+    }
+  });
 
   buildHead();
   buildPanel();
