@@ -24,6 +24,7 @@ import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '
 import { safeStaticPath } from '../server/static-path.mjs';
 import { isInsCode } from '../server/ins-code.mjs';
 import { readBody, BodyTooLargeError } from '../server/read-body.mjs';
+import { nextWatchDelaySec } from '../server/watch-backoff.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -844,6 +845,17 @@ group('۱۹. سقف بدنه درخواست');
   let exact = null;
   try { exact = await readBody(fakeReq(['x'.repeat(100)]), 100); } catch { exact = 'threw'; }
   check('برابر سقف هنوز پذیرفته می‌شود', exact === 'x'.repeat(100));
+}
+
+group('۲۰. عقب‌نشینی حلقه دیده‌بان');
+{
+  check('بدون شکست، فاصله همان تنظیم است', nextWatchDelaySec(5, 0) === 5);
+  check('کف فاصله رعایت می‌شود', nextWatchDelaySec(1, 0) === 2);
+  check('اولین شکست، فاصله را دو برابر می‌کند', nextWatchDelaySec(5, 1) === 10);
+  check('شکست پیاپی، نمایی رشد می‌کند', nextWatchDelaySec(5, 3) === 40);
+  check('رشد نمایی از سقف عبور نمی‌کند', nextWatchDelaySec(5, 20, 120) === 120);
+  check('موفقیت دوباره، فاصله را به حالت عادی برمی‌گرداند',
+    nextWatchDelaySec(5, 0) === 5 && nextWatchDelaySec(5, 1) !== 5);
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

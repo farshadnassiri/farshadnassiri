@@ -21,6 +21,7 @@ import { defaults, sanitize } from '../core/settings.mjs';
 import { safeStaticPath } from './static-path.mjs';
 import { isInsCode } from './ins-code.mjs';
 import { readBody, BodyTooLargeError } from './read-body.mjs';
+import { nextWatchDelaySec } from './watch-backoff.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -239,11 +240,12 @@ function broadcast(event, payload) {
   for (const res of clients) { try { res.write(msg); } catch { clients.delete(res); } }
 }
 
+/** @returns {Promise<boolean>} نبود خطا. بازار بسته خطا نیست. */
 async function watchTick() {
   const gate = marketOpen();
   stat.paused = !gate.open;
   stat.pauseReason = gate.why;
-  if (!gate.open) return;
+  if (!gate.open) return true;
 
   const t0 = Date.now();
   try {
@@ -265,15 +267,19 @@ async function watchTick() {
     stat.lastWatchMs = Date.now() - t0;
     // بار اول کل عکس، بعد فقط ردیف‌های تغییرکرده
     broadcast('watch', { at: watch.at, full: first, count: rows.length, rows: first ? rows : changed });
+    return true;
   } catch (e) {
     broadcast('trouble', { at: Date.now(), message: `${e.name}: ${e.message}` });
+    return false;
   }
 }
 
 async function watchLoop() {
+  let failStreak = 0;
   for (;;) {
-    await watchTick();
-    await sleep(Math.max(2, S.watchIntervalSec) * 1000);
+    const ok = await watchTick();
+    failStreak = ok ? 0 : failStreak + 1;
+    await sleep(nextWatchDelaySec(S.watchIntervalSec, failStreak) * 1000);
   }
 }
 
