@@ -15,7 +15,7 @@ import {
 import { walkBook, resolvePrice, maxSize, bookCapacity } from '../core/exec.mjs';
 import { evaluate, profitRegions, probOfProfit, breakevenMetrics } from '../core/evaluate.mjs';
 import { CATALOG, buildLegs, byId } from '../strategies/catalog.mjs';
-import { defaults } from '../core/settings.mjs';
+import { defaults, SCHEMA } from '../core/settings.mjs';
 import { buildChain, underlyingList, chainStats } from '../core/chain.mjs';
 import { scan as scanFn, scanAll, generateCombos, unexecutableReason } from '../core/scan.mjs';
 import { markToMarket, rollAnalysis } from '../core/positions.mjs';
@@ -1209,6 +1209,12 @@ group('۲۱. قالب‌بندی عدد فارسی');
   const samples = [uiFmt.money(-12345.6), uiFmt.pct(-0.5), uiFmt.num(999999), uiFmt.int(7),
                    axisNum(-40500000), axisNum(2.5e9), axisNum(45000), axisNum(120)];
   check('هیچ رقم لاتینی باقی نمی‌ماند', samples.every((s) => !latin.test(s)), samples.join(' | '));
+
+  // faNum/faDigits همه‌جا بی‌قیدوشرط فارسی می‌کنند — پس SCHEMA نباید کلید
+  // «ارقام فارسی» قابل‌تنظیم داشته باشد؛ چنین کلیدی در تب تنظیمات چک‌باکسی
+  // واقعی و ذخیره‌شدنی می‌سازد ولی هیچ مصرف‌کننده‌ای در کد ندارد — کنترل
+  // مرده‌ای که کاربر را گمراه می‌کند (بازبینی هدفمند، دور هفتم).
+  check('SCHEMA کلید مرده «ارقام فارسی» ندارد', !SCHEMA.some((f) => f.key === 'persianDigits'));
 
   check('محور: میلیون و میلیارد و هزار', axisNum(2.5e9) === '۲٫۵ میلیارد' && axisNum(45000) === '۴۵ هزار',
         `${axisNum(2.5e9)} و ${axisNum(45000)}`);

@@ -212,8 +212,6 @@ export const SCHEMA = [
   // ——— نمایش ———
   { key: 'theme', group: 'view', kind: 'pick', scope: 'client',
     def: 'ledger', options: [['ledger', 'دفتر — روشن'], ['board', 'تابلو — تیره']], label: 'پوسته' },
-  { key: 'persianDigits', group: 'view', kind: 'bool', scope: 'client',
-    def: false, label: 'ارقام فارسی' },
   { key: 'topN', group: 'view', kind: 'num', scope: 'client',
     def: 200, min: 10, max: 5000, step: 10, unit: 'ردیف', label: 'سقف ردیف جدول' },
 ];

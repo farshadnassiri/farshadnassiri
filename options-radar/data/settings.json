@@ -57,6 +57,5 @@
   "tradingDaysYr": 240,
   "shockPct": 10,
   "theme": "ledger",
-  "persianDigits": false,
   "topN": 200
 }
