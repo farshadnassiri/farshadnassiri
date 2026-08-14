@@ -268,7 +268,7 @@ function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, r
 
   host.innerHTML = `
     <div class="chart-box">
-      <div class="chart-canvas" tabindex="0" role="img" aria-label="نمودار تعامل‌پذیر — فلش چپ و راست برای پیمایش، + و − برای زوم، Home برای نمای اول"></div>
+      <div class="chart-canvas" tabindex="0" role="group" aria-label="نمودار تعامل‌پذیر — فلش چپ و راست برای پیمایش، + و − برای زوم، Home برای نمای اول"></div>
       <div class="chart-tools">
         <span class="chart-read">${hint}</span>
         <span class="sp"></span>
