@@ -5,6 +5,7 @@
 
 import { markToMarket, blankPosition } from '/core/positions.mjs';
 import { todayJalali } from '/core/jalali.mjs';
+import { marginParamsOf } from '/core/settings.mjs';
 import { mountPayoff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
 import { faDigits, kpiTone, signColor } from '/ui/fmt.mjs';
@@ -191,7 +192,7 @@ export async function mount(root, { state, api }) {
     const spot = uaQ.last || uaQ.close || p.legs.find((l) => l.kind === 'underlying')?.price || 0;
     const quotes = p.legs.map((l) => (l.kind === 'underlying' ? uaQ : quoteFor(l)));
     const m = markToMarket(p, quotes, {
-      fees, spot, spotClose: uaQ.close || spot,
+      fees, spot, spotClose: uaQ.close || spot, params: marginParamsOf(s()),
       creditMode: s().creditSpreadMargin, capitalMode: s().capitalMode,
       basis: s().priceBasis === 'BOOK' ? 'BOOK' : s().priceBasis,
     });

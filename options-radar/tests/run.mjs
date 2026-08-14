@@ -706,6 +706,24 @@ group('۱۳. موقعیت واقعی و تحلیل رول');
     Math.abs(mtmNaked.margin - staleMargin) > 1e-6,
     `کهنه ${Math.round(staleMargin).toLocaleString()} ≠ الان ${Math.round(mtmNaked.margin).toLocaleString()}`);
 
+  // markToMarket باید ضرایب وجه تضمین دلخواه کاربر (marginA/B/C/maint در
+  // تنظیمات) را هم به strategyMargin برساند — قبلاً opt.params اصلاً
+  // خوانده نمی‌شد، پس تب موقعیت‌های من همیشه با DEFAULT_PARAMS هاردکد
+  // حساب می‌کرد، حتی اگر کاربر ضریب‌ها را در تنظیمات عوض کرده بود.
+  const customParams = { A: 0.30, B: 0.10, C: 10000, maint: 0.70 };
+  const mtmCustom = markToMarket(nakedPos, [q(9000, 9600)], {
+    fees, spot: 115000, spotClose: 115000, params: customParams,
+  });
+  const expectedCustomMargin = strategyMargin(nakedPos.legs, {
+    S: 115000, closes: { 0: currentClose }, creditMode: 'FULL', params: customParams,
+  }).margin;
+  check('markToMarket ضرایب سفارشی وجه تضمین را به strategyMargin می‌رساند',
+    Math.abs(mtmCustom.margin - expectedCustomMargin) < 1e-6,
+    `مانتومارکت ${Math.round(mtmCustom.margin).toLocaleString()} ~ انتظار ${Math.round(expectedCustomMargin).toLocaleString()}`);
+  check('ضرایب سفارشی نتیجه را از DEFAULT_PARAMS متفاوت می‌کند',
+    Math.abs(mtmCustom.margin - mtmNaked.margin) > 1e-6,
+    `سفارشی ${Math.round(mtmCustom.margin).toLocaleString()} ≠ پیش‌فرض ${Math.round(mtmNaked.margin).toLocaleString()}`);
+
   // رول: کال ۱۱۰ را ببند، کال ۱۲۰ سررسید دورتر بفروش
   const roll = rollAnalysis({
     pos, quotes: [q(104000, 105000), q(7000, 7400)],

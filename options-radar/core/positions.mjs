@@ -102,7 +102,7 @@ export function markToMarket(pos, quotes, opt = {}) {
   const closes = {};
   legs.forEach((l, i) => { closes[i] = num(quotes[i]?.close, num(l.price)); });
   const margin = strategyMargin(legs, {
-    S: num(opt.spotClose, opt.spot), closes,
+    S: num(opt.spotClose, opt.spot), closes, params: opt.params,
     creditMode: opt.creditMode || 'FULL', capitalMode: opt.capitalMode || 'NET',
   });
   const cap = capitalBase({ legs, netCash: entryNet, marginNet: margin.marginNet, maxLoss: an.maxLoss });
