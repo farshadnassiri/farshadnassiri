@@ -227,14 +227,17 @@ export async function mount(root, { state }) {
     const net = grossCash(legs) - entryFees(legs, fees);
     const { points, analysis } = chartPoints(legs, net, { fees, padPct: 0.4 });
 
-    // مظنه مصنوعی از قیمت دستی، تا ارزیاب همان مسیر واقعی را طی کند
+    // مظنه مصنوعی از قیمت دستی، تا ارزیاب همان مسیر واقعی را طی کند. بدون
+    // اسپرد مصنوعی: عرضه و تقاضا هر دو دقیقاً همان قیمت تایپ‌شده‌اند، وگرنه
+    // با execMode پیش‌فرض (تهاجمی) ارزیاب روی عرضه/تقاضای منهای/بعلاوه ۲٪
+    // اجرا می‌شد، نه خودِ قیمت — کارت‌های KPI و جدول ردیف با نمودار/جدول
+    // بازه‌ها که مستقیم از قیمت تایپ‌شده می‌آیند، عدد متفاوت نشان می‌دادند.
     const quotes = legs.map((l) => {
       const p = l.price;
-      const half = Math.max(1, p * 0.02);
       return {
-        bid: p - half, bidQty: 1e9, ask: p + half, askQty: 1e9,
+        bid: p, bidQty: 1e9, ask: p, askQty: 1e9,
         last: p, close: p, low: p * 0.9, high: p * 1.1, state: 'A', staleSec: 0,
-        book: [{ level: 1, bid: p - half, bidQty: 1e9, ask: p + half, askQty: 1e9 }],
+        book: [{ level: 1, bid: p, bidQty: 1e9, ask: p, askQty: 1e9 }],
       };
     });
 
