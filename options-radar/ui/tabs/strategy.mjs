@@ -46,7 +46,12 @@ const VIEWS = {
 
 export async function mount(root, { tab, state, api }) {
   const def = tab.def || byId(tab.id);
-  const s = () => state.settings;
+  // کنترل‌های محلی این تب (priceBasis، rankBy، ...) روی state.settings
+  // مشترک نمی‌نشینند — آن شیء همان چیزی است که تب تنظیمات با آن فرم
+  // می‌سازد و بقیه تب‌ها (برترین موقعیت‌ها، رول، موقعیت‌های من) هم زنده
+  // می‌خوانندش؛ تغییر اینجا بدون این لایه، بی‌صدا روی همه‌شان اثر می‌گذاشت.
+  const overrides = {};
+  const s = () => ({ ...state.settings, ...overrides });
   let rows = [];
   let picked = null;
   let view = 'خلاصه';
@@ -146,7 +151,7 @@ export async function mount(root, { tab, state, api }) {
     node.addEventListener('change', () => {
       const v = kind === 'bool' ? node.checked : kind === 'num' ? Number(node.value) : node.value;
       if (key === 'qty') qty = Math.max(1, v);
-      else state.settings = { ...state.settings, [key]: v };
+      else overrides[key] = v;
       if (auto.checked) run(); else setStatus('تنظیم عوض شد — اسکن را بزن.');
     });
   }
