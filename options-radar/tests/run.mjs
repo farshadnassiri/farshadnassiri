@@ -428,6 +428,33 @@ group('۹. ارزیاب ردیف، سرتاسری');
   check('عمق ناکافی برای حجم ۳، در هشدارها دیده می‌شود',
     row.warn.includes('عمق ناکافی') || row.maxQty < 3, row.warn.join(' , ') || 'بی‌هشدار');
 
+  // پانل جزئیات تب استراتژی/برترین موقعیت‌ها (ui/tabs/strategy.mjs،
+  // ui/tabs/top.mjs) با کارمزد زنده تنظیمات، analyzePayoff را دوباره
+  // می‌سازد تا نمودار/سناریو با فعلی‌ترین نرخ کارمزد به‌روز بماند. قبلاً
+  // netCash همان ردیف (r.netCash، از لحظه اسکن با کارمزد آن‌وقت) بدون
+  // تغییر به این تابع می‌رفت — اگر کاربر بین اسکن و باز کردن جزئیات
+  // کارمزد را عوض کرده باشد، netCash کهنه با fees تازه قاطی می‌شد و
+  // بیشترین سود/زیان پانل جزئیات با ستون جدول اصلی فرق می‌کرد. اصلاح:
+  // netCash هم از همان legs و fees زنده دوباره ساخته شود، نه از r.netCash.
+  // feeOption روی entryFees اثر مستقیم دارد (بر خلاف feeExercise که فقط در
+  // تسویه اعمال می‌شود)، پس تغییرش netCash را واقعاً جابه‌جا می‌کند.
+  const feesAtScan = { buyStock: s.feeBuyStock, sellStock: s.feeSellStock, option: s.feeOption, exercise: s.feeExercise };
+  const feesChanged = { ...feesAtScan, option: 0.03 }; // کاربر کارمزد معامله اختیار را زیاد کرده
+  const staleAn = analyzePayoff(row.__legs, row.netCash, { fees: feesChanged });
+  const freshNetCash = grossCash(row.__legs) - entryFees(row.__legs, feesChanged);
+  const freshAn = analyzePayoff(row.__legs, freshNetCash, { fees: feesChanged });
+  // مرجع مستقل: اگر همان لحظه با کارمزد تازه دوباره evaluate می‌شد
+  const rowFresh = evaluate({
+    legs, quotes,
+    ctx: { S: 100000, Sclose: 100000, days: 30, size, qty: 3, settings: { ...s, feeOption: 0.03 }, def, underlying: 'نمونه', sigmaHist: 0.6 },
+  });
+  check('netCash کهنه با کارمزد تازه، بیشترین سود را با اسکن تازه ناهم‌خوان می‌کند',
+    Math.abs(staleAn.maxProfit - rowFresh.maxProfit) > 1,
+    `کهنه ${Math.round(staleAn.maxProfit).toLocaleString()} ≠ اسکن تازه ${Math.round(rowFresh.maxProfit).toLocaleString()}`);
+  check('netCash بازساخته‌شده از fees زنده، دقیقاً با اسکن تازه هم‌خوان است',
+    near(freshAn.maxProfit, rowFresh.maxProfit, 1),
+    `بازساخته ${Math.round(freshAn.maxProfit).toLocaleString()} ~ اسکن تازه ${Math.round(rowFresh.maxProfit).toLocaleString()}`);
+
   // اسپرد بستانکار: قاعده وجه تضمین و ریسک لنگ‌زدن
   const bc = byId('bear-call-spread');
   const legs2 = buildLegs(bc, { strikes: [100000, 110000], size, days: [30] });

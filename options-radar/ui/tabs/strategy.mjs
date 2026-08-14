@@ -10,7 +10,7 @@
 
 import { byId } from '/strategies/catalog.mjs';
 import { COLUMNS } from '/core/evaluate.mjs';
-import { analyzePayoff, scenarioGrid } from '/core/payoff.mjs';
+import { analyzePayoff, scenarioGrid, grossCash, entryFees } from '/core/payoff.mjs';
 import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
 import { timeMachine } from '/core/timemachine.mjs';
 import { priceQuantile } from '/core/bs.mjs';
@@ -229,6 +229,11 @@ export async function mount(root, { tab, state, api }) {
     root.querySelector('#detail-title').textContent = `${r.underlying} — ${r.legsText}`;
 
     const fees = { buyStock: s().feeBuyStock, sellStock: s().feeSellStock, option: s().feeOption, exercise: s().feeExercise };
+    // نقد خالص باید با همین fees زنده هم‌راستا بماند — r.netCash کارمزد
+    // ورود لحظه اسکن را دارد، که اگر کاربر بعد از آن تنظیمات کارمزد را عوض
+    // کرده باشد (بدون اسکن دوباره)، با fees بالا ناهم‌خوان می‌شود و
+    // بیشترین سود/زیان این پانل با ستون جدول اصلی فرق می‌کند.
+    const netCash = grossCash(r.__legs) - entryFees(r.__legs, fees);
     const single = isSingleExpiry(r.__legs);
     const candidates = sameUnderlyingCandidates(rows, r);
     const chartOpt = {
@@ -237,8 +242,8 @@ export async function mount(root, { tab, state, api }) {
       ...(sameRow && chartRange ? { initRange: chartRange } : {}),
     };
     const an = single
-      ? analyzePayoff(r.__legs, r.netCash, { fees })
-      : analyzeMixed(r.__legs, r.netCash, { fees, spot: r.S, sigma: r.sigmaUse, rFree: s().rFree, divYield: s().divYield });
+      ? analyzePayoff(r.__legs, netCash, { fees })
+      : analyzeMixed(r.__legs, netCash, { fees, spot: r.S, sigma: r.sigmaUse, rFree: s().rFree, divYield: s().divYield });
     const grid = Array.from({ length: 11 }, (_, i) => {
       const pct = -s().shockPct * 2 + (i * s().shockPct * 4) / 10;
       const S2 = r.S * (1 + pct / 100);
@@ -301,7 +306,7 @@ export async function mount(root, { tab, state, api }) {
       <div>
         <dl class="kv">
           <dt>جهت نقدی</dt><dd>${r.cashLabel}</dd>
-          <dt>نقد خالص</dt><dd>${fmt.money(r.netCash)}</dd>
+          <dt>نقد خالص</dt><dd>${fmt.money(netCash)}</dd>
           <dt>اگر همین حالا ببندی — دفتر سفارش</dt>
           <dd style="color:${signColor(r.instantClosePnl)}">${fmt.money(r.instantClosePnl)}</dd>
           <dt>اگر با آخرین معامله تسویه کنی <span class="unit">مرجع</span></dt>
@@ -361,12 +366,13 @@ export async function mount(root, { tab, state, api }) {
         .filter((c) => compareIds.has(c.id))
         .slice(0, MAX_COMPARE)
         .map((c) => ({
-          at: payoffAt(c.__legs, c.netCash, { fees, spot: c.S, sigma: c.sigmaUse, rFree: s().rFree, divYield: s().divYield }),
+          at: payoffAt(c.__legs, grossCash(c.__legs) - entryFees(c.__legs, fees),
+            { fees, spot: c.S, sigma: c.sigmaUse, rFree: s().rFree, divYield: s().divYield }),
           label: compareLabel(c),
           full: compareFullLabel(c),
         }));
       chart?.destroy();
-      chart = mountPayoff(root.querySelector('#chart'), r.__legs, r.netCash, { ...chartOpt, compare });
+      chart = mountPayoff(root.querySelector('#chart'), r.__legs, netCash, { ...chartOpt, compare });
     }
     function renderCmpPicker() {
       const box = root.querySelector('#cmp-picker');
