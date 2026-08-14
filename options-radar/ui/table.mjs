@@ -138,7 +138,7 @@ export function makeTable(host, cols, opts = {}) {
         <button type="button" class="ghost tbl-cols-btn" ${all === cols ? 'hidden' : ''}>
           ستون‌ها <b class="tbl-cols-n"></b>
         </button>
-        <span class="tbl-sort"></span>
+        <span class="tbl-sort" role="status" aria-live="polite"></span>
         <span class="sp"></span>
         <span class="tbl-count"></span>
       </div>
@@ -369,7 +369,11 @@ export function makeTable(host, cols, opts = {}) {
     computeRanges();
     if (activeIdx >= view.length) activeIdx = view.length - 1;
     for (const th of headRow.children) {
-      th.dataset.sorted = th.dataset.key === k ? (dir < 0 ? 'desc' : 'asc') : '';
+      const sorted = th.dataset.key === k ? (dir < 0 ? 'desc' : 'asc') : '';
+      th.dataset.sorted = sorted;
+      // aria-sort استاندارد همان اطلاعات را برای صفحه‌خوان می‌گوید — قبلاً
+      // فقط بصری (فلش/رنگ) بود، مرتب‌سازی برای کاربر صفحه‌خوان بی‌خبر می‌ماند
+      th.setAttribute('aria-sort', sorted === 'desc' ? 'descending' : sorted === 'asc' ? 'ascending' : 'none');
     }
     const col = byKey.get(k);
     sortLbl.textContent = `مرتب بر ${col?.label ?? k} ${dir < 0 ? '↓' : '↑'}`;
