@@ -87,7 +87,7 @@ export async function mount(root, { tab, state, api }) {
           <button class="btn" id="run">اسکن</button>
           <label class="field row" style="margin:0"><input type="checkbox" id="auto"> <label for="auto">اسکن پیوسته</label></label>
           <span class="sp"></span>
-          <span id="status" class="picker-sum"></span>
+          <span id="status" class="picker-sum" role="status" aria-live="polite"></span>
         </div>
         <div class="scan-progress" id="progress" style="display:none"><div class="scan-progress-fill" id="progress-fill"></div></div>
       </section>

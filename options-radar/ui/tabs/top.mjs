@@ -52,7 +52,7 @@ export async function mount(root, { state, api }) {
           <button class="btn" id="run">اسکن</button>
           <label class="field row" style="margin:0"><input type="checkbox" id="auto"> <label for="auto">اسکن پیوسته</label></label>
           <span class="sp"></span>
-          <span id="status" class="picker-sum"></span>
+          <span id="status" class="picker-sum" role="status" aria-live="polite"></span>
         </div>
       </section>
     </div>
