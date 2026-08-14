@@ -15,7 +15,7 @@ import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
 import { timeMachine } from '/core/timemachine.mjs';
 import { priceQuantile } from '/core/bs.mjs';
 import { gregorianToJalali } from '/core/jalali.mjs';
-import { makeTable, funnelBar } from '/ui/table.mjs';
+import { makeTable, funnelBar, changedIds } from '/ui/table.mjs';
 import { fmt, faNum, faDigits, coverageInfo, signTone } from '/ui/fmt.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { mountPayoff, payoffAt } from '/ui/chart.mjs';
@@ -54,6 +54,10 @@ export async function mount(root, { tab, state, api }) {
   let hasScanned = false;
   const NOT_SCANNED_MSG = 'هنوز اسکن نزدی — نماد را انتخاب کن و دکمه اسکن را بزن.';
   let qty = s().qtyDefault;
+  // آخرین اسکن دومرحله‌ای تمام‌شده — پایه مقایسه برای نشان «تغییر کرد»ی
+  // اسکن پیوسته بعدی. اولین اسکن هر نشست null می‌ماند، پس چیزی فلش نمی‌زند.
+  let lastFullRows = null;
+  let flashTimer = null;
 
   root.innerHTML = `
     <div class="page-head">
@@ -473,6 +477,11 @@ export async function mount(root, { tab, state, api }) {
           } else {
             const byId2 = new Map(res.rows.map((r) => [r.id, r]));
             rows = rows.map((r) => byId2.get(r.id) || r);
+            // اسکن پیوسته: ردیفی که مبنای رتبه‌بندی‌اش نسبت به آخرین اسکن
+            // تمام‌شده عوض شده، فلش می‌گیرد — همان قرارداد نیمه‌کاره
+            // rowClass در table.mjs، حالا با چیزی که واقعاً می‌نویسدش.
+            const changed = changedIds(lastFullRows, rows, s().rankBy);
+            for (const r of rows) r.__flash = changed.has(r.id);
             // افت مظنه رتبه‌ها را زیر و رو می‌کند، پس دوباره مرتب می‌شود
             table.set(rows);
             table.sortBy(s().rankBy);
@@ -480,6 +489,18 @@ export async function mount(root, { tab, state, api }) {
             if (picked) { const f = byId2.get(picked.id); if (f) showDetail(f); }
             setStatus(`مرحله دو کامل — عمق ${fmt.int(res.asked || 0)} نماد گرفته شد. ${fmt.int(rows.length)} ردیف.`);
             setProgress(100);
+            lastFullRows = rows;
+            clearTimeout(flashTimer);
+            if (changed.size) {
+              // rows را جدا می‌گیریم، نه از بستار — اگر تیک بعدی زودتر از
+              // ۱۷۰۰ میلی‌ثانیه برسد، rows بیرونی عوض شده ولی این آرایه
+              // همان فهرستی می‌ماند که واقعاً فلش گرفت.
+              const flashedRows = rows;
+              flashTimer = setTimeout(() => {
+                for (const r of flashedRows) r.__flash = false;
+                table.redraw();
+              }, 1700);
+            }
           }
         },
       });
@@ -504,5 +525,5 @@ export async function mount(root, { tab, state, api }) {
   });
 
   setStatus();
-  return () => { offWatch(); offChain(); clearInterval(timer); chart?.destroy(); };
+  return () => { offWatch(); offChain(); clearInterval(timer); clearTimeout(flashTimer); chart?.destroy(); };
 }

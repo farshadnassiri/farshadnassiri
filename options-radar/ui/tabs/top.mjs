@@ -11,7 +11,7 @@
 import { COLUMNS } from '/core/evaluate.mjs';
 import { analyzePayoff } from '/core/payoff.mjs';
 import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
-import { makeTable, funnelBar } from '/ui/table.mjs';
+import { makeTable, funnelBar, changedIds } from '/ui/table.mjs';
 import { fmt, coverageInfo, signTone } from '/ui/fmt.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { mountPayoff, payoffAt } from '/ui/chart.mjs';
@@ -28,6 +28,9 @@ export async function mount(root, { state, api }) {
   let busy = false;
   let hasScanned = false;
   const NOT_SCANNED_MSG = 'هنوز اسکن نزدی — نماد را انتخاب کن و دکمه اسکن را بزن.';
+  // آخرین اسکن تمام‌شده — پایه مقایسه برای نشان «تغییر کرد»ی اسکن پیوسته بعدی
+  let lastFullRows = null;
+  let flashTimer = null;
 
   root.innerHTML = `
     <div class="page-head">
@@ -214,10 +217,23 @@ export async function mount(root, { state, api }) {
       const res = await runScanAll({ uaKeys: keys, settings: s(), qty: s().qtyDefault, limit: s().topN });
       if (res.error) { setStatus(`خطا: ${res.error}`); table.setLoading(false); return; }
       rows = res.rows;
+      // اسکن پیوسته: ردیفی که مبنای رتبه‌بندی‌اش نسبت به آخرین اسکن
+      // تمام‌شده عوض شده، فلش می‌گیرد.
+      const changed = changedIds(lastFullRows, rows, s().rankBy);
+      for (const r of rows) r.__flash = changed.has(r.id);
       funnelBar(root.querySelector('#funnel'), res.funnel);
       table.set(rows);
       drawKpis();
       setStatus(`${fmt.int(res.ms)} میلی‌ثانیه — از ${fmt.int(res.total)} ردیف کل، ${fmt.int(rows.length)} نمایش.`);
+      lastFullRows = rows;
+      clearTimeout(flashTimer);
+      if (changed.size) {
+        const flashedRows = rows;
+        flashTimer = setTimeout(() => {
+          for (const r of flashedRows) r.__flash = false;
+          table.redraw();
+        }, 1700);
+      }
     } finally {
       busy = false;
       runBtn.disabled = false;
@@ -234,5 +250,5 @@ export async function mount(root, { state, api }) {
 
   const offWatch = api.subscribeWatch((w) => pushRows(w, !w.changed));
   setStatus();
-  return () => { offWatch(); offChain(); clearInterval(timer); chart?.destroy(); };
+  return () => { offWatch(); offChain(); clearInterval(timer); clearTimeout(flashTimer); chart?.destroy(); };
 }

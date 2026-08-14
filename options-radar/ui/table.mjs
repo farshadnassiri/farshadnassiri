@@ -73,6 +73,28 @@ export function insertColumn(keys, k, order) {
   return next;
 }
 
+/**
+ * شناسه ردیف‌هایی که مقدار ستون `key` نسبت به اسکن تمام‌شده قبلی تغییر
+ * کرده — پایه نشانگر «تغییر کرد» در اسکن پیوسته (`rowClass`ی این فایل از
+ * قبل `r.__flash` را می‌خواند، فقط چیزی آن را نمی‌نوشت).
+ *
+ * بدون `prevRows` (اولین اسکن یک نشست، چیزی برای مقایسه نیست) مجموعه خالی
+ * برمی‌گردد — نه همه ردیف‌ها «تغییر کرده» باشند و چشم را کور کنند، نه
+ * خطا بدهد. تابع خالص است تا بی‌نیاز از مرورگر آزمون شود.
+ */
+export function changedIds(prevRows, nextRows, key) {
+  const out = new Set();
+  if (!prevRows || !key) return out;
+  const before = new Map(prevRows.map((r) => [r.id, r[key]]));
+  for (const r of nextRows) {
+    const a = before.get(r.id);
+    const b = r[key];
+    if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+    if (Math.abs(a - b) > 1e-9 * Math.max(1, Math.abs(a), Math.abs(b))) out.add(r.id);
+  }
+  return out;
+}
+
 /** انتخاب ستون هر جدول جدا می‌ماند، تا نمای تب سرمایه نمای تب یونانی را عوض نکند. */
 function loadPick(storeKey) {
   if (!storeKey) return null;

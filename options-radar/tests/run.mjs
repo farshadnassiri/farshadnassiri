@@ -25,7 +25,7 @@ import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '
 import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
 import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone, pageTitle } from '../ui/fmt.mjs';
-import { moveColumn, insertColumn } from '../ui/table.mjs';
+import { moveColumn, insertColumn, changedIds } from '../ui/table.mjs';
 import { sameUnderlyingCandidates, compareLabel, compareFullLabel, MAX_COMPARE } from '../ui/compare.mjs';
 
 let pass = 0, fail = 0;
@@ -1216,6 +1216,23 @@ group('۲۲. چیدمان ستون');
   // رفت و برگشت: جابه‌جایی و برگرداندن، به همان نقطه اول می‌رسد
   const moved = moveColumn(K, 'a', 'c');
   check('جابه‌جایی برگشت‌پذیر است', moveColumn(moved, 'a', 'a').join('') === moved.join(''));
+
+  // نشان «تغییر کرد» اسکن پیوسته (پ-۶ بک‌لاگ): rowClass از قبل r.__flash
+  // را می‌خواند ولی هیچ‌جا نوشته نمی‌شد — changedIds همان نویسنده است.
+  const prev = [{ id: 'x', v: 10 }, { id: 'y', v: 20 }, { id: 'z', v: 30 }];
+  check('اولین اسکن (بدون prevRows)، چیزی فلش نمی‌گیرد',
+        changedIds(null, prev, 'v').size === 0);
+  const next = [{ id: 'x', v: 10 }, { id: 'y', v: 25 }, { id: 'z', v: 30 }, { id: 'w', v: 5 }];
+  check('فقط ردیفی که مقدارش واقعاً عوض شده فلش می‌گیرد',
+        [...changedIds(prev, next, 'v')].join('') === 'y');
+  check('ردیف تازه (بدون سابقه در prevRows) فلش نمی‌گیرد',
+        !changedIds(prev, next, 'v').has('w'));
+  check('تغییر ناچیز کف شناوری، فلش نمی‌گیرد',
+        changedIds([{ id: 'x', v: 10 }], [{ id: 'x', v: 10 + 1e-12 }], 'v').size === 0);
+  check('کلید نامعتبر یا نبود، مجموعه خالی می‌دهد',
+        changedIds(prev, next, null).size === 0 && changedIds(prev, next, undefined).size === 0);
+  check('مقدار غیرعددی در هیچ سمتی، فلش نمی‌گیرد',
+        changedIds([{ id: 'x', v: NaN }], [{ id: 'x', v: 10 }], 'v').size === 0);
 }
 
 // ═══════════════ ۲۳. کش سرور: سقف ورودی ═══════════════
