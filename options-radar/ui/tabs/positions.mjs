@@ -228,8 +228,14 @@ export async function mount(root, { state, api }) {
       b.addEventListener('click', async (e) => {
         e.stopPropagation();
         if (b.disabled) return;
+        const i = Number(b.dataset.del);
+        const p = positions[i];
+        // موقعیت دستی برخلاف کش سرور یا تنظیمات، از بازار بازتولید نمی‌شود
+        // — قیمت ورود و تاریخ فقط همین‌جا ثبت شده‌اند. یک کلیک نباید بی‌درنگ
+        // نابودش کند.
+        if (!confirm(`موقعیت «${p?.title || '—'}» برای همیشه حذف شود؟ این کار بازگشت‌پذیر نیست.`)) return;
         b.disabled = true;
-        positions.splice(Number(b.dataset.del), 1);
+        positions.splice(i, 1);
         await save();
         render();
       });
