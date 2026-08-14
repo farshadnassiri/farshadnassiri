@@ -160,8 +160,7 @@ export function evaluate({ legs, quotes, ctx }) {
     : { delta: NaN, gamma: NaN, vega: NaN, theta: NaN, rho: NaN, deltaShares: NaN, incomplete: true };
 
   const sigmaUse = s.volSource === 'MANUAL' ? s.volManual
-    : ok(ctx.sigmaHist) ? ctx.sigmaHist
-    : priced.map((l) => l.sigma).find(ok);
+    : priced.map((l) => l.sigma).find(ok) ?? (ok(ctx.sigmaHist) ? ctx.sigmaHist : NaN);
 
   // ——— ۷. احتمال ———
   const pop = probOfProfit(payoff, S, T, sigmaUse);

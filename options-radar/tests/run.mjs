@@ -469,6 +469,35 @@ group('۹. ارزیاب ردیف، سرتاسری');
   check('بستن فوری همیشه هزینه اسپرد کامل را می‌پردازد، بدتر از تسویه مرجع',
     rowSpFee.instantClosePnl < rowSpFee.settleLastPnl && rowSpFee.instantClosePnl < rowSpFee.settleClosePnl,
     `فوری ${Math.round(rowSpFee.instantClosePnl)} | آخرین ${Math.round(rowSpFee.settleLastPnl)} | پایانی ${Math.round(rowSpFee.settleClosePnl)}`);
+
+  // sigmaUse (تلاطم مبنای popPct و نمودار) باید طبق volSource='IV' از
+  // تلاطم ضمنی واقعی همان پا بیاید، نه بی‌قیدوشرط از sigmaHist — قبلاً هر
+  // وقت sigmaHist عددی معتبر بود، جلوتر از تلاطم ضمنی محاسبه‌شده انتخاب
+  // می‌شد، حتی با volSource='IV' (پیش‌فرض). sigmaHist این‌جا عمداً خیلی
+  // دور از تلاطم ضمنی واقعی این مظنه انتخاب شده تا اشتباه قابل تشخیص باشد.
+  const sIV = { ...s, volSource: 'IV' };
+  const ncDef = byId('naked-call');
+  const legsNc = buildLegs(ncDef, { strikes: [105000], size, days: [30] });
+  const qNc = [mkQuote(6000, 6400)];
+  const rowSigma = evaluate({
+    legs: legsNc, quotes: qNc,
+    ctx: { S: 100000, Sclose: 100000, days: 30, size, qty: 1, settings: sIV, def: ncDef, underlying: 'نمونه', sigmaHist: 0.9 },
+  });
+  check('sigmaUse با volSource=IV از تلاطم ضمنی واقعی پا می‌آید',
+    Number.isFinite(rowSigma.sigmaUse) && near(rowSigma.sigmaUse, rowSigma.legPrices[0].sigma, 1e-9),
+    `sigmaUse=${rowSigma.sigmaUse?.toFixed(4)} legSigma=${rowSigma.legPrices[0].sigma?.toFixed(4)}`);
+  check('sigmaUse دیگر بی‌قیدوشرط sigmaHist نیست',
+    Math.abs(rowSigma.sigmaUse - 0.9) > 0.05, `sigmaUse=${rowSigma.sigmaUse?.toFixed(4)} sigmaHist=0.9`);
+
+  // با volSource='HIST'، sigmaUse باید همچنان sigmaHist باشد — رفتار قبلی
+  // برای این حالت درست بود و نباید با اصلاح بالا خراب شود.
+  const sHist = { ...s, volSource: 'HIST' };
+  const rowSigmaHist = evaluate({
+    legs: legsNc, quotes: qNc,
+    ctx: { S: 100000, Sclose: 100000, days: 30, size, qty: 1, settings: sHist, def: ncDef, underlying: 'نمونه', sigmaHist: 0.9 },
+  });
+  check('sigmaUse با volSource=HIST همچنان sigmaHist است',
+    near(rowSigmaHist.sigmaUse, 0.9, 1e-9), `sigmaUse=${rowSigmaHist.sigmaUse}`);
 }
 
 group('۱۰. فهرست استراتژی‌ها');
