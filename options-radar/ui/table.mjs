@@ -399,10 +399,10 @@ export function makeTable(host, cols, opts = {}) {
         const td = document.createElement('td');
         const v = r[c.key];
         const isNum = NUM_FMT.has(c.fmt);
-        td.className = isNum ? 'n' : '';
+        const isNeg = isNum && Number.isFinite(v) && v < 0;
+        td.className = `${isNum ? 'n' : ''}${isNeg ? ' neg' : ''}`;
         td.textContent = (fmt[c.fmt] || fmt.text)(v);
         if (c.heat) td.style.cssText = heatStyle(c, v);
-        if (isNum && Number.isFinite(v) && v < 0) td.style.color = 'var(--loss)';
         tr.appendChild(td);
       }
       tr.addEventListener('click', () => { activeIdx = i; opts.onPick?.(r); });

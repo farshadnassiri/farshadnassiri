@@ -559,6 +559,11 @@ dl.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nu
 .col-opt input { accent-color: var(--accent); }
 .col-opt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tbl-body td { padding: 4px 8px; font-size: 12.5px; white-space: nowrap; border-bottom: 1px solid var(--line-soft); }
+/* رنگ سلول عددی منفی — قبلاً style این‌لاین بود که همیشه بر .stale td
+   (زیر) برنده می‌شد، دقیقاً همان مشکل دورهای ۲۴/۳۰؛ اینجا با کلاس، سلول
+   زیانِ همان ردیفی که کاربر باید کمتر از همه بهش اعتماد کند (مظنه کهنه)
+   درست خاکستری می‌ماند، نه قرمز عادی. */
+.tbl-body td.neg { color: var(--loss); }
 .tbl-body tr { height: 27px; cursor: pointer; }
 .tbl-body tr:hover td { background: var(--panel-2) !important; }
 .tbl-body tr.unexec td { opacity: .55; font-style: italic; }
