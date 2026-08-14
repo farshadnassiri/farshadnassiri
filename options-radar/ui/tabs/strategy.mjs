@@ -280,7 +280,7 @@ export async function mount(root, { tab, state, api }) {
     }).filter((x) => Number.isFinite(x.level));
     const riskTableRows = riskRows.map((x) => `
       <tr><td class="n">${faNum(x.pct)}٪</td><td class="n">${fmt.money(x.level)}</td>
-      <td class="n" style="color:${x.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(x.pnl)}</td></tr>`).join('');
+      <td class="n" style="color:${signColor(x.pnl)}">${fmt.money(x.pnl)}</td></tr>`).join('');
 
     root.querySelector('#detail').innerHTML = `
       <div>
@@ -303,11 +303,11 @@ export async function mount(root, { tab, state, api }) {
           <dt>جهت نقدی</dt><dd>${r.cashLabel}</dd>
           <dt>نقد خالص</dt><dd>${fmt.money(r.netCash)}</dd>
           <dt>اگر همین حالا ببندی — دفتر سفارش</dt>
-          <dd style="color:${r.instantClosePnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(r.instantClosePnl)}</dd>
+          <dd style="color:${signColor(r.instantClosePnl)}">${fmt.money(r.instantClosePnl)}</dd>
           <dt>اگر با آخرین معامله تسویه کنی <span class="unit">مرجع</span></dt>
-          <dd style="color:${r.settleLastPnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(r.settleLastPnl)}</dd>
+          <dd style="color:${signColor(r.settleLastPnl)}">${fmt.money(r.settleLastPnl)}</dd>
           <dt>اگر با قیمت پایانی تسویه کنی <span class="unit">مرجع</span></dt>
-          <dd style="color:${r.settleClosePnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(r.settleClosePnl)}</dd>
+          <dd style="color:${signColor(r.settleClosePnl)}">${fmt.money(r.settleClosePnl)}</dd>
           <dt>سرمایه درگیر</dt><dd>${fmt.money(r.capital)}</dd>
           <dt>مبنای سرمایه</dt><dd>${r.capitalLabel}</dd>
           <dt>وجه تضمین</dt><dd>${fmt.money(r.margin)}</dd>
@@ -431,7 +431,7 @@ export async function mount(root, { tab, state, api }) {
       const rows2 = tm.map((x) => `
         <tr><td>${jalaliFromDEven(x.date)}</td><td class="n">${fmt.money(x.S)}</td>
           <td class="n">${fmt.int(x.daysLeft)}</td>
-          <td class="n" style="color:${x.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(x.pnl)}</td></tr>`).join('');
+          <td class="n" style="color:${signColor(x.pnl)}">${fmt.money(x.pnl)}</td></tr>`).join('');
       out.innerHTML = `
         <p class="note" style="color:var(--warn)">شبیه‌سازی بلک-شولز با تلاطم امروز (${fmt.num(r.sigmaUse)})
           روی قیمت پایانی تاریخی پایه — نه قیمت واقعی اختیار در آن روز. دیده‌بان تاریخچه مظنه ذخیره نمی‌کند،

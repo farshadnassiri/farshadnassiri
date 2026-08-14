@@ -11,7 +11,7 @@ import { rollAnalysis, markToMarket } from '/core/positions.mjs';
 import { impliedVol } from '/core/bs.mjs';
 import { mountPayoff, mountDiff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
-import { faDigits, signTone } from '/ui/fmt.mjs';
+import { faDigits, signTone, signColor } from '/ui/fmt.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
 export async function mount(root, { state, api }) {
@@ -259,7 +259,7 @@ export async function mount(root, { state, api }) {
         <tr data-i="${x.i}" style="cursor:pointer" class="${x.i === candIdx ? 'picked' : ''}" tabindex="0" role="button" aria-label="نامزد رول به اعمال ${fmt.money(x.strike)}">
           <td class="n">${fmt.money(x.strike)}</td>${multiExpiry ? `<td class="n">${faDigits(x.days)} روز</td>` : ''}
           <td class="n">${fmt.money(x.r.netCashChange)}</td>
-          <td class="n" style="color:${x.r.atSpot >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(x.r.atSpotTotal)}</td>
+          <td class="n" style="color:${signColor(x.r.atSpot)}">${fmt.money(x.r.atSpotTotal)}</td>
           <td class="n">${fmt.money(x.r.nextMaxProfit)}</td>
           <td class="n">${fmt.money(x.r.nextBreakevens[0])}</td>
           <td>${x.i === bestIdx ? `<span class="tag ${bestTone}">بهترین تفاضل</span>` : ''}${x.i === candIdx ? '<span class="tag flat">انتخاب‌شده</span>' : ''}</td>

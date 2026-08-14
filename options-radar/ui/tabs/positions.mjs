@@ -7,7 +7,7 @@ import { markToMarket, blankPosition } from '/core/positions.mjs';
 import { todayJalali } from '/core/jalali.mjs';
 import { mountPayoff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
-import { faDigits, kpiTone } from '/ui/fmt.mjs';
+import { faDigits, kpiTone, signColor } from '/ui/fmt.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
 const KINDS = [
@@ -210,7 +210,7 @@ export async function mount(root, { state, api }) {
         <td class="n">${p.entryDate ? faDigits(p.entryDate) : '—'}</td>
         <td class="n">${m.daysHeld == null ? '—' : fmt.int(m.daysHeld)}</td>
         <td class="n">${fmt.money(m.capital * p.qty)}</td>
-        <td class="n" style="color:${m.pnlTotal >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(m.pnlTotal)}</td>
+        <td class="n" style="color:${signColor(m.pnlTotal)}">${fmt.money(m.pnlTotal)}</td>
         <td class="n">${fmt.pct(m.retPct)}</td>
         <td class="n">${fmt.pct(m.retMonthPct)}</td>
         <td class="n">${fmt.money(m.ifHeld.atSpot * p.qty)}</td>
@@ -297,7 +297,7 @@ export async function mount(root, { state, api }) {
         <td class="n">${fmt.money(l.markPrice)}</td>
         <td class="n">${fmt.int(l.units)}</td>
         <td class="n">${fmt.money(l.feeIn + l.feeOut)}</td>
-        <td class="n" style="color:${l.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(l.pnl)}</td>
+        <td class="n" style="color:${signColor(l.pnl)}">${fmt.money(l.pnl)}</td>
       </tr>`).join('');
 
     root.querySelector('#det').innerHTML = `
