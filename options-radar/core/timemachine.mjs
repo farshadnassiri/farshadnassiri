@@ -10,6 +10,12 @@
 import { num, ok } from './num.mjs';
 import { bsPrice } from './bs.mjs';
 
+/** dEven (مثلاً ۲۰۲۶۰۱۱۴) به میلی‌ثانیه UTC، فقط برای تفاضل روز تقویمی. */
+function dEvenToMs(d) {
+  const s = String(d);
+  return Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8));
+}
+
 /**
  * ارزش کل ترکیب در یک لحظه، از دید دارنده (خرید مثبت، فروش منفی).
  * علامت این عدد یعنی: نقد دریافتی هنگام ورود = −ارزش(ورود)، و سود و
@@ -40,8 +46,13 @@ export function timeMachine(legs, closes, { daysToday, sigma, rFree = 0, divYiel
   const n = closes.length;
   if (!n || !ok(daysToday) || !ok(sigma) || sigma <= 0) return [];
 
-  const rows = closes.map((row, i) => {
-    const daysAgo = n - 1 - i; // امروز = صفر
+  // closes یک ردیف به ازای هر روز معاملاتی است، نه هر روز تقویمی — آخر
+  // هفته و تعطیلی افتاده، پس فاصله دو ردیف پیاپی همیشه یک روز نیست. قبلاً
+  // daysAgo از فاصله ایندکس آرایه حساب می‌شد که همین فرضِ غلط را داشت؛
+  // حالا از تفاضل واقعی تاریخ می‌آید.
+  const todayMs = dEvenToMs(closes[n - 1].date);
+  const rows = closes.map((row) => {
+    const daysAgo = Math.round((todayMs - dEvenToMs(row.date)) / 86400000);
     const daysLeft = Math.max(0, daysToday + daysAgo);
     const T = Math.max(daysLeft, 0.5) / 365; // نصف روز، تا سررسید خودش صفر نشود
     const S = num(row.close);

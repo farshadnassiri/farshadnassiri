@@ -1655,6 +1655,25 @@ group('۲۹. ماشین زمان');
   check('بدون تاریخچه، فهرست خالی برمی‌گرداند', timeMachine(legLongCall, [], { daysToday: 30, sigma: 0.5 }).length === 0);
   check('تلاطم نامعتبر، فهرست خالی برمی‌گرداند',
     timeMachine(legLongCall, flatCloses, { daysToday: 30, sigma: 0 }).length === 0);
+
+  // closes یک ردیف به ازای هر روز معاملاتی است، نه هر روز تقویمی — بین دو
+  // ردیف پیاپی ممکن است آخر هفته افتاده باشد. قبلاً daysAgo از فاصله
+  // ایندکس آرایه حساب می‌شد (فرض غلط: هر ردیف دقیقاً یک روز از قبلی
+  // دورتر است)، نه از تفاضل واقعی تاریخ. اینجا سه ردیف با یک شکاف
+  // سه‌روزه (مثل پنجشنبه تا شنبه) وسط، ایندکس و تقویم را عمداً واگرا
+  // می‌کند.
+  const gappedCloses = [
+    { date: 20260101, close: K }, // قدیمی‌ترین — ۴ روز تقویمی تا امروز
+    { date: 20260104, close: K }, // ۱ روز تقویمی تا امروز
+    { date: 20260105, close: K }, // امروز
+  ];
+  const rGap = timeMachine(legLongCall, gappedCloses, { daysToday: 30, sigma: 0.5 });
+  check('daysAgo از تفاضل واقعی تاریخ می‌آید، نه فاصله ایندکس آرایه',
+    rGap[0].daysAgo === 4 && rGap[1].daysAgo === 1 && rGap[2].daysAgo === 0,
+    rGap.map((r) => r.daysAgo).join(' , '));
+  check('روز باقیمانده تا سررسید همان تفاضل روز تقویمی را منعکس می‌کند',
+    rGap[0].daysLeft === 34 && rGap[1].daysLeft === 31 && rGap[2].daysLeft === 30,
+    rGap.map((r) => r.daysLeft).join(' , '));
 }
 
 // ═══ ۳۰. افق ارزش‌گذاری قابل‌بازنویسی — منحنی «امروز» کنار «سررسید» ═══
