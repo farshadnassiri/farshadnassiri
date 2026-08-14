@@ -23,6 +23,7 @@ import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
 import { safeStaticPath } from '../server/static-path.mjs';
 import { isInsCode } from '../server/ins-code.mjs';
+import { readBody, BodyTooLargeError } from '../server/read-body.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -809,6 +810,25 @@ group('۱۸. مسیر امن سرو فایل ایستا');
   check('کد خالی رد می‌شود', !isInsCode(''));
   check('عبور از مسیر در کد ابزار رد می‌شود', !isInsCode('../ClosingPrice'));
   check('کد با کاراکتر غیرعددی رد می‌شود', !isInsCode('123abc'));
+}
+
+group('۱۹. سقف بدنه درخواست');
+{
+  const fakeReq = (chunks) => ({
+    async *[Symbol.asyncIterator]() { for (const c of chunks) yield Buffer.from(c); },
+  });
+
+  const small = await readBody(fakeReq(['{"a":', '1}']), 100);
+  check('بدنه زیر سقف کامل خوانده می‌شود', small === '{"a":1}');
+
+  let threw = null;
+  try { await readBody(fakeReq(['x'.repeat(50), 'y'.repeat(60)]), 100); }
+  catch (e) { threw = e; }
+  check('عبور از سقف، خطای BodyTooLargeError می‌دهد', threw instanceof BodyTooLargeError);
+
+  let exact = null;
+  try { exact = await readBody(fakeReq(['x'.repeat(100)]), 100); } catch { exact = 'threw'; }
+  check('برابر سقف هنوز پذیرفته می‌شود', exact === 'x'.repeat(100));
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════
