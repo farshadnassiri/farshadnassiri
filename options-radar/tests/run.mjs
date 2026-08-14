@@ -5,6 +5,7 @@
 //
 // اجرا:  node tests/run.mjs
 
+import path from 'node:path';
 import { bsPrice, bsGreeks, impliedVol, probBelow, histVol } from '../core/bs.mjs';
 import { grossCash, entryFees, analyzePayoff, signedQty } from '../core/payoff.mjs';
 import { analyzeMixed } from '../core/mixed.mjs';
@@ -20,6 +21,7 @@ import { buildChain, underlyingList, chainStats } from '../core/chain.mjs';
 import { scan as scanFn, generateCombos } from '../core/scan.mjs';
 import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
+import { safeStaticPath } from '../server/static-path.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -788,6 +790,19 @@ group('۱۷. سنجه‌های سربه‌سری');
   // مقدار بی‌معنی در فهرست، دور ریخته می‌شود
   const dirty = breakevenMetrics([NaN, -5, 0, 103000], S);
   check('سربه‌سری بی‌معنی کنار گذاشته شد', dirty.beCount === 1 && dirty.beNear === 103000);
+}
+
+group('۱۸. مسیر امن سرو فایل ایستا');
+{
+  const ROOT = '/x/options-radar';
+  check('پوشه هم‌نام‌شروع کنار ریشه رد می‌شود',
+    safeStaticPath(ROOT, '/../options-radar-private/secret') === null);
+  check('عبور صریح با ../ رد می‌شود',
+    safeStaticPath(ROOT, '/../../../etc/passwd') === null);
+  check('مسیر عادی داخل ریشه پذیرفته می‌شود',
+    safeStaticPath(ROOT, '/ui/index.html') === path.join(ROOT, '/ui/index.html'));
+  check('ریشه، به فایل نمایه می‌رسد',
+    safeStaticPath(ROOT, '/') === path.join(ROOT, '/ui/index.html'));
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════
