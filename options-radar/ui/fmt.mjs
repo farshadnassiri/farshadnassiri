@@ -95,14 +95,35 @@ export const fmt = {
  * پسوند فارسی است ولی داخل SVG می‌نشیند، جایی که جهت‌دهی دوسویه دردسر
  * می‌سازد. قاعده «‎.payoff text» جهت را چپ‌به‌راست و جداشده می‌گیرد تا هم
  * نشانه منفی سر جایش بماند و هم حرف فارسی وارونه نشود.
+ *
+ * همان دسته «مرز گرد شدن» دور ۳۹ (fmt.num): واحد روی رقم خام تصمیم گرفته
+ * می‌شد. عددی مثل ۹۹۹٬۹۶۰ خودش زیر ۱ میلیون بود، شاخه «هزار» را می‌رفت،
+ * ولی گرد کردن به «۱۰۰۰ هزار» می‌رسید — باید «۱ م» می‌شد. یک بار رندر با
+ * واحد اول، بعد دوباره از روی مقدار گردشده تصمیم می‌گیرد.
  */
+function axisTier(x) {
+  const a = Math.abs(x);
+  if (a >= 1e9) {
+    const dec = a >= 1e10 ? 0 : 1;
+    return { text: `${faNum((x / 1e9).toFixed(dec))} میلیارد`, rounded: Number((x / 1e9).toFixed(dec)) * 1e9 };
+  }
+  if (a >= 1e6) {
+    const dec = a >= 1e7 ? 0 : 1;
+    return { text: `${faNum((x / 1e6).toFixed(dec))} م`, rounded: Number((x / 1e6).toFixed(dec)) * 1e6 };
+  }
+  if (a >= 1e4) {
+    const r = Math.round(x / 1e3);
+    return { text: `${faNum(r.toString())} هزار`, rounded: r * 1e3 };
+  }
+  return null;
+}
+
 export function axisNum(v) {
   if (!Number.isFinite(v)) return '—';
-  const a = Math.abs(v);
-  if (a >= 1e9) return faNum((v / 1e9).toFixed(a >= 1e10 ? 0 : 1)) + ' میلیارد';
-  if (a >= 1e6) return faNum((v / 1e6).toFixed(a >= 1e7 ? 0 : 1)) + ' م';
-  if (a >= 1e4) return faNum(Math.round(v / 1e3).toString()) + ' هزار';
-  return fmt.money(v);
+  const first = axisTier(v);
+  if (!first) return fmt.money(v);
+  const second = axisTier(first.rounded);
+  return second ? second.text : fmt.money(first.rounded);
 }
 
 /** فاصله زمانی تا الان، به فارسی خوانا. */
