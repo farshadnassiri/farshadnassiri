@@ -79,12 +79,27 @@ export function analyzeMixed(legs, netCash, opt = {}) {
   const anchor = spot > 0 ? spot : (ks[0] || 1);
   const lo = Math.max(anchor * 0.35, 1);
   const hi = anchor * 2.2;
+  const farDn = Math.max(anchor * 1e-6, 1e-9);
   const N = 400;
   const pts = [];
   for (let i = 0; i <= N; i++) {
     const S = lo + ((hi - lo) * i) / N;
     pts.push({ S, pnl: value(S) });
   }
+
+  // دم پایین، فقط برای بازه‌های سود: برای ترکیب پوت‌دار، ناحیه سود می‌تواند
+  // پیش از کف بازه رسم (۰٫۳۵×پایه) شروع شود. بدون این دم، `regions` — که
+  // ورودی احتمال سود است — آن ناحیه را در همان کف بریده می‌دید، نه در مرز
+  // واقعی‌اش. تُنُک و لگاریتمی است چون این ترکیب‌ها در این دم یکنواخت‌اند؛
+  // جدا از `pts` نگه داشته می‌شود تا نمودار و نمونه‌های بیشترین سود و زیان
+  // دست‌نخورده بماند.
+  const NLOW = 60;
+  const regionPts = farDn < lo
+    ? [...Array.from({ length: NLOW }, (_, i) => {
+        const S = farDn * Math.pow(lo / farDn, i / NLOW);
+        return { S, pnl: value(S) };
+      }), ...pts]
+    : pts;
 
   // ——— سربه‌سری با تنصیف روی تغییر علامت ———
   const breakevens = [];
@@ -115,7 +130,6 @@ export function analyzeMixed(legs, netCash, opt = {}) {
     return daysLeft > 0 ? sigma(l) * Math.sqrt(daysLeft / 365) : 0;
   }));
   const farUp = anchor * Math.exp(10 * maxSd + 2);
-  const farDn = Math.max(anchor * 1e-6, 1e-9);
   const slopeAt = (S) => {
     const h = Math.max(S * 1e-6, 1e-9);
     return (value(S + h) - value(S - h)) / (2 * h);
@@ -149,7 +163,7 @@ export function analyzeMixed(legs, netCash, opt = {}) {
   // ——— بازه‌های سود، برای احتمال سود ———
   const regions = [];
   let open = null;
-  for (const p of pts) {
+  for (const p of regionPts) {
     if (p.pnl > 0 && open == null) open = p.S;
     if (p.pnl <= 0 && open != null) { regions.push([open, p.S]); open = null; }
   }
