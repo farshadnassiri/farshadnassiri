@@ -51,29 +51,6 @@ export function minMargin(rm, p = DEFAULT_PARAMS) {
   return p.maint * rm;
 }
 
-/**
- * قیمت تقریبی پایه که در آن حساب کال مارجین می‌شود.
- * فرض: قیمت پایانی اختیار در سناریو دست‌کم برابر ارزش ذاتی همان قیمت است.
- * پس عدد خروجی کف است نه سقف، چون ارزش زمانی لحاظ نشده.
- * وجه تضمین لازم در S یکنواست، پس تنصیف جواب می‌دهد و پیمایش لازم نیست.
- */
-export function marginCallPrice(S, K, size, kind, optClose, equity, p = DEFAULT_PARAMS) {
-  if (!(equity > 0)) return NaN;
-  const need = (s) => {
-    const intr = kind === 'call' ? Math.max(0, s - K) : Math.max(0, K - s);
-    return minMargin(requiredMargin(s, K, size, kind, Math.max(num(optClose), intr), p), p);
-  };
-  const dir = kind === 'call' ? 1 : -1;
-  let lo = S;
-  let hi = kind === 'call' ? S * 3 : S * 0.02;
-  if (need(hi) <= equity) return NaN;              // حتی در انتها هم کال مارجین نمی‌شود
-  for (let i = 0; i < 80; i++) {
-    const mid = (lo + hi) / 2;
-    if (need(mid) > equity) hi = mid; else lo = mid;
-  }
-  return dir === 1 ? hi : hi;
-}
-
 // ——————————————— اعتبارسنجی با تابلو ———————————————
 
 /** اجزای محاسبه در برابر اعداد تابلو. */
