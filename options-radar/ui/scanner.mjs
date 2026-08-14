@@ -67,20 +67,24 @@ export function onChain(fn) {
 export const chainDetail = (uaIns) => ask({ type: 'chain-detail', uaIns });
 
 // ————————————————————————— تلاطم تاریخی —————————————————————————
+// کلید کش هم طول تاریخچه و هم روز معاملاتی سال را دارد، وگرنه با تغییر
+// این دو در تنظیمات، مقدار قدیمی همان نماد تا آخر نشست دوباره برنمی‌گشت —
+// این دو مقدار در محاسبه histVol اثر مستقیم دارند.
 const sigmaCache = new Map();
+const sigmaCacheKey = (ins, settings) => `${ins}|${settings.volDays}|${settings.tradingDaysYr}`;
 
 export async function sigmas(uaKeys, settings) {
-  const todo = uaKeys.filter((k) => !sigmaCache.has(k)).slice(0, 24);
+  const todo = uaKeys.filter((k) => !sigmaCache.has(sigmaCacheKey(k, settings))).slice(0, 24);
   await Promise.all(todo.map(async (ins) => {
     try {
       const r = await (await fetch(`/api/daily?ins=${ins}&n=${settings.volDays}`)).json();
       const closes = (r.rows || []).map((x) => x.close).filter((x) => x > 0);
       const { histVol } = await import('/core/bs.mjs');
-      sigmaCache.set(ins, histVol(closes, settings.tradingDaysYr));
-    } catch { sigmaCache.set(ins, NaN); }
+      sigmaCache.set(sigmaCacheKey(ins, settings), histVol(closes, settings.tradingDaysYr));
+    } catch { sigmaCache.set(sigmaCacheKey(ins, settings), NaN); }
   }));
   const out = {};
-  for (const k of uaKeys) out[k] = sigmaCache.get(k);
+  for (const k of uaKeys) out[k] = sigmaCache.get(sigmaCacheKey(k, settings));
   return out;
 }
 
