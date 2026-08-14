@@ -205,5 +205,5 @@ export async function mount(root, { state, api }) {
     }
   });
 
-  return () => { spy.disconnect(); window.removeEventListener('scroll', onScroll); };
+  return () => { spy.disconnect(); window.removeEventListener('scroll', onScroll); clearTimeout(flashTimer); };
 }

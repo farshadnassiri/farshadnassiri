@@ -384,5 +384,5 @@ export async function mount(root, { state, api }) {
   await load();
   await priceAll();
   const timer = setInterval(priceAll, 15000);
-  return () => { offChain(); offWatch(); clearInterval(timer); chart?.destroy(); };
+  return () => { offChain(); offWatch(); clearInterval(timer); clearTimeout(flashTimer); chart?.destroy(); };
 }
