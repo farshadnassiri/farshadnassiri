@@ -194,7 +194,7 @@ export async function mount(root, { state, api }) {
     drawKpis(chainState.stats, chainState.at);
   }
 
-  const offWatch = api.subscribeWatch((w) => pushRows(w, !w.changed));
+  const offWatch = api.subscribeWatch((w) => pushRows(w, !w.changed, state.settings));
   drawFlow();
   const timer = setInterval(drawFlow, 4000);
 

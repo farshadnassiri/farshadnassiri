@@ -51,9 +51,11 @@ function ask(msg) {
   });
 }
 
-/** ردیف‌های عکس لحظه‌ای را به ریسه می‌دهد. ساخت زنجیره آنجا انجام می‌شود. */
-export function pushRows(watch, full) {
-  return ask({ type: 'rows', full, rows: watch.rows, at: watch.at });
+/** ردیف‌های عکس لحظه‌ای را به ریسه می‌دهد. ساخت زنجیره آنجا انجام می‌شود.
+ * settings لازم است چون تلاطم ضمنی نمادها (atmIv) از rFree/divYield واقعی
+ * کاربر حساب می‌شود، نه پیش‌فرض هاردکد core/chain.mjs. */
+export function pushRows(watch, full, settings) {
+  return ask({ type: 'rows', full, rows: watch.rows, at: watch.at, settings });
 }
 
 export function onChain(fn) {

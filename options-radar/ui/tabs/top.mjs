@@ -248,7 +248,7 @@ export async function mount(root, { state, api }) {
     if (auto.checked) { run(); timer = setInterval(run, Math.max(10, s().watchIntervalSec * 3) * 1000); }
   });
 
-  const offWatch = api.subscribeWatch((w) => pushRows(w, !w.changed));
+  const offWatch = api.subscribeWatch((w) => pushRows(w, !w.changed, s()));
   setStatus();
   return () => { offWatch(); offChain(); clearInterval(timer); clearTimeout(flashTimer); chart?.destroy(); };
 }

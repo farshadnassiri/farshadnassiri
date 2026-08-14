@@ -380,7 +380,7 @@ export async function mount(root, { state, api }) {
 
   const offChain = onChain((cs) => { uaList = cs.list; refreshUaOptions(); });
   if (chainState.list.length) { uaList = chainState.list; refreshUaOptions(); }
-  const offWatch = api.subscribeWatch((w) => pushRows(w, !w.changed));
+  const offWatch = api.subscribeWatch((w) => pushRows(w, !w.changed, s()));
 
   await load();
   await priceAll();

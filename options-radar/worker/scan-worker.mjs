@@ -69,7 +69,8 @@ function handleMessage(m) {
     const ch = ensureChain();
     self.postMessage({
       type: 'chain', id: m.id,
-      list: underlyingList(ch), stats: chainStats(ch), at: m.at,
+      list: underlyingList(ch, { rFree: m.settings?.rFree, divYield: m.settings?.divYield }),
+      stats: chainStats(ch), at: m.at,
     });
     return;
   }

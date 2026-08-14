@@ -818,6 +818,16 @@ group('۱۵. قرارداد پیام‌رسانی ریسه اسکن');
   check('ریسه زنجیره ساخت و فهرست نماد داد', !!ch && ch.list.length === 1 && ch.stats.contracts === 20,
     `${ch?.list.length} نماد | ${ch?.stats.contracts} قرارداد`);
 
+  // تلاطم ضمنی نمادها (atmIv) باید از rFree/divYield واقعی کاربر بیاید، نه
+  // پیش‌فرض هاردکد core/chain.mjs — قبلاً پیام 'rows' هیچ‌وقت settings
+  // نمی‌فرستاد، پس همیشه rFree=۰٫۳۰ هاردکد استفاده می‌شد، حتی اگر کاربر در
+  // تنظیمات چیز دیگری گذاشته باشد.
+  send({ type: 'rows', id: 1.5, full: true, rows, at: Date.now(), settings: { ...st, rFree: 0.02, divYield: 0 } });
+  const chLowR = out.filter((m) => m.type === 'chain').at(-1);
+  check('پیام rows با settings، atmIv را طبق rFree واقعی حساب می‌کند، نه ۰٫۳۰ هاردکد',
+    Number.isFinite(chLowR.list[0].atmIv) && Math.abs(chLowR.list[0].atmIv - ch.list[0].atmIv) > 1e-6,
+    `rFree پیش‌فرض ${ch.list[0].atmIv?.toFixed(4)} ≠ rFree=۰٫۰۲ ${chLowR.list[0].atmIv?.toFixed(4)}`);
+
   send({ type: 'scan', id: 2, defId: 'covered-call', uaKeys: ['1'], settings: st, qty: 1 });
   const sc = out.find((m) => m.type === 'scan');
   check('ریسه اسکن کرد و نوار تشخیص برگشت', sc.rows.length > 0 && sc.funnel.built > 0,

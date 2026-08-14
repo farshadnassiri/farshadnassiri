@@ -320,7 +320,7 @@ export async function mount(root, { state, api }) {
   el('#new').addEventListener('change', draw);
 
   const offChain = onChain(() => {});
-  const offWatch = api.subscribeWatch((w) => pushRows(w, !w.changed));
+  const offWatch = api.subscribeWatch((w) => pushRows(w, !w.changed, s()));
   await load();
   const timer = setInterval(priceAll, 15000);
   return () => { offChain(); offWatch(); clearInterval(timer); dChart?.destroy(); c1Chart?.destroy(); c2Chart?.destroy(); };

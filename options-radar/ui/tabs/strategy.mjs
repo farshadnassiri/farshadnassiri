@@ -526,7 +526,7 @@ export async function mount(root, { tab, state, api }) {
 
   // اشتراک عکس لحظه‌ای فقط تا وقتی این تب باز است
   const offWatch = api.subscribeWatch((w) => {
-    pushRows(w, !w.changed);
+    pushRows(w, !w.changed, s());
   });
 
   setStatus();
