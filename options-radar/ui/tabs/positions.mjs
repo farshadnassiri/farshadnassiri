@@ -64,8 +64,8 @@ export async function mount(root, { state, api }) {
   const field = (key, label, kind, extra = '') => {
     const w = document.createElement('div');
     w.className = 'field';
-    if (kind === 'select') w.innerHTML = `<label>${label}</label><select id="f-${key}">${extra}</select>`;
-    else w.innerHTML = `<label>${label}</label><input type="${kind}" id="f-${key}" ${extra}>`;
+    if (kind === 'select') w.innerHTML = `<label for="f-${key}">${label}</label><select id="f-${key}">${extra}</select>`;
+    else w.innerHTML = `<label for="f-${key}">${label}</label><input type="${kind}" id="f-${key}" ${extra}>`;
     form.appendChild(w);
     F[key] = w.querySelector(`#f-${key}`);
     return F[key];

@@ -95,10 +95,12 @@ export async function mount(root, { state }) {
     const legs = buildLegs(def, { strikes, size, days: [days, days * 2] });
 
     inputsHost.innerHTML = '';
+    let addIdx = 0;
     const add = (label, value, onChange, hint = '') => {
       const w = document.createElement('div');
       w.className = 'field';
-      w.innerHTML = `<label>${label}</label><input type="number" value="${value}">${hint ? `<span class="hint">${hint}</span>` : ''}`;
+      const id = `eng-in-${addIdx++}`;
+      w.innerHTML = `<label for="${id}">${label}</label><input id="${id}" type="number" value="${value}">${hint ? `<span class="hint">${hint}</span>` : ''}`;
       w.querySelector('input').addEventListener('change', (e) => { onChange(Number(e.target.value)); render(false); });
       inputsHost.appendChild(w);
     };
