@@ -249,7 +249,7 @@ export async function mount(root, { state, api }) {
         <th>سقف سود پس از رول</th><th>سربه‌سری پس از رول</th><th></th>
       </tr></thead>
       <tbody>${candRows.map((x) => `
-        <tr data-i="${x.i}" style="cursor:pointer;${x.i === candIdx ? 'background:var(--accent-soft)' : ''}">
+        <tr data-i="${x.i}" style="cursor:pointer" class="${x.i === candIdx ? 'picked' : ''}" tabindex="0" role="button" aria-label="نامزد رول به اعمال ${fmt.money(x.strike)}">
           <td class="n">${fmt.money(x.strike)}</td>${multiExpiry ? `<td class="n">${faDigits(x.days)} روز</td>` : ''}
           <td class="n">${fmt.money(x.r.netCashChange)}</td>
           <td class="n" style="color:${x.r.atSpot >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(x.r.atSpotTotal)}</td>
@@ -258,7 +258,13 @@ export async function mount(root, { state, api }) {
           <td>${x.i === bestIdx ? '<span class="tag gain">بهترین تفاضل</span>' : ''}${x.i === candIdx ? '<span class="tag flat">انتخاب‌شده</span>' : ''}</td>
         </tr>`).join('')}</tbody>`;
     for (const tr of root.querySelectorAll('#cand tbody tr')) {
-      tr.addEventListener('click', () => { el('#new').value = tr.dataset.i; draw(); });
+      const pick = () => { el('#new').value = tr.dataset.i; draw(); };
+      tr.addEventListener('click', pick);
+      tr.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        pick();
+      });
     }
 
     const ks = [...r.curAnalysis.strikes, ...r.nextAnalysis.strikes, spot];

@@ -355,6 +355,10 @@ table.data tbody tr:hover { background: var(--panel-2); }
    شکست نمی‌دهد. */
 table.data tbody tr.atm { background: var(--accent-soft); }
 table.data tbody tr.atm:hover { background: var(--panel-2); }
+/* نامزد انتخاب‌شده جدول مقایسه رول (roll.mjs) — همان مشکل ردیف نزدیک‌به‌پول
+   دور ۲۴، این‌بار پیش‌گیرانه با کلاس نه style این‌لاین. */
+table.data tbody tr.picked { background: var(--accent-soft); }
+table.data tbody tr.picked:hover { background: var(--panel-2); }
 
 /* ردیف برجسته با فلش بالا/پایین (table.mjs) — .tbl-body خودش tabindex="0"
    دارد، این فقط می‌گوید صفحه‌کلید الان کدام ردیف را می‌بیند. همان نشانه

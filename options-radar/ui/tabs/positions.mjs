@@ -202,7 +202,7 @@ export async function mount(root, { state, api }) {
     const evals = positions.map((p) => ({ p, ...evalPos(p) }));
 
     const rows = evals.map(({ p, m }, i) => `
-      <tr data-i="${i}" style="cursor:pointer">
+      <tr data-i="${i}" style="cursor:pointer" tabindex="0" role="button" aria-label="جزئیات موقعیت ${p.title || '—'}">
         <td>${p.title || '—'}</td>
         <td>${p.uaName || p.uaIns}</td>
         <td>${p.legs.map((l) => `${l.side === 'sell' ? '−' : '+'}${l.kind === 'underlying' ? 'سهم' : (l.kind === 'call' ? 'کال' : 'پوت') + ' ' + fmt.money(l.strike)}`).join(' ')}</td>
@@ -236,6 +236,16 @@ export async function mount(root, { state, api }) {
     }
     for (const tr of root.querySelectorAll('#list tbody tr[data-i]')) {
       tr.addEventListener('click', () => { expanded = Number(tr.dataset.i); drawDetail(); });
+      // فقط وقتی خودِ ردیف تمرکز دارد، نه وقتی Enter روی دکمه «حذف» تودرتو
+      // زده می‌شود — آن دکمه رویداد کلیک خودش را دارد، keydown هم بهش بسنده
+      // می‌کند و نباید تا ردیف حباب بزند و جزئیات را هم باز کند.
+      tr.addEventListener('keydown', (e) => {
+        if (e.target !== tr) return;
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        expanded = Number(tr.dataset.i);
+        drawDetail();
+      });
     }
 
     const tot = evals.reduce((a, x) => a + x.m.pnlTotal, 0);
