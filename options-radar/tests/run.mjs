@@ -664,6 +664,31 @@ group('۱۲. زنجیره و ترکیب‌سازی');
   const ranked = scanFn({ def: byId('covered-call'), chain, uaKeys: ['1'], settings: { ...s2, rankBy: 'retMonthPct' } });
   const rr = ranked.rows.map((r) => r.retMonthPct).filter(Number.isFinite);
   check('ردیف‌ها نزولی مرتب شدند', rr.every((v, i) => i === 0 || rr[i - 1] >= v));
+
+  // بازبینی هدفمند هفدهم: spot (ctx.S، «قیمت پایه» نمایشی) باید مثل
+  // chain.mjs همیشه آخرین معامله را بر پایانی ترجیح بدهد؛ قبلاً spot و
+  // spotClose هر دو از فرمول «پایانی سپس آخرین» می‌آمدند و روی نوسان روز
+  // یک عدد کهنه می‌شدند.
+  const rowsDiverge = [];
+  for (const k of [95000, 100000, 105000]) {
+    rowsDiverge.push({
+      uaInsCode: '3', lval30_UA: 'واگرا', pDrCotVal_UA: 101000, pClosing_UA: 99000, priceYesterday_UA: 98000,
+      insCode_C: `c${k}`, lVal18AFC_C: `ض${k}`, insCode_P: `p${k}`, lVal18AFC_P: `ط${k}`,
+      strikePrice: k, contractSize: 1000, remainedDay: 30, endDate: 20260101,
+      pMeDem_C: 500, qTitMeDem_C: 100, pMeOf_C: 550, qTitMeOf_C: 100,
+      pDrCotVal_C: 500, pClosing_C: 500, oP_C: 500, qTotTran5J_C: 1000,
+      pMeDem_P: 500, qTitMeDem_P: 100, pMeOf_P: 550, qTitMeOf_P: 100,
+      pDrCotVal_P: 500, pClosing_P: 500, oP_P: 400, qTotTran5J_P: 800,
+    });
+  }
+  const chainDiverge = buildChain(rowsDiverge);
+  const combosDiverge = generateCombos(byId('naked-call'), chainDiverge.get('3'), s2);
+  check('spot از آخرین معامله می‌آید، نه پایانی',
+    combosDiverge.length > 0 && combosDiverge.every((r) => r.spot === 101000),
+    combosDiverge.map((r) => r.spot).join(','));
+  check('spotClose عمداً پایانی می‌ماند',
+    combosDiverge.every((r) => r.spotClose === 99000),
+    combosDiverge.map((r) => r.spotClose).join(','));
 }
 
 group('۱۳. موقعیت واقعی و تحلیل رول');
