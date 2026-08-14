@@ -25,6 +25,7 @@ import { safeStaticPath } from '../server/static-path.mjs';
 import { isInsCode } from '../server/ins-code.mjs';
 import { readBody, BodyTooLargeError } from '../server/read-body.mjs';
 import { nextWatchDelaySec } from '../server/watch-backoff.mjs';
+import { BoundedCache } from '../server/bounded-cache.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -856,6 +857,29 @@ group('۲۰. عقب‌نشینی حلقه دیده‌بان');
   check('رشد نمایی از سقف عبور نمی‌کند', nextWatchDelaySec(5, 20, 120) === 120);
   check('موفقیت دوباره، فاصله را به حالت عادی برمی‌گرداند',
     nextWatchDelaySec(5, 0) === 5 && nextWatchDelaySec(5, 1) !== 5);
+}
+
+group('۲۱. کش با سقف اندازه');
+{
+  const c = new BoundedCache(3);
+  c.set('a', 1); c.set('b', 2); c.set('c', 3);
+  check('زیر سقف، چیزی حذف نمی‌شود', c.size === 3 && c.get('a') === 1);
+
+  c.set('d', 4);
+  check('عبور از سقف، کهنه‌ترین کلید حذف می‌شود',
+    c.size === 3 && c.get('a') === undefined && c.get('d') === 4);
+
+  const c2 = new BoundedCache(2);
+  c2.set('x', 1); c2.set('y', 2);
+  c2.set('x', 9); // دوباره‌نویسی x، پس y حالا کهنه‌تر است
+  c2.set('z', 3);
+  check('دوباره‌نویسی کلید، ترتیب حذف را عوض می‌کند',
+    c2.get('x') === 9 && c2.get('z') === 3 && c2.get('y') === undefined);
+
+  const c3 = new BoundedCache(5);
+  c3.set('k', 1);
+  c3.clear();
+  check('پاک‌سازی کامل هنوز کار می‌کند', c3.size === 0 && c3.get('k') === undefined);
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

@@ -22,6 +22,7 @@ import { safeStaticPath } from './static-path.mjs';
 import { isInsCode } from './ins-code.mjs';
 import { readBody, BodyTooLargeError } from './read-body.mjs';
 import { nextWatchDelaySec } from './watch-backoff.mjs';
+import { BoundedCache } from './bounded-cache.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -123,8 +124,8 @@ async function pump() {
 
 // ————————————————————————————————— کش و ادغام درخواست در پرواز —————————————————————————————————
 
-const cache = new Map();     // url -> { at, data }
-const inflight = new Map();  // url -> Promise
+const cache = new BoundedCache(5000); // url -> { at, data }
+const inflight = new Map();           // url -> Promise
 
 async function fetchUpstream(url) {
   const ac = new AbortController();
