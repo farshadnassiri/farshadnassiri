@@ -682,6 +682,30 @@ group('۱۳. موقعیت واقعی و تحلیل رول');
   check('اگر تا سررسید نگه داری، سود در قیمت فعلی', Number.isFinite(mtm.ifHeld.atSpot));
   check('روز نگه‌داری از تاریخ شمسی خوانده شد', mtm.daysHeld === 0, `${mtm.daysHeld}`);
 
+  // وجه تضمین باید از قیمت پایانی روز مظنه فعلی بیاید، نه قیمت ورودی
+  // ثبت‌شده روزها قبل — قبلاً markToMarket همیشه closes:{} خالی به
+  // strategyMargin می‌داد، که بی‌سروصدا به l.price (قیمت ورود) برمی‌گشت.
+  // با پوزیشن لخت (بدون پوشش سهم)، وجه تضمین مستقیم به قیمت آپشن حساس
+  // است، پس اختلاف اینجا قابل اندازه‌گیری است.
+  const nakedPos = {
+    id: 'p2', qty: 1, entryDate: todayJalali(), uaIns: '1',
+    legs: [{ kind: 'call', side: 'sell', ratio: 1, size, strike: 100000, price: 3000, days: 30 }],
+  };
+  const currentClose = 9300;
+  const mtmNaked = markToMarket(nakedPos, [q(9000, 9600)], { fees, spot: 115000, spotClose: 115000 });
+  const expectedMargin = strategyMargin(nakedPos.legs, {
+    S: 115000, closes: { 0: currentClose }, creditMode: 'FULL',
+  }).margin;
+  const staleMargin = strategyMargin(nakedPos.legs, {
+    S: 115000, closes: { 0: 3000 }, creditMode: 'FULL',
+  }).margin;
+  check('وجه تضمین موقعیت لخت از قیمت پایانی فعلی می‌آید، نه قیمت ورود',
+    Math.abs(mtmNaked.margin - expectedMargin) < 1e-6,
+    `مانتومارکت ${Math.round(mtmNaked.margin).toLocaleString()} ~ انتظار ${Math.round(expectedMargin).toLocaleString()}`);
+  check('وجه تضمین دیگر برابر محاسبه با قیمت کهنه ورود نیست',
+    Math.abs(mtmNaked.margin - staleMargin) > 1e-6,
+    `کهنه ${Math.round(staleMargin).toLocaleString()} ≠ الان ${Math.round(mtmNaked.margin).toLocaleString()}`);
+
   // رول: کال ۱۱۰ را ببند، کال ۱۲۰ سررسید دورتر بفروش
   const roll = rollAnalysis({
     pos, quotes: [q(104000, 105000), q(7000, 7400)],
