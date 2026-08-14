@@ -118,7 +118,14 @@ export function bsGreeks(kind, S, K, T, r, q, sigma) {
 }
 
 /**
- * تلاطم ضمنی با تنصیف.
+ * تلاطم ضمنی با نیوتن روی وگا، و تنصیف به‌عنوان تور ایمنی.
+ *
+ * هر قدم نیوتن پذیرفته می‌شود فقط اگر داخل کران‌های تازه‌شده بماند؛ در
+ * اسکن کامل که این تابع برای هر پای هر ترکیب صدا زده می‌شود، همین چند
+ * برابر سریع‌تر است — بدون نیوتن معمولاً به ۶۰-۱۲۰ قدم تنصیف نیاز بود، با
+ * آن معمولاً زیر ۱۰ قدم به تلورانس می‌رسد. کران هم مثل قبل تضمین همگرایی
+ * را می‌دهد، حتی وقتی وگا نزدیک صفر یا نیوتن بیرون از کران بپرد.
+ *
  * اگر قیمت بازار زیر کف نظری یا بالای سقف نظری باشد عدد بی‌معنی نمی‌سازد و
  * مقدار نامعتبر برمی‌گرداند. ستون جدول در این حالت خط تیره نشان می‌دهد.
  */
@@ -136,14 +143,19 @@ export function impliedVol(kind, mktPrice, S, K, T, r, q, opt = {}) {
   if (fLo > 0) return NaN; // زیر کف نظری، ارزش ذاتی نقض شده
   if (fHi < 0) return NaN; // بالای سقف نظری
 
+  const scale = tol * Math.max(1, mktPrice);
+  let sigma = clamp(0.5 * (lo + hi), lo, hi);
   for (let i = 0; i < iters; i++) {
-    const mid = 0.5 * (lo + hi);
-    const fm = f(mid);
-    if (Math.abs(fm) < tol * Math.max(1, mktPrice)) return mid;
-    if (fm < 0) lo = mid;
-    else hi = mid;
+    const fs = f(sigma);
+    if (Math.abs(fs) < scale) return sigma;
+    if (fs < 0) lo = sigma; else hi = sigma;
+
+    // وگای bsGreeks به ازای یک درصد تلاطم است؛ نیوتن به واحد خام سیگما نیاز دارد
+    const vegaRaw = bsGreeks(kind, S, K, T, r, q, sigma).vega * 100;
+    const next = vegaRaw > 1e-8 ? sigma - fs / vegaRaw : NaN;
+    sigma = Number.isFinite(next) && next > lo && next < hi ? next : 0.5 * (lo + hi);
   }
-  return 0.5 * (lo + hi);
+  return clamp(sigma, lo, hi);
 }
 
 /**
