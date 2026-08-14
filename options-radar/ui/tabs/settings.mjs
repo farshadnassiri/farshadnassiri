@@ -159,10 +159,15 @@ export async function mount(root, { state, api }) {
   };
 
   const msg = root.querySelector('#msg');
+  let flashTimer = null;
   const flash = (t, bad = false) => {
     msg.textContent = t;
     msg.style.color = bad ? 'var(--loss)' : 'var(--gain)';
-    setTimeout(() => { msg.textContent = ''; }, 2600);
+    // اگر پیام قبلی هنوز پاک نشده، تایمرش هم لغو شود — وگرنه تایمر پیام
+    // کهنه‌تر این پیام تازه‌تر را زودتر از موعد پاک می‌کرد (مثلاً «بازگشت
+    // به پیش‌فرض» سریع پشت‌سرِ «ذخیره تنظیمات»).
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { msg.textContent = ''; }, 2600);
   };
 
   const saveBtn = root.querySelector('#save');

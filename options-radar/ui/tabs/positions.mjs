@@ -120,10 +120,15 @@ export async function mount(root, { state, api }) {
   });
 
   const msg = root.querySelector('#msg');
+  let flashTimer = null;
   const flash = (t, bad) => {
     msg.textContent = t;
     msg.style.color = bad ? 'var(--loss)' : 'var(--gain)';
-    setTimeout(() => { msg.textContent = ''; }, 3000);
+    // تایمر پیام قبلی لغو می‌شود — وگرنه اگر دو flash نزدیک هم بیایند
+    // (مثلاً افزودن سریع دو موقعیت)، تایمر اولی پیام دومی را زودتر از
+    // موعد پاک می‌کرد.
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { msg.textContent = ''; }, 3000);
   };
 
   const addBtn = root.querySelector('#add');
