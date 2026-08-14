@@ -8,7 +8,7 @@
 // ضریب خطی هر بازه را نشان می‌دهد؛ همان چیزی که سربه‌سری و بیشترین سود از
 // آن بیرون می‌آید.
 
-import { fmt, faNum, faDigits } from '/ui/fmt.mjs';
+import { fmt, faNum, faDigits, signTone } from '/ui/fmt.mjs';
 import { CATALOG, byId, buildLegs } from '/strategies/catalog.mjs';
 import { grossCash, entryFees, analyzePayoff, chartPoints } from '/core/payoff.mjs';
 import { mountPayoff } from '/ui/chart.mjs';
@@ -203,7 +203,7 @@ export async function mount(root, { state }) {
       ['بیشترین سود', fmt.money(row.maxProfit), row.unlimitedProfit ? 'نامحدود' : 'محدود', 'gain'],
       ['بیشترین زیان', fmt.money(row.maxLoss), row.unlimitedLoss ? 'نامحدود' : 'محدود', 'loss'],
       ['سرمایه درگیر', fmt.money(row.capital), row.capitalLabel, ''],
-      ['بازده دوره', `${fmt.pct(row.retMaxPct)}٪`, `${faDigits(row.days)} روز`, row.retMaxPct > 0 ? 'gain' : 'loss'],
+      ['بازده دوره', `${fmt.pct(row.retMaxPct)}٪`, `${faDigits(row.days)} روز`, signTone(row.retMaxPct)],
       ['احتمال سود', `${fmt.pct(row.popPct)}٪`, 'لگاریتم-نرمال، بدون دامنه', ''],
       ['هزینه اجرا', fmt.money(row.execCost), `${faDigits(row.legCount)} پا`, 'loss'],
       ['وجه تضمین', fmt.money(row.margin), row.isCredit ? 'بستانکار' : 'بدهکار — صفر', ''],
