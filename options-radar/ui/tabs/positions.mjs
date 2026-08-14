@@ -52,7 +52,13 @@ export async function mount(root, { state, api }) {
 
     <section class="card" id="det-card" style="display:none">
       <h3 id="det-title">جزئیات موقعیت</h3>
-      <div class="detail" id="det"></div>
+      <div class="detail" id="det">
+        <div>
+          <div id="pos-chart"></div>
+          <div id="det-left"></div>
+        </div>
+        <div id="det-right"></div>
+      </div>
     </section>`;
 
   // ——————————————— فرم ———————————————
@@ -235,13 +241,20 @@ export async function mount(root, { state, api }) {
     if (expanded != null) drawDetail();
   }
 
+  // هر ۱۵ ثانیه priceAll دوباره صدا می‌زند و اگر پانلی باز باشد drawDetail هم
+  // دوباره اجرا می‌شود. اگر همان موقعیت باز مانده، فقط chart.update صدا زده
+  // می‌شود تا زوم و پیمایش کاربر روی نمودار دست‌نخورده بماند — همان اصلاحی
+  // که در تب استراتژی برای showDetail شد (بک‌لاگ #۱۱).
+  let detPosId = null;
   function drawDetail() {
     const p = positions[expanded];
     if (!p) {
-      detChart?.destroy(); detChart = null;
+      detChart?.destroy(); detChart = null; detPosId = null;
       root.querySelector('#det-card').style.display = 'none';
       return;
     }
+    const sameRow = detPosId === p.id && !!detChart;
+    detPosId = p.id;
     const { m, spot, fees } = evalPos(p);
     root.querySelector('#det-card').style.display = '';
     root.querySelector('#det-title').textContent = `${p.title} — ${p.uaName || p.uaIns}`;
@@ -256,18 +269,15 @@ export async function mount(root, { state, api }) {
         <td class="n" style="color:${l.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(l.pnl)}</td>
       </tr>`).join('');
 
-    detChart?.destroy();
-    root.querySelector('#det').innerHTML = `
-      <div>
-        <div id="pos-chart"></div>
-        <h4 style="margin:14px 0 4px;font-size:12px">تفکیک هر پا — برای یک دست قرارداد</h4>
-        <table class="mini">
-          <thead><tr><th>پا</th><th>قیمت ورود</th><th>قیمت بستن</th><th>سهم درگیر</th><th>کارمزد رفت و برگشت</th><th>سود و زیان</th></tr></thead>
-          <tbody>${legRows}</tbody>
-        </table>
-        <p class="note" style="margin-top:10px">قیمت بستن، مظنه مخالف است: موقعیت خرید روی تقاضا بسته می‌شود و موقعیت فروش روی عرضه بازخرید می‌شود.</p>
-      </div>
-      <div>
+    root.querySelector('#det-left').innerHTML = `
+      <h4 style="margin:14px 0 4px;font-size:12px">تفکیک هر پا — برای یک دست قرارداد</h4>
+      <table class="mini">
+        <thead><tr><th>پا</th><th>قیمت ورود</th><th>قیمت بستن</th><th>سهم درگیر</th><th>کارمزد رفت و برگشت</th><th>سود و زیان</th></tr></thead>
+        <tbody>${legRows}</tbody>
+      </table>
+      <p class="note" style="margin-top:10px">قیمت بستن، مظنه مخالف است: موقعیت خرید روی تقاضا بسته می‌شود و موقعیت فروش روی عرضه بازخرید می‌شود.</p>`;
+
+    root.querySelector('#det-right').innerHTML = `
         <dl class="kv">
           <dt>جریان نقد ورود</dt><dd>${fmt.money(m.entryNet)}</dd>
           <dt>ارزش بستن الان</dt><dd>${fmt.money(m.closeNet)}</dd>
@@ -288,9 +298,14 @@ export async function mount(root, { state, api }) {
           <dt>بیشترین زیان</dt><dd>${fmt.money(m.ifHeld.maxLoss)}</dd>
           <dt>سربه‌سری</dt><dd>${m.ifHeld.breakevens.map((b) => Math.round(b).toLocaleString('en-US')).join(' , ') || '—'}</dd>
         </dl>
-        <p class="note" style="margin-top:10px">برای تصمیم رول همین موقعیت، به تب تحلیل رول برو.</p>
-      </div>`;
-    detChart = mountPayoff(root.querySelector('#pos-chart'), p.legs, m.entryNet, { fees, spot, width: 720, height: 250 });
+        <p class="note" style="margin-top:10px">برای تصمیم رول همین موقعیت، به تب تحلیل رول برو.</p>`;
+
+    if (sameRow) {
+      detChart.update(p.legs, m.entryNet, { fees, spot, width: 720, height: 250 });
+    } else {
+      detChart?.destroy();
+      detChart = mountPayoff(root.querySelector('#pos-chart'), p.legs, m.entryNet, { fees, spot, width: 720, height: 250 });
+    }
   }
 
   // ——————————————— داده ———————————————

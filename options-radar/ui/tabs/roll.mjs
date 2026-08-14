@@ -20,6 +20,11 @@ export async function mount(root, { state, api }) {
   let detail = null;
   let candidates = [];
   let dchart = null, c1chart = null, c2chart = null;
+  // priceAll هر ۱۵ ثانیه draw را دوباره صدا می‌زند. اگر همان موقعیت و همان
+  // پای بسته‌شده و همان کاندیدا هستند — فقط قیمت‌ها تازه شده‌اند — نمودارها
+  // با update به‌روز می‌شوند نه destroy+mount از نو، وگرنه زوم و پیمایش
+  // کاربر روی هر سه نمودار هر ۱۵ ثانیه گم می‌شد (همان اصلاح بک‌لاگ #۱۱).
+  let drawKey = null;
 
   root.innerHTML = `
     <div class="page-head">
@@ -183,17 +188,30 @@ export async function mount(root, { state, api }) {
     const lo = Math.max(1, Math.min(...ks) * 0.75);
     const hi = Math.max(...ks) * 1.3;
 
-    dchart?.destroy();
-    dchart = mountDiff(el('#dchart'), (S) => r.diff(S) * p.qty, lo, hi, { spot, width: 760, height: 240 });
+    const key = `${p.id}|${closeIdx}|${cand.q.ins}`;
+    const sameSelection = drawKey === key && !!dchart && !!c1chart && !!c2chart;
+    drawKey = key;
+
+    if (sameSelection) {
+      dchart.update((S) => r.diff(S) * p.qty, lo, hi, { spot, width: 760, height: 240 });
+    } else {
+      dchart?.destroy();
+      dchart = mountDiff(el('#dchart'), (S) => r.diff(S) * p.qty, lo, hi, { spot, width: 760, height: 240 });
+    }
     el('#dtitle').textContent = `تفاضل دو موقعیت — ${r.verdict}`;
     el('#dlegend').innerHTML = `
       <span>${r.note}</span>
       <span>مرز تصمیم: ${dchart.crossings.map((x) => Math.round(x).toLocaleString('en-US')).join(' , ') || 'ندارد'}</span>`;
 
-    c1chart?.destroy();
-    c2chart?.destroy();
-    c1chart = mountPayoff(el('#c1'), p.legs, r.curNet, { fees, spot, width: 480, height: 220 });
-    c2chart = mountPayoff(el('#c2'), r.nextLegs, r.nextNet, { fees, spot, width: 480, height: 220 });
+    if (sameSelection) {
+      c1chart.update(p.legs, r.curNet, { fees, spot, width: 480, height: 220 });
+      c2chart.update(r.nextLegs, r.nextNet, { fees, spot, width: 480, height: 220 });
+    } else {
+      c1chart?.destroy();
+      c2chart?.destroy();
+      c1chart = mountPayoff(el('#c1'), p.legs, r.curNet, { fees, spot, width: 480, height: 220 });
+      c2chart = mountPayoff(el('#c2'), r.nextLegs, r.nextNet, { fees, spot, width: 480, height: 220 });
+    }
   }
 
   el('#pos').addEventListener('change', () => pickPos(Number(el('#pos').value)));
