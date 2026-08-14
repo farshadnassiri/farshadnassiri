@@ -21,6 +21,7 @@ import { buildChain, underlyingList, chainStats } from '../core/chain.mjs';
 import { scan as scanFn, generateCombos } from '../core/scan.mjs';
 import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
+import { zeroCrossings } from '../core/curve.mjs';
 import { safeStaticPath } from '../server/static-path.mjs';
 import { isInsCode } from '../server/ins-code.mjs';
 import { readBody, BodyTooLargeError } from '../server/read-body.mjs';
@@ -896,6 +897,40 @@ group('۲۱. کش با سقف اندازه');
   c3.set('k', 1);
   c3.clear();
   check('پاک‌سازی کامل هنوز کار می‌کند', c3.size === 0 && c3.get('k') === undefined);
+}
+
+group('۲۲. نقاط تغییر علامت — نمودار تفاضل');
+{
+  const mk = (xMin, xMax, N, fn) => Array.from({ length: N + 1 }, (_, i) => {
+    const S = xMin + ((xMax - xMin) * i) / N;
+    return { S, v: fn(S) };
+  });
+  const val = (p) => p.v;
+
+  const simple = mk(60, 140, 8, (S) => S - 100);
+  check('یک تغییر علامت ساده پیدا می‌شود',
+    zeroCrossings(simple, val).length === 1 && near(zeroCrossings(simple, val)[0], 100, 1e-6));
+
+  // باگ واقعی: با بازه و شمار نمونه رند، یک نمونه دقیقاً روی صفر می‌افتد.
+  // شرط a<0 && b>0 نه در زوج قبلی‌اش می‌گیرد نه در بعدی‌اش، پس مرز تصمیم
+  // گم می‌شد — همان چیزی که برای S=100 با N=240 روی بازه [60,140] رخ می‌داد.
+  const exactZero = mk(60, 140, 240, (S) => (S - 100) * 1000);
+  check('نمونه دقیقاً روی صفر هم به‌عنوان مرز تصمیم شمرده می‌شود',
+    zeroCrossings(exactZero, val).length === 1 && near(zeroCrossings(exactZero, val)[0], 100, 1e-6));
+
+  const none = mk(60, 140, 8, () => 5);
+  check('بدون تغییر علامت، فهرست خالی است', zeroCrossings(none, val).length === 0);
+
+  const two = mk(0, 300, 30, (S) => (S - 100) * (200 - S));
+  check('دو تغییر علامت هر دو پیدا می‌شوند', zeroCrossings(two, val).length === 2);
+
+  const withNaN = mk(60, 140, 8, (S) => (S < 90 ? NaN : S - 100));
+  check('نمونه نامعتبر رد می‌شود، نه شمرده', zeroCrossings(withNaN, val).every(Number.isFinite));
+
+  // نمونه پایانی هم دقیقاً روی صفر — سر دیگر همان لبه
+  const lastZero = mk(60, 100, 40, (S) => S - 100);
+  check('صفر دقیق روی آخرین نمونه هم دیده می‌شود',
+    zeroCrossings(lastZero, val).length === 1 && near(zeroCrossings(lastZero, val)[0], 100, 1e-6));
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

@@ -5,7 +5,7 @@
 
 import { markToMarket, blankPosition } from '/core/positions.mjs';
 import { todayJalali } from '/core/jalali.mjs';
-import { payoffSvg } from '/ui/chart.mjs';
+import { mountPayoff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
@@ -23,6 +23,7 @@ export async function mount(root, { state, api }) {
   let quotesByIns = new Map();
   let uaList = [];
   let expanded = null;
+  let detChart = null;
 
   root.innerHTML = `
     <div class="page-head">
@@ -236,11 +237,14 @@ export async function mount(root, { state, api }) {
 
   function drawDetail() {
     const p = positions[expanded];
-    if (!p) { root.querySelector('#det-card').style.display = 'none'; return; }
+    if (!p) {
+      detChart?.destroy(); detChart = null;
+      root.querySelector('#det-card').style.display = 'none';
+      return;
+    }
     const { m, spot, fees } = evalPos(p);
     root.querySelector('#det-card').style.display = '';
     root.querySelector('#det-title').textContent = `${p.title} — ${p.uaName || p.uaIns}`;
-    const { svg } = payoffSvg(p.legs, m.entryNet, { fees, spot, width: 720, height: 250 });
 
     const legRows = m.perLeg.map((l) => `
       <tr>
@@ -252,9 +256,10 @@ export async function mount(root, { state, api }) {
         <td class="n" style="color:${l.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(l.pnl)}</td>
       </tr>`).join('');
 
+    detChart?.destroy();
     root.querySelector('#det').innerHTML = `
       <div>
-        ${svg}
+        <div id="pos-chart"></div>
         <h4 style="margin:14px 0 4px;font-size:12px">تفکیک هر پا — برای یک دست قرارداد</h4>
         <table class="mini">
           <thead><tr><th>پا</th><th>قیمت ورود</th><th>قیمت بستن</th><th>سهم درگیر</th><th>کارمزد رفت و برگشت</th><th>سود و زیان</th></tr></thead>
@@ -285,6 +290,7 @@ export async function mount(root, { state, api }) {
         </dl>
         <p class="note" style="margin-top:10px">برای تصمیم رول همین موقعیت، به تب تحلیل رول برو.</p>
       </div>`;
+    detChart = mountPayoff(root.querySelector('#pos-chart'), p.legs, m.entryNet, { fees, spot, width: 720, height: 250 });
   }
 
   // ——————————————— داده ———————————————
@@ -329,5 +335,5 @@ export async function mount(root, { state, api }) {
   await load();
   await priceAll();
   const timer = setInterval(priceAll, 15000);
-  return () => { offChain(); offWatch(); clearInterval(timer); };
+  return () => { offChain(); offWatch(); clearInterval(timer); detChart?.destroy(); };
 }

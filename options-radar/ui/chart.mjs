@@ -16,6 +16,7 @@
 
 import { chartPoints, analyzePayoff } from '/core/payoff.mjs';
 import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
+import { zeroCrossings } from '/core/curve.mjs';
 
 const money = (v) => (Number.isFinite(v) ? Math.round(v).toLocaleString('en-US') : '—');
 const MIN_SPAN = 1e-6;
@@ -137,7 +138,7 @@ function frame(points, analysis, opt, xMin, xMax) {
     ? `<line class="spot" x1="${X(spot)}" y1="${pad.t}" x2="${X(spot)}" y2="${H - pad.b}"/>
        <text class="lbl" x="${X(spot)}" y="${pad.t - 6}" text-anchor="middle" style="fill:var(--warn)">پایه ${money(spot)}</text>` : '';
 
-  const svg = `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار بازده در سررسید">
+  const svg = `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="${opt.ariaLabel || 'نمودار بازده در سررسید'}">
       ${grid}${areas.join('')}${strikes}${spotLine}
       <line class="axis" x1="${pad.l}" y1="${H - pad.b}" x2="${W - pad.r}" y2="${H - pad.b}"/>
       ${xTicks}
@@ -176,13 +177,23 @@ export function payoffSvg(legs, netCash, opt = {}) {
  *
  *   غلتک          زوم حول همان نقطه‌ای که نشانگر رویش است
  *   کشیدن         پیمایش افقی
- *   حرکت نشانگر   خط راهنما و خواندن سود و زیان سر همان قیمت پایه
+ *   حرکت نشانگر   خط راهنما و خواندن مقدار سر همان قیمت پایه
  *   دوبار کلیک    برگشت به نمای اول
+ *
+ * تب موقعیت‌های من، تحلیل رول، و نمودار تفاضل هم همین مؤلفه را صدا می‌زنند
+ * — یکی برای بازده معمولی (`mountPayoff`) و یکی برای تفاضل دو موقعیت
+ * (`mountDiff`) — پس نسخه دوم منطق زوم و پیمایش و خط راهنما نگه داشته
+ * نمی‌شود. `points`/`analysis` ورودی مشترک است؛ `mountPayoff` آن را از
+ * پاها می‌سازد و `mountDiff` از یک تابع تفاضل.
  *
  * برمی‌گرداند { analysis, reset, destroy }.
  */
 export function mountPayoff(host, legs, netCash, opt = {}) {
   const { points, analysis } = seriesFor(legs, netCash, opt);
+  return mountFromSeries(host, points, analysis, opt);
+}
+
+function mountFromSeries(host, points, analysis, opt = {}) {
   const ys = points.map((p) => p.pnl).filter(Number.isFinite);
   if (!ys.length) {
     host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
@@ -287,7 +298,7 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
     g.querySelector('.cur-x').setAttribute('x2', x);
     g.querySelector('.cur-dot').setAttribute('cx', x);
     g.querySelector('.cur-dot').setAttribute('cy', y);
-    read.innerHTML = `پایه <b>${money(S)}</b> — سود و زیان `
+    read.innerHTML = `پایه <b>${money(S)}</b> — ${opt.pnlLabel || 'سود و زیان'} `
       + `<b style="color:${pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(pnl)}</b>`;
   }
   function hideCursor() {
@@ -323,7 +334,33 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   };
 }
 
-/** نمودار تفاضل دو موقعیت — ورودی تصمیم رول. */
+/**
+ * نمودار تفاضل دو موقعیت، تعامل‌پذیر — همان زوم و پیمایش و خط راهنمای
+ * `mountPayoff`، روی یک تابع خام به‌جای پاهای یک ترکیب. `fn` مستقیم صدا
+ * زده می‌شود، پس بازه نمونه‌برداری صریح لازم است: `analyzeMixed` و
+ * `analyzePayoff` بازه‌شان را از قیمت‌های اعمال می‌سازند، ولی تفاضل دو
+ * موقعیت قیمت اعمال خودش را ندارد.
+ */
+export function mountDiff(host, fn, xMin, xMax, opt = {}) {
+  const N = 240;
+  const points = [];
+  for (let i = 0; i <= N; i++) {
+    const S = xMin + ((xMax - xMin) * i) / N;
+    points.push({ S, pnl: fn(S) });
+  }
+
+  const crossings = zeroCrossings(points, (p) => p.pnl);
+
+  const analysis = { at: fn, breakevens: crossings, strikes: [] };
+  const inst = mountFromSeries(host, points, analysis, {
+    ...opt,
+    pnlLabel: opt.pnlLabel || 'تفاضل',
+    ariaLabel: opt.ariaLabel || 'نمودار تفاضل دو موقعیت',
+  });
+  return { ...inst, crossings };
+}
+
+/** نمودار تفاضل دو موقعیت — ورودی تصمیم رول. برای چاپ؛ نسخه تعامل‌پذیر `mountDiff` است. */
 export function diffSvg(fn, xMin, xMax, opt = {}) {
   const W = opt.width ?? 760, H = opt.height ?? 240;
   const pad = { t: 16, r: 14, b: 30, l: 14 };
@@ -350,15 +387,7 @@ export function diffSvg(fn, xMin, xMax, opt = {}) {
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');
 
   // نقاط تغییر علامت: مرز تصمیم
-  const cross = [];
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1], b = pts[i];
-    if ((a.v < 0 && b.v > 0) || (a.v > 0 && b.v < 0)) {
-      const t = -a.v / (b.v - a.v);
-      const S = a.S + t * (b.S - a.S);
-      cross.push(S);
-    }
-  }
+  const cross = zeroCrossings(pts, (p) => p.v);
   const dots = cross.map((S) => `<circle class="be" cx="${X(S)}" cy="${y0}" r="4"/>
     <text class="lbl" x="${X(S)}" y="${y0 - 8}" text-anchor="middle">${money(S)}</text>`).join('');
   const spotLine = Number.isFinite(opt.spot) && opt.spot >= xMin && opt.spot <= xMax
