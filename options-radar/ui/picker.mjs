@@ -96,11 +96,20 @@ export function makePicker(host, opts = {}) {
     }
   }
 
+  /** انتخابی که هر پیش‌تنظیم روی فهرست جاری می‌سازد — بدون اثر جانبی، برای اجرا و برای راستی‌آزمایی. */
+  function computePreset(kind) {
+    if (kind === 'none') return new Set();
+    if (kind === 'all') return new Set(list.map((u) => u.ins));
+    if (kind === 'liquid') return new Set(list.slice(0, 12).map((u) => u.ins));
+    if (kind === 'quoted') return new Set(list.filter((u) => u.quoted >= 4).map((u) => u.ins));
+    return null;
+  }
+  const setsEqual = (a, b) => a.size === b.size && [...a].every((x) => b.has(x));
+
   function preset(kind) {
-    if (kind === 'none') selected = new Set();
-    else if (kind === 'all') selected = new Set(list.map((u) => u.ins));
-    else if (kind === 'liquid') selected = new Set(list.slice(0, 12).map((u) => u.ins));
-    else if (kind === 'quoted') selected = new Set(list.filter((u) => u.quoted >= 4).map((u) => u.ins));
+    const next = computePreset(kind);
+    if (!next) return;
+    selected = next;
     activePreset = kind;
     syncPresetButtons();
     save(); render(); opts.onChange?.([...selected]);
@@ -118,6 +127,13 @@ export function makePicker(host, opts = {}) {
       // نمادهایی که دیگر در دیده‌بان نیستند از انتخاب بیرون می‌روند
       const live = new Set(list.map((u) => u.ins));
       for (const k of [...selected]) if (!live.has(k)) selected.delete(k);
+      // «دارای مظنه» و «پرمعامله» روی داده زنده تعریف می‌شوند: هر تیک دیده‌بان
+      // مظنه و حجم را عوض می‌کند، پس همان فهرست انتخاب‌شده دیگر با تعریف
+      // پیش‌تنظیم یکی نیست. اگر دکمه هنوز پررنگ (aria-pressed) بماند، دروغ
+      // می‌گوید — انگار انتخاب هنوز زنده دنبال تعریف می‌رود، در حالی که یک
+      // عکس لحظه‌ای منجمد از لحظه کلیک است.
+      if (activePreset && !setsEqual(selected, computePreset(activePreset) || new Set())) activePreset = null;
+      syncPresetButtons();
       render();
     },
     selected: () => [...selected],
