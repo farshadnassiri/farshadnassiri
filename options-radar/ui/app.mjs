@@ -316,10 +316,17 @@ function buildRail() {
 
 let current = null;
 let disposer = null;
+// شمارنده نسل — کلیک تب دوم پیش از تمام شدن import/mount تب اول، بدون این
+// می‌توانست بعداً دیرتر برگردد و روی stage/hash/عنوانِ تب دومِ درستی که
+// کاربر واقعاً می‌بیند بنشیند: فهرست کناری تب دوم را روشن نشان می‌داد ولی
+// کاربر محتوای تب اول را می‌دید. هر تلاش نسل خودش را می‌گیرد؛ هر جا از یک
+// await برگشت، اگر دیگر جدیدترین نیست، بی‌صدا کنار می‌کشد.
+let openGen = 0;
 
 async function open(id) {
   const t = TABS.find((x) => x.id === id);
   if (!t || current === id) return;
+  const gen = ++openGen;
   if (disposer) { try { disposer(); } catch {} disposer = null; }
   current = id;
   for (const b of document.querySelectorAll('.tab-btn')) {
@@ -343,10 +350,14 @@ async function open(id) {
 
   try {
     const mod = t.mod ? await import(t.mod) : await import('/ui/tabs/soon.mjs');
+    if (gen !== openGen) return; // تب دیگری وسط import کلیک شد؛ این تلاش کهنه است
     stage.innerHTML = '';
-    disposer = await mod.mount(stage, { tab: t, state, api: { loadSettings, putSettings, subscribeWatch } });
+    const d = await mod.mount(stage, { tab: t, state, api: { loadSettings, putSettings, subscribeWatch } });
+    if (gen !== openGen) { try { d?.(); } catch {} return; } // وسط mount هم کهنه شد؛ بی‌صدا خودش را جمع می‌کند
+    disposer = d;
     scrollToStage();
   } catch (e) {
+    if (gen !== openGen) return; // خطای یک تلاش کهنه، دیگر ربطی به تب باز فعلی ندارد
     stage.innerHTML = `<div class="card"><h3>تب باز نشد</h3><p class="note">${e.message}</p></div>`;
     console.error(e);
     scrollToStage();
