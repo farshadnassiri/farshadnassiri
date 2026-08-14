@@ -378,7 +378,10 @@ const THEME_NEXT = { ledger: 'board', board: 'ledger' };
 
 function applyTheme(name) {
   document.body.dataset.theme = name;
-  localStorage.setItem('theme', name);
+  // حافظه خصوصی/محدودشده مرورگر می‌تواند پرتاب کند؛ اگر همین‌جا بی‌نگهبان
+  // بترکد، خط‌های زیرش (به‌روزرسانی برچسب دکمه) هرگز اجرا نمی‌شوند — پوسته
+  // بصری عوض می‌شود ولی دکمه همچنان وضعیت قبلی را نشان می‌دهد
+  try { localStorage.setItem('theme', name); } catch { /* حافظه پر یا قفل */ }
   const btn = el('theme-btn');
   btn.textContent = `پوسته: ${THEME_NAME[name] || name}`;
   btn.title = `تعویض به پوسته ${THEME_NAME[THEME_NEXT[name]] || ''}`;
@@ -436,10 +439,15 @@ document.addEventListener('keydown', (e) => {
 
 // ————————————————————————————————— شروع —————————————————————————————————
 
-applyTheme(localStorage.getItem('theme') || 'ledger');
+// این دو خط پیش از buildRail اجرا می‌شوند — اگر localStorage همین‌جا
+// بی‌نگهبان پرتاب کند (حافظه خصوصی/محدودشده مرورگر)، کل بوت برنامه قبل
+// از رسیدن به فهرست کناری می‌ترکد، نه فقط پوسته اشتباه بماند.
+const getTheme = () => { try { return localStorage.getItem('theme'); } catch { return null; } };
+
+applyTheme(getTheme() || 'ledger');
 buildRail();
 await loadSettings();
-applyTheme(localStorage.getItem('theme') || state.settings.theme || 'ledger');
+applyTheme(getTheme() || state.settings.theme || 'ledger');
 tickHealth();
 setInterval(tickHealth, 3000);
 

@@ -7,9 +7,21 @@ import { fmt, normFa } from '/ui/fmt.mjs';
 
 const KEY = 'picker.selected';
 
+// حافظه خصوصی/محدودشده مرورگر localStorage را قفل یا پرتاب‌گر می‌کند —
+// table.mjs و رول تاشدگی فهرست کناری (app.mjs) از قبل همین نگهبان را
+// دارند؛ اینجا نبود، پس یک محیط محدود می‌توانست خودِ انتخابگر نماد را
+// همان لحظه بارگذاری از کار بیندازد.
+function loadSelected() {
+  try { return new Set(JSON.parse(localStorage.getItem(KEY) || '[]')); }
+  catch { return new Set(); }
+}
+function saveSelected(selected) {
+  try { localStorage.setItem(KEY, JSON.stringify([...selected])); } catch { /* حافظه پر یا قفل */ }
+}
+
 export function makePicker(host, opts = {}) {
   let list = [];
-  let selected = new Set(JSON.parse(localStorage.getItem(KEY) || '[]'));
+  let selected = loadSelected();
   let filter = '';
   // کدام پیش‌تنظیم آخرین‌بار زده شده — بقیه دکمه‌های تعاملی برنامه (چیپ
   // سررسید زنجیره، چیپ نمای استراتژی، ...) همه aria-pressed دارند، این
@@ -34,7 +46,7 @@ export function makePicker(host, opts = {}) {
   const sum = host.querySelector('#pk-sum');
   const q = host.querySelector('#pk-q');
 
-  const save = () => localStorage.setItem(KEY, JSON.stringify([...selected]));
+  const save = () => saveSelected(selected);
 
   function render() {
     // نیم‌فاصله/حرف عربی (ي/ك) رایج در نام رسمی نمادها هم باید پیدا شود،
