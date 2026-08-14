@@ -165,13 +165,18 @@ export async function mount(root, { state, api }) {
     setTimeout(() => { msg.textContent = ''; }, 2600);
   };
 
-  root.querySelector('#save').addEventListener('click', async () => {
+  const saveBtn = root.querySelector('#save');
+  saveBtn.addEventListener('click', async () => {
+    if (saveBtn.disabled) return;
+    saveBtn.disabled = true;
     try {
       const saved = await api.putSettings(read());
       write(saved);
       flash('ذخیره شد. حلقه دریافت داده از همین حالا با اعداد تازه کار می‌کند.');
     } catch (e) {
       flash(`ذخیره نشد: ${e.message}`, true);
+    } finally {
+      saveBtn.disabled = false;
     }
   });
 
@@ -180,13 +185,18 @@ export async function mount(root, { state, api }) {
     flash('پیش‌فرض‌ها بازگشت. برای اعمال، ذخیره را بزن.');
   });
 
-  root.querySelector('#clear-cache').addEventListener('click', async () => {
+  const clearCacheBtn = root.querySelector('#clear-cache');
+  clearCacheBtn.addEventListener('click', async () => {
+    if (clearCacheBtn.disabled) return;
+    clearCacheBtn.disabled = true;
     try {
       const r = await fetch('/api/cache', { method: 'DELETE' });
       if (!r.ok) throw new Error('خالی نشد');
       flash('کش سرور خالی شد. درخواست بعدی از بازار می‌آید.');
     } catch (e) {
       flash(`خالی نشد: ${e.message}`, true);
+    } finally {
+      clearCacheBtn.disabled = false;
     }
   });
 
