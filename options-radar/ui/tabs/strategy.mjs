@@ -19,7 +19,7 @@ import { makeTable, funnelBar } from '/ui/table.mjs';
 import { fmt, faNum, faDigits, coverageInfo, signTone } from '/ui/fmt.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { mountPayoff, payoffAt } from '/ui/chart.mjs';
-import { sameUnderlyingCandidates, compareLabel, MAX_COMPARE } from '/ui/compare.mjs';
+import { sameUnderlyingCandidates, compareLabel, compareFullLabel, MAX_COMPARE } from '/ui/compare.mjs';
 import { runScan, onChain, pushRows, chainState } from '/ui/scanner.mjs';
 
 /** dEven عددی (مثلاً ۲۰۲۶۰۱۰۱) به تاریخ شمسی خوانا. */
@@ -354,6 +354,7 @@ export async function mount(root, { tab, state, api }) {
         .map((c) => ({
           at: payoffAt(c.__legs, c.netCash, { fees, spot: c.S, sigma: c.sigmaUse, rFree: s().rFree, divYield: s().divYield }),
           label: compareLabel(c),
+          full: compareFullLabel(c),
         }));
       chart?.destroy();
       chart = mountPayoff(root.querySelector('#chart'), r.__legs, r.netCash, { ...chartOpt, compare });

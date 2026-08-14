@@ -26,7 +26,7 @@ import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
 import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn } from '../ui/table.mjs';
-import { sameUnderlyingCandidates, compareLabel, MAX_COMPARE } from '../ui/compare.mjs';
+import { sameUnderlyingCandidates, compareLabel, compareFullLabel, MAX_COMPARE } from '../ui/compare.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -1562,6 +1562,15 @@ group('۳۱. مقایسه با موقعیت‌های دیگر هم‌نماد ر
   const longLabel = compareLabel({ strategy: 'استراتژی خیلی طولانی', legsText: 'خرید کال ۱۰۰۰۰ و فروش کال ۲۰۰۰۰ و بازهم بیشتر' });
   check('برچسب بلند با سه‌نقطه بریده می‌شود', longLabel.length === 22 && longLabel.endsWith('…'), longLabel);
   check('سقف مقایسه هم‌زمان ۴ است', MAX_COMPARE === 4);
+
+  // ——— برچسب کامل، برای tooltip روی legend نمودار (دور ۱۸ پ-۶) ———
+  const rowLong31 = { strategy: 'استراتژی خیلی طولانی', legsText: 'خرید کال ۱۰۰۰۰ و فروش کال ۲۰۰۰۰ و بازهم بیشتر' };
+  check('برچسب کامل هرگز بریده نمی‌شود',
+    compareFullLabel(rowLong31) === 'استراتژی خیلی طولانی — خرید کال ۱۰۰۰۰ و فروش کال ۲۰۰۰۰ و بازهم بیشتر');
+  check('برچسب کامل با شروع برچسب کوتاه یکی است',
+    compareFullLabel(rowLong31).startsWith(compareLabel(rowLong31).slice(0, -1)));
+  const rowShort31 = { legsText: 'کوتاه' };
+  check('برچسب کوتاه و کامل برای متن کوتاه یکسانند', compareFullLabel(rowShort31) === compareLabel(rowShort31));
 
   // منحنی و legend مقایسه‌ای خودشان در chart.mjs رسم می‌شوند (وارد کردن مطلق
   // `/core/...` دارد، پس در Node قابل import نیست) — رسم واقعی با Playwright

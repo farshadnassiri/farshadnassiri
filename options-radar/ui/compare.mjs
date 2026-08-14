@@ -14,8 +14,17 @@ export function sameUnderlyingCandidates(rows, picked) {
   return rows.filter((r) => r.underlying === picked.underlying && r.id !== picked.id).slice(0, LIST_LIMIT);
 }
 
+function fullCompareText(r) {
+  return r.strategy ? `${r.strategy} — ${r.legsText}` : r.legsText;
+}
+
 /** برچسب کوتاه یک ردیف برای legend نمودار — پای‌های کامل جا نمی‌شوند. */
 export function compareLabel(r) {
-  const t = r.strategy ? `${r.strategy} — ${r.legsText}` : r.legsText;
+  const t = fullCompareText(r);
   return t.length > 22 ? `${t.slice(0, 21)}…` : t;
+}
+
+/** متن کامل بریده‌نشده، برای tooltip روی برچسب کوتاه‌شده. */
+export function compareFullLabel(r) {
+  return fullCompareText(r);
 }

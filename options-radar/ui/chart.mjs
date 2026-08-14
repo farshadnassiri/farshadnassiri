@@ -156,7 +156,7 @@ function frame(points, analysis, opt, xMin, xMax, todayPoints) {
     }
     if (raw.length < 2) return null;
     const d = raw.map((p, j) => `${j ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(Math.min(Math.max(p.v, yMin), yMax)).toFixed(1)}`).join(' ');
-    return { d, cls: EXTRA_STYLE[i], label: c.label };
+    return { d, cls: EXTRA_STYLE[i], label: c.label, full: c.full };
   }).filter(Boolean);
 
   // ——— محور عمودی: گام گرد، برچسب سمت چپ، صفر جدا کشیده می‌شود ———
@@ -195,13 +195,15 @@ function frame(points, analysis, opt, xMin, xMax, todayPoints) {
   const legendItems = [
     ...(todayLine ? [{ cls: 'curve-today', label: 'امروز' }] : []),
     ...((todayLine || cmpLines.length) ? [{ cls: 'curve', label: 'سررسید' }] : []),
-    ...cmpLines.map((c) => ({ cls: `curve-${c.cls}`, label: c.label })),
+    ...cmpLines.map((c) => ({ cls: `curve-${c.cls}`, label: c.label, full: c.full })),
   ];
+  // برچسب مقایسه‌ای بریده‌شده (پای‌های کامل جا نمی‌شوند)، پس متن کامل به‌عنوان
+  // title روی <text> می‌نشیند تا با هاور مرورگر دیده شود.
   const legend2 = legendItems.length ? `
     <g class="curve2-legend">
       ${legendItems.map((it, i) => `
       <line x1="${W - pad.r - 92}" y1="${pad.t + 5 + i * 13}" x2="${W - pad.r - 72}" y2="${pad.t + 5 + i * 13}" class="${it.cls}"/>
-      <text x="${W - pad.r - 96}" y="${pad.t + 8 + i * 13}" text-anchor="end" class="lbl">${it.label}</text>`).join('')}
+      <text x="${W - pad.r - 96}" y="${pad.t + 8 + i * 13}" text-anchor="end" class="lbl">${it.label}${it.full && it.full !== it.label ? `<title>${it.full}</title>` : ''}</text>`).join('')}
     </g>` : '';
 
   const cmpPaths = cmpLines.map((c) => `<path class="curve-${c.cls}" d="${c.d}"/>`).join('');
