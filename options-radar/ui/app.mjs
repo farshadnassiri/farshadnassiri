@@ -357,9 +357,18 @@ async function open(id) {
 
 // ————————————————————————————————— پوسته —————————————————————————————————
 
+// نام‌ها همان برچسب‌های core/settings.mjs (گزینه theme) هستند — یک منبع
+// برای دو جا. دکمه قبلاً همیشه فقط «پوسته» می‌گفت؛ بدون کلیک هیچ راهی
+// نبود بفهمی الان در کدام پوسته‌ای یا کلیک بعدی کدام را باز می‌کند.
+const THEME_NAME = { ledger: 'دفتر', board: 'تابلو' };
+const THEME_NEXT = { ledger: 'board', board: 'ledger' };
+
 function applyTheme(name) {
   document.body.dataset.theme = name;
   localStorage.setItem('theme', name);
+  const btn = el('theme-btn');
+  btn.textContent = `پوسته: ${THEME_NAME[name] || name}`;
+  btn.title = `تعویض به پوسته ${THEME_NAME[THEME_NEXT[name]] || ''}`;
 }
 el('theme-btn').addEventListener('click', () => {
   applyTheme(document.body.dataset.theme === 'ledger' ? 'board' : 'ledger');
