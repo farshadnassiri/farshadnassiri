@@ -332,7 +332,7 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
 }
 .ghost:hover { border-color: var(--accent); color: var(--accent); }
 .ghost:active { background: var(--accent-soft); }
-.ghost[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.ghost[aria-pressed="true"], .ghost[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .ghost:disabled { opacity: .6; cursor: not-allowed; }
 .ghost:disabled:hover { border-color: var(--line); color: var(--ink-2); }
 .bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

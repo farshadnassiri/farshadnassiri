@@ -135,7 +135,7 @@ export function makeTable(host, cols, opts = {}) {
   host.innerHTML = `
     <div class="tbl-wrap">
       <div class="tbl-tools">
-        <button type="button" class="ghost tbl-cols-btn" ${all === cols ? 'hidden' : ''}>
+        <button type="button" class="ghost tbl-cols-btn" aria-expanded="false" ${all === cols ? 'hidden' : ''}>
           ستون‌ها <b class="tbl-cols-n"></b>
         </button>
         <span class="tbl-sort" role="status" aria-live="polite"></span>
@@ -322,7 +322,7 @@ export function makeTable(host, cols, opts = {}) {
   function togglePanel() {
     const open = panel.hasAttribute('hidden');
     panel.toggleAttribute('hidden', !open);
-    colsBtn?.setAttribute('aria-pressed', open ? 'true' : 'false');
+    colsBtn?.setAttribute('aria-expanded', open ? 'true' : 'false');
     if (open) {
       document.addEventListener('mousedown', closeOnOutside);
       document.addEventListener('keydown', closeOnEscape);
