@@ -190,6 +190,11 @@ code, .mono, .num { font-family: var(--mono); font-variant-numeric: tabular-nums
 .tone.flat { background: var(--panel-2); color: var(--muted); border-color: var(--line); }
 .tone.vol { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
 .tab-btn[data-locked="1"] { color: var(--muted); }
+/* نشانگر جداگانه از aria-current — این همان ردیفی است که کلید بالا و پایین
+   رویش نشسته، نه لزوماً همان تبی که الان باز است */
+.tab-btn[data-kb="1"] {
+  background: var(--panel-2); outline: 2px solid var(--accent-2); outline-offset: -2px;
+}
 
 .stage { padding: 20px 22px 60px; min-width: 0; }
 @media (max-width: 820px) {

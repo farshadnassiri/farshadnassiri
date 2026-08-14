@@ -158,6 +158,30 @@ function dirTone(def) {
 const norm = (s) => String(s || '').replace(/[ي]/g, 'ی').replace(/[ك]/g, 'ک').replace(/‌/g, ' ').trim();
 
 let railQuery = '';
+// کدام ردیف فهرست فیلترشده زیر کلید بالا و پایین است — جدا از aria-current
+// که تب واقعاً بازشده را نشان می‌دهد
+let activeIdx = -1;
+
+function railButtons() {
+  return [...el('rail-list').querySelectorAll('.tab-btn')];
+}
+
+function applyActiveHighlight() {
+  const btns = railButtons();
+  if (activeIdx >= btns.length) activeIdx = btns.length - 1;
+  btns.forEach((b, i) => {
+    if (i === activeIdx) b.setAttribute('data-kb', '1');
+    else b.removeAttribute('data-kb');
+  });
+  if (activeIdx >= 0 && btns[activeIdx]) btns[activeIdx].scrollIntoView({ block: 'nearest' });
+}
+
+function moveActive(delta) {
+  const btns = railButtons();
+  if (!btns.length) return;
+  activeIdx = activeIdx < 0 ? (delta > 0 ? 0 : btns.length - 1) : (activeIdx + delta + btns.length) % btns.length;
+  applyActiveHighlight();
+}
 
 function buildRail() {
   const list = el('rail-list');
@@ -226,6 +250,7 @@ function buildRail() {
     list.innerHTML = '<p class="rail-none">چیزی پیدا نشد.</p>';
   }
   el('rail-count').textContent = q ? `${shown} از ${TABS.length}` : `${TABS.length} تب`;
+  applyActiveHighlight();
 }
 
 let current = null;
@@ -265,13 +290,35 @@ el('theme-btn').addEventListener('click', () => {
 
 el('rail-q').addEventListener('input', (e) => {
   railQuery = e.target.value;
+  activeIdx = -1; // فهرست عوض شد، نشانگر کلید هم از نو
   buildRail();
 });
-// در فهرست فیلترشده، اینتر یعنی «همان یکی که مانده را باز کن»
+// بالا و پایین بین تب‌های فیلترشده حرکت می‌کند؛ اینتر همان ردیف را باز
+// می‌کند، یا اگر کلید بالا و پایین لمس نشده، اولین ردیف مانده را
 el('rail-q').addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); moveActive(1); return; }
+  if (e.key === 'ArrowUp') { e.preventDefault(); moveActive(-1); return; }
   if (e.key !== 'Enter') return;
-  const first = el('rail-list').querySelector('.tab-btn');
-  if (first) open(first.dataset.tab);
+  const btns = railButtons();
+  const target = activeIdx >= 0 ? btns[activeIdx] : btns[0];
+  if (target) open(target.dataset.tab);
+});
+
+// میان‌بر صفحه‌کلید: «/» یا Ctrl+K نشانگر را داخل جست‌وجو می‌برد. «/» فقط
+// وقتی جای دیگری در حال تایپ نیستی — وگرنه نوشتن «تحلیل/رول» در یک فیلد
+// دیگر را قطع می‌کرد. Ctrl+K همیشه کار می‌کند، چون آن ترکیب هیچ‌جای دیگری
+// معنی تایپی ندارد.
+window.addEventListener('keydown', (e) => {
+  const isSlash = e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey;
+  const isCtrlK = e.key.toLowerCase() === 'k' && (e.ctrlKey || e.metaKey) && !e.altKey;
+  if (!isSlash && !isCtrlK) return;
+  const t = document.activeElement;
+  const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+  if (isSlash && typing) return;
+  e.preventDefault();
+  const q = el('rail-q');
+  q.focus();
+  q.select();
 });
 
 // ————————————————————————————————— شروع —————————————————————————————————
