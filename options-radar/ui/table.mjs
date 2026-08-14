@@ -191,13 +191,26 @@ export function makeTable(host, cols, opts = {}) {
       th.title = `کلیک برای مرتب‌سازی بر ${c.label} — کشیدن برای جابه‌جایی`;
       th.dataset.key = c.key;
       th.draggable = true;
+      th.tabIndex = 0;
+      th.setAttribute('role', 'button');
       if (NUM_FMT.has(c.fmt)) th.classList.add('n');
 
-      th.addEventListener('click', () => {
-        if (justDropped) return;
+      const sortByThis = () => {
         if (sortKey === c.key) sortDir = -sortDir;
         else { sortKey = c.key; sortDir = -1; }
         apply();
+      };
+      th.addEventListener('click', () => {
+        if (justDropped) return;
+        sortByThis();
+      });
+      // aria-sort از دور ۳۳ به این سرستون می‌نشیند، ولی بدون این، کاربر
+      // صفحه‌کلیدی هیچ‌وقت نمی‌توانست خودِ مرتب‌سازی را که ARIA اعلام
+      // می‌کند تغییر بدهد — فقط با ماوس می‌شد کلیک کرد.
+      th.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        sortByThis();
       });
 
       th.addEventListener('dragstart', (e) => {
