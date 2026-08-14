@@ -54,9 +54,24 @@ export const fmt = {
   money: (v) => (Number.isFinite(v) ? grouped(v)
     : v === Infinity ? '∞' : v === -Infinity ? '−∞' : '—'),
   pct: (v) => (Number.isFinite(v) ? faNum(stripNegZero(v.toFixed(2))) : '—'),
-  num: (v) => (Number.isFinite(v)
-    ? (Math.abs(v) >= 1000 ? grouped(v) : faNum(stripNegZero(Math.abs(v) < 1 ? v.toFixed(4) : v.toFixed(2))))
-    : '—'),
+  /**
+   * شاخه‌بندی (گروه‌بندی‌شده ≥۱۰۰۰ ، چهار رقم اعشار زیر ۱ ، دو رقم اعشار
+   * بین این دو) روی v خام تصمیم گرفته می‌شد، بعد toFixed گرد می‌کرد. یک
+   * عددی مثل ۹۹۹٫۹۹۶ چون خودش زیر ۱۰۰۰ بود شاخه بدون گروه‌بندی می‌رفت،
+   * ولی toFixed(2) به «1000.00» گرد می‌کرد — چاپ می‌شد «۱۰۰۰٫۰۰» بدون
+   * جداکننده هزارگان، برخلاف هر عدد دیگری که همان ۱۰۰۰ را نشان می‌دهد.
+   * رفع: بعد از گرد کردن اول، شاخه دوباره از روی مقدار گردشده تعیین
+   * می‌شود — همان ایده «مرز گرد شدن» دور ۳۱ («−۰»).
+   */
+  num: (v) => {
+    if (!Number.isFinite(v)) return '—';
+    const decimalsFor = (x) => (Math.abs(x) >= 1000 ? null : Math.abs(x) < 1 ? 4 : 2);
+    const d1 = decimalsFor(v);
+    if (d1 === null) return grouped(v);
+    const r = Number(v.toFixed(d1));
+    const d2 = decimalsFor(r);
+    return d2 === null ? grouped(r) : faNum(stripNegZero(r.toFixed(d2)));
+  },
   int: (v) => (Number.isFinite(v) ? grouped(v) : '—'),
   text: (v) => (v == null ? '—' : faDigits(String(v))),
   list: (v) => (Array.isArray(v)
