@@ -22,6 +22,7 @@ import { scan as scanFn, generateCombos } from '../core/scan.mjs';
 import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
 import { safeStaticPath } from '../server/static-path.mjs';
+import { isInsCode } from '../server/ins-code.mjs';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -803,6 +804,11 @@ group('۱۸. مسیر امن سرو فایل ایستا');
     safeStaticPath(ROOT, '/ui/index.html') === path.join(ROOT, '/ui/index.html'));
   check('ریشه، به فایل نمایه می‌رسد',
     safeStaticPath(ROOT, '/') === path.join(ROOT, '/ui/index.html'));
+
+  check('کد ابزار عددی پذیرفته می‌شود', isInsCode('123456'));
+  check('کد خالی رد می‌شود', !isInsCode(''));
+  check('عبور از مسیر در کد ابزار رد می‌شود', !isInsCode('../ClosingPrice'));
+  check('کد با کاراکتر غیرعددی رد می‌شود', !isInsCode('123abc'));
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════
