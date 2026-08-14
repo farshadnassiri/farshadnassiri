@@ -332,13 +332,26 @@ async function open(id) {
   location.hash = id;
   document.title = pageTitle(t.title);
 
+  // زیر ۸۲۰ پیکسل (همان مرز style.css) فهرست کناری بالای محتوا می‌نشیند؛
+  // کلیک روی تبی که پایین فهرست بلند است، بدون این خط کاربر را همان‌جا
+  // پایین رها می‌کرد و محتوای تازه از دید بیرون می‌ماند. بعد از رسیدن
+  // محتوای واقعی صدا زده می‌شود، نه روی اسکلت خالی — تا آن وقت صفحه هنوز
+  // آن‌قدر بلند نشده که stage واقعاً بتواند بالای دید بنشیند.
+  const scrollToStage = () => {
+    if (window.matchMedia('(max-width: 820px)').matches) {
+      stage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   try {
     const mod = t.mod ? await import(t.mod) : await import('/ui/tabs/soon.mjs');
     stage.innerHTML = '';
     disposer = await mod.mount(stage, { tab: t, state, api: { loadSettings, putSettings, subscribeWatch } });
+    scrollToStage();
   } catch (e) {
     stage.innerHTML = `<div class="card"><h3>تب باز نشد</h3><p class="note">${e.message}</p></div>`;
     console.error(e);
+    scrollToStage();
   }
 }
 
