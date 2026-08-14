@@ -40,14 +40,22 @@ export function toEnDigits(s) {
     .replace(/−/g, '-');
 }
 
-const grouped = (v) => faNum(Math.round(v).toLocaleString('en-US'));
+/**
+ * «−۰» را به «۰» ساده می‌کند. گرد کردن یک عدد منفی خیلی کوچک (مثلاً سود و
+ * زیان ۰٫۴- ریال، یا دلتای ۰٫۰۰۰۴۰۰۰۰-) به دقت نمایش، ریاضی صفر می‌دهد ولی
+ * `Math.round`/`toFixed` رشته «-0» یا «-0.00» برمی‌گردانند — به چشم انگار
+ * هنوز کمی زیان مانده، در حالی که عدد واقعی دقیقاً صفر است.
+ */
+const stripNegZero = (s) => s.replace(/^-0(\.0+)?$/, (m) => m.slice(1));
+
+const grouped = (v) => faNum(stripNegZero(Math.round(v).toLocaleString('en-US')));
 
 export const fmt = {
   money: (v) => (Number.isFinite(v) ? grouped(v)
     : v === Infinity ? '∞' : v === -Infinity ? '−∞' : '—'),
-  pct: (v) => (Number.isFinite(v) ? faNum(v.toFixed(2)) : '—'),
+  pct: (v) => (Number.isFinite(v) ? faNum(stripNegZero(v.toFixed(2))) : '—'),
   num: (v) => (Number.isFinite(v)
-    ? (Math.abs(v) >= 1000 ? grouped(v) : faNum(Math.abs(v) < 1 ? v.toFixed(4) : v.toFixed(2)))
+    ? (Math.abs(v) >= 1000 ? grouped(v) : faNum(stripNegZero(Math.abs(v) < 1 ? v.toFixed(4) : v.toFixed(2))))
     : '—'),
   int: (v) => (Number.isFinite(v) ? grouped(v) : '—'),
   text: (v) => (v == null ? '—' : faDigits(String(v))),
