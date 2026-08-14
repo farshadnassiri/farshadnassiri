@@ -11,7 +11,7 @@ import { rollAnalysis, markToMarket } from '/core/positions.mjs';
 import { impliedVol } from '/core/bs.mjs';
 import { mountPayoff, mountDiff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
-import { faDigits } from '/ui/fmt.mjs';
+import { faDigits, signTone } from '/ui/fmt.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
 export async function mount(root, { state, api }) {
@@ -242,7 +242,14 @@ export async function mount(root, { state, api }) {
       const r2 = rollAnalysis({ pos: p, quotes, closeIdx, newLeg: nl, newQuote: nq, opt: { fees, spot, basis: 'BOOK', sigma, rFree: s().rFree, divYield: s().divYield } });
       return { i, strike: c2.st.strike, days: c2.days, r: r2 };
     });
-    const bestIdx = candRows.reduce((best, x) => (x.r.atSpot > candRows[best].r.atSpot ? x.i : best), 0);
+    const best = candRows.reduce((a, x) => (x.r.atSpot > a.r.atSpot ? x : a), candRows[0]);
+    const bestIdx = best.i;
+    // برچسب فقط می‌گوید «بهترین بین همین نامزدها» — اگر همه نامزدها از نگه
+    // داشتن بدترند، بهترینشان هم واقعاً بهتر نیست. رنگ سبز ثابت قبلاً این
+    // را قایم می‌کرد: حتی وقتی atSpot بهترین گزینه هم منفی بود، همان رنگ
+    // «خبر خوب» را می‌گرفت. signTone همان تابعی است که کارت‌های KPI
+    // تب‌های استراتژی/برترین موقعیت‌ها (دور ۱۷) برای همین منظور دارند.
+    const bestTone = signTone(best.r.atSpot);
     root.querySelector('#cand').innerHTML = `
       <thead><tr>
         <th>اعمال</th>${multiExpiry ? '<th>سررسید</th>' : ''}<th>خالص نقدی رول</th><th>تفاضل در قیمت فعلی</th>
@@ -255,7 +262,7 @@ export async function mount(root, { state, api }) {
           <td class="n" style="color:${x.r.atSpot >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(x.r.atSpotTotal)}</td>
           <td class="n">${fmt.money(x.r.nextMaxProfit)}</td>
           <td class="n">${fmt.money(x.r.nextBreakevens[0])}</td>
-          <td>${x.i === bestIdx ? '<span class="tag gain">بهترین تفاضل</span>' : ''}${x.i === candIdx ? '<span class="tag flat">انتخاب‌شده</span>' : ''}</td>
+          <td>${x.i === bestIdx ? `<span class="tag ${bestTone}">بهترین تفاضل</span>` : ''}${x.i === candIdx ? '<span class="tag flat">انتخاب‌شده</span>' : ''}</td>
         </tr>`).join('')}</tbody>`;
     for (const tr of root.querySelectorAll('#cand tbody tr')) {
       const pick = () => { el('#new').value = tr.dataset.i; draw(); };
