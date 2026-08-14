@@ -126,35 +126,42 @@ export async function mount(root, { state, api }) {
     setTimeout(() => { msg.textContent = ''; }, 3000);
   };
 
-  root.querySelector('#add').addEventListener('click', async () => {
+  const addBtn = root.querySelector('#add');
+  addBtn.addEventListener('click', async () => {
+    if (addBtn.disabled) return;
     const o = F.opt.selectedOptions[0];
     if (!o || !F.ua.value) { flash('نماد پایه و قرارداد را انتخاب کن.', true); return; }
-    const strike = Number(o.dataset.strike);
-    const size = Number(o.dataset.size) || 1000;
-    const days = Number(o.dataset.days);
-    const kind = F.kind.value;
-    const put = wantPut();
-    const legs = [];
-    if (kind === 'covered-call') {
-      legs.push({ kind: 'underlying', side: 'buy', ratio: 1, size, price: Number(F.sPrice.value), ins: F.ua.value });
-    }
-    legs.push({
-      kind: put ? 'put' : 'call',
-      side: kind.startsWith('long') ? 'buy' : 'sell',
-      ratio: 1, size, strike, days,
-      price: Number(F.oPrice.value), ins: o.value, name: o.textContent.split('—')[0].trim(),
-    });
+    addBtn.disabled = true;
+    try {
+      const strike = Number(o.dataset.strike);
+      const size = Number(o.dataset.size) || 1000;
+      const days = Number(o.dataset.days);
+      const kind = F.kind.value;
+      const put = wantPut();
+      const legs = [];
+      if (kind === 'covered-call') {
+        legs.push({ kind: 'underlying', side: 'buy', ratio: 1, size, price: Number(F.sPrice.value), ins: F.ua.value });
+      }
+      legs.push({
+        kind: put ? 'put' : 'call',
+        side: kind.startsWith('long') ? 'buy' : 'sell',
+        ratio: 1, size, strike, days,
+        price: Number(F.oPrice.value), ins: o.value, name: o.textContent.split('—')[0].trim(),
+      });
 
-    positions.push({
-      ...blankPosition(),
-      title: `${KINDS.find(([v]) => v === kind)[1].split('—')[0].trim()} ${detail.name}`,
-      uaIns: F.ua.value, uaName: detail.name,
-      entryDate: F.date.value, qty: Math.max(1, Number(F.qty.value) || 1),
-      legs,
-    });
-    await save();
-    flash('موقعیت افزوده شد.');
-    render();
+      positions.push({
+        ...blankPosition(),
+        title: `${KINDS.find(([v]) => v === kind)[1].split('—')[0].trim()} ${detail.name}`,
+        uaIns: F.ua.value, uaName: detail.name,
+        entryDate: F.date.value, qty: Math.max(1, Number(F.qty.value) || 1),
+        legs,
+      });
+      await save();
+      flash('موقعیت افزوده شد.');
+      render();
+    } finally {
+      addBtn.disabled = false;
+    }
   });
 
   async function save() {
@@ -215,6 +222,8 @@ export async function mount(root, { state, api }) {
     for (const b of root.querySelectorAll('[data-del]')) {
       b.addEventListener('click', async (e) => {
         e.stopPropagation();
+        if (b.disabled) return;
+        b.disabled = true;
         positions.splice(Number(b.dataset.del), 1);
         await save();
         render();
