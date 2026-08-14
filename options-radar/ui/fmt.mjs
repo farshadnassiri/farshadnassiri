@@ -119,8 +119,13 @@ export const coverageInfo = (state) => COVERAGE_INFO[state] || { label: state ||
  * جاری») یا نسبتش («بازده روی سرمایه»). بقیه کارت‌ها (سرمایه درگیر، تعداد
  * موقعیت) خنثی می‌مانند. اینجاست تا با style.css (.kpi:has(.v.gain/.loss))
  * هم‌قرارداد و در بیش از یک تب قابل‌استفاده و آزمون‌پذیر باشد.
+ *
+ * `isGain` می‌تواند `null`/`undefined` باشد — یعنی «هنوز عددی برای قضاوت
+ * نیست» (مثلاً صفر موقعیت، بازده روی سرمایه نامعلوم)؛ چنین کارتی هم باید
+ * بی‌رنگ بماند، نه این‌که falsy بودن null آن را قرمز نشان دهد.
  */
 export function kpiTone(label, isGain) {
+  if (isGain == null) return '';
   return /سود|بازده/.test(label) ? (isGain ? 'gain' : 'loss') : '';
 }
 

@@ -256,14 +256,21 @@ export async function mount(root, { state, api }) {
 
     const tot = evals.reduce((a, x) => a + x.m.pnlTotal, 0);
     const cap = evals.reduce((a, x) => a + x.m.capital * x.p.qty, 0);
+    // بدون موقعیت، سود و زیان جاری دقیقاً صفر است ولی چیزی برای «در سود
+    // بودن» وجود ندارد؛ بدون سرمایه درگیر، بازده روی سرمایه هم نامعلوم
+    // است (fmt.pct(NaN) → «—٪»). هر دو باید بی‌رنگ بمانند، نه سبز پیش‌فرض —
+    // قبلاً یک isGain مشترک (tot>=0) به هر دو کارت می‌رسید و صفر موقعیت را
+    // هم «در سود» رنگ می‌کرد.
+    const pnlGain = positions.length ? tot >= 0 : null;
+    const roiGain = cap > 0 ? tot >= 0 : null;
     root.querySelector('#kpis').innerHTML = [
-      ['موقعیت باز', fmt.int(positions.length), ''],
-      ['سرمایه درگیر', fmt.money(cap), 'ریال'],
-      ['سود و زیان جاری', fmt.money(tot), tot >= 0 ? 'در سود' : 'در زیان'],
-      ['بازده روی سرمایه', `${fmt.pct(cap > 0 ? (tot / cap) * 100 : NaN)}٪`, ''],
-      ['قیمت‌گیری', quotesByIns.size ? `${fmt.int(quotesByIns.size)} نماد` : 'بی‌قیمت — قیمت‌گیری نشد', ''],
-    ].map(([k, v, sub]) => `<div class="kpi"><div class="k">${k}</div>
-      <div class="v ${kpiTone(k, tot >= 0)}">${v}</div><div class="s">${sub}</div></div>`).join('');
+      ['موقعیت باز', fmt.int(positions.length), '', null],
+      ['سرمایه درگیر', fmt.money(cap), 'ریال', null],
+      ['سود و زیان جاری', fmt.money(tot), pnlGain == null ? '' : pnlGain ? 'در سود' : 'در زیان', pnlGain],
+      ['بازده روی سرمایه', `${fmt.pct(cap > 0 ? (tot / cap) * 100 : NaN)}٪`, '', roiGain],
+      ['قیمت‌گیری', quotesByIns.size ? `${fmt.int(quotesByIns.size)} نماد` : 'بی‌قیمت — قیمت‌گیری نشد', '', null],
+    ].map(([k, v, sub, gain]) => `<div class="kpi"><div class="k">${k}</div>
+      <div class="v ${kpiTone(k, gain)}">${v}</div><div class="s">${sub}</div></div>`).join('');
 
     if (expanded != null) drawDetail();
   }
