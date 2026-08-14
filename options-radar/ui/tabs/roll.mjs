@@ -8,6 +8,7 @@
 // می‌گیرد و از همان موتور بازده مشترک می‌آید.
 
 import { rollAnalysis, markToMarket } from '/core/positions.mjs';
+import { marginParamsOf } from '/core/settings.mjs';
 import { impliedVol } from '/core/bs.mjs';
 import { mountPayoff, mountDiff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
@@ -209,7 +210,10 @@ export async function mount(root, { state, api }) {
     const sigma = curSigma(cur, quotes[closeIdx], spot);
 
     const r = rollAnalysis({ pos: p, quotes, closeIdx, newLeg, newQuote, opt: { fees, spot, basis: 'BOOK', sigma, rFree: s().rFree, divYield: s().divYield } });
-    const m = markToMarket(p, quotes, { fees, spot, spotClose: uaQ.close || spot });
+    const m = markToMarket(p, quotes, {
+      fees, spot, spotClose: uaQ.close || spot,
+      params: marginParamsOf(s()), creditMode: s().creditSpreadMargin, capitalMode: s().capitalMode,
+    });
 
     el('#cur').innerHTML = `
       <dt>پایه</dt><dd>${p.uaName || p.uaIns}</dd>
