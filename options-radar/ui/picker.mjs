@@ -11,6 +11,11 @@ export function makePicker(host, opts = {}) {
   let list = [];
   let selected = new Set(JSON.parse(localStorage.getItem(KEY) || '[]'));
   let filter = '';
+  // کدام پیش‌تنظیم آخرین‌بار زده شده — بقیه دکمه‌های تعاملی برنامه (چیپ
+  // سررسید زنجیره، چیپ نمای استراتژی، ...) همه aria-pressed دارند، این
+  // چهارتا نداشتند. با اولین ویرایش دستی (تیک زدن یک ردیف) پاک می‌شود،
+  // چون انتخاب دیگر دقیقاً همان پیش‌تنظیم نیست.
+  let activePreset = null;
 
   host.innerHTML = `
     <div class="picker">
@@ -50,6 +55,8 @@ export function makePicker(host, opts = {}) {
       row.querySelector('input').addEventListener('change', (e) => {
         if (e.target.checked) selected.add(u.ins); else selected.delete(u.ins);
         row.setAttribute('aria-selected', e.target.checked ? 'true' : 'false');
+        activePreset = null;
+        syncPresetButtons();
         save(); summary(); opts.onChange?.([...selected]);
       });
       frag.appendChild(row);
@@ -67,15 +74,24 @@ export function makePicker(host, opts = {}) {
       : 'هیچ نمادی انتخاب نشده. تا انتخاب نکنی، اسکنی انجام نمی‌شود.';
   }
 
+  function syncPresetButtons() {
+    for (const b of host.querySelectorAll('[data-pre]')) {
+      b.setAttribute('aria-pressed', b.dataset.pre === activePreset ? 'true' : 'false');
+    }
+  }
+
   function preset(kind) {
     if (kind === 'none') selected = new Set();
     else if (kind === 'all') selected = new Set(list.map((u) => u.ins));
     else if (kind === 'liquid') selected = new Set(list.slice(0, 12).map((u) => u.ins));
     else if (kind === 'quoted') selected = new Set(list.filter((u) => u.quoted >= 4).map((u) => u.ins));
+    activePreset = kind;
+    syncPresetButtons();
     save(); render(); opts.onChange?.([...selected]);
   }
 
   for (const b of host.querySelectorAll('[data-pre]')) {
+    b.setAttribute('aria-pressed', 'false');
     b.addEventListener('click', () => preset(b.dataset.pre));
   }
   q.addEventListener('input', () => { filter = q.value.trim(); render(); });
