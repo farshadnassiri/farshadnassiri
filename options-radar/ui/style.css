@@ -349,6 +349,12 @@ table.data thead th {
 table.data thead th:hover { color: var(--accent); }
 table.data tbody tr { transition: background .1s ease; }
 table.data tbody tr:hover { background: var(--panel-2); }
+/* ردیف نزدیک‌به‌پول دیده‌بان زنجیره (chain.mjs) قبلاً با style این‌لاین رنگ
+   می‌گرفت که همیشه بر :hover بالا می‌زد — هاور روی همان ردیف هیچ بازخوردی
+   نداشت، برخلاف بقیه ردیف‌های همان جدول. کلاس با اولویت برابر :hover را
+   شکست نمی‌دهد. */
+table.data tbody tr.atm { background: var(--accent-soft); }
+table.data tbody tr.atm:hover { background: var(--panel-2); }
 table.data td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; direction: ltr; }
 
 .skel-row td { padding: 7px 8px; }

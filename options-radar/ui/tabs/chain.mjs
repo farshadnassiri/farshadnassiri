@@ -148,7 +148,7 @@ export async function mount(root, { state, api }) {
 
     const body = ex.strikes.map((st) => {
       const near = Math.abs(st.strike - spot) / (spot || 1) < 0.02;
-      return `<tr style="${near ? 'background:var(--accent-soft)' : ''}">
+      return `<tr class="${near ? 'atm' : ''}">
         ${cell(st.call)}
         <td class="n" style="font-weight:700;border-inline:1px solid var(--line)">${fmt.money(st.strike)}</td>
         ${cell(st.put)}
