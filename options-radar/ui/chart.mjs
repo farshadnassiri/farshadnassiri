@@ -268,7 +268,7 @@ function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, r
 
   host.innerHTML = `
     <div class="chart-box">
-      <div class="chart-canvas"></div>
+      <div class="chart-canvas" tabindex="0" role="img" aria-label="نمودار تعامل‌پذیر — فلش چپ و راست برای پیمایش، + و − برای زوم، Home برای نمای اول"></div>
       <div class="chart-tools">
         <span class="chart-read">${hint}</span>
         <span class="sp"></span>
@@ -370,6 +370,18 @@ function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, r
 
   const reset = () => { lo = homeLo; hi = homeHi; render(); };
 
+  // ——— صفحه‌کلید — همان سه حرکت ماوس (زوم، پیمایش، نمای اول)، برای
+  // کاربری که نمودار را با Tab گرفته، نه با نشانگر. .chart-canvas از قبل
+  // tabindex دارد، فقط keydown کم بود.
+  const onKey = (ev) => {
+    const step = (hi - lo) * 0.1;
+    if (ev.key === 'ArrowRight') { ev.preventDefault(); clampRange(lo + step, hi + step); }
+    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); clampRange(lo - step, hi - step); }
+    else if (ev.key === '+' || ev.key === '=') { ev.preventDefault(); zoomAt(NaN, 1 / 1.3); }
+    else if (ev.key === '-' || ev.key === '_') { ev.preventDefault(); zoomAt(NaN, 1.3); }
+    else if (ev.key === 'Home') { ev.preventDefault(); reset(); }
+  };
+
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointermove', onMove);
@@ -377,6 +389,7 @@ function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, r
   canvas.addEventListener('pointercancel', onUp);
   canvas.addEventListener('pointerleave', hideCursor);
   canvas.addEventListener('dblclick', reset);
+  canvas.addEventListener('keydown', onKey);
   host.querySelector('[data-act="home"]').addEventListener('click', reset);
   host.querySelector('[data-act="in"]').addEventListener('click', () => zoomAt(NaN, 1 / 1.3));
   host.querySelector('[data-act="out"]').addEventListener('click', () => zoomAt(NaN, 1.3));
@@ -392,11 +405,12 @@ function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, r
       canvas.removeEventListener('pointercancel', onUp);
       canvas.removeEventListener('pointerleave', hideCursor);
       canvas.removeEventListener('dblclick', reset);
+      canvas.removeEventListener('keydown', onKey);
     },
   };
 }
 
-const PAYOFF_HINT = 'غلتک برای زوم ، کشیدن برای پیمایش ، دوبار کلیک برای نمای اول';
+const PAYOFF_HINT = 'غلتک برای زوم ، کشیدن برای پیمایش ، دوبار کلیک برای نمای اول ، فلش/±/Home با صفحه‌کلید';
 
 /**
  * نمودار بازده تعامل‌پذیر. برمی‌گرداند { analysis, view, reset, destroy }.
