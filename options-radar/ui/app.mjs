@@ -3,7 +3,7 @@
 // قاعده تب تنبل: ماژول هر تب فقط لحظه اولین کلیک وارد می‌شود و اشتراک
 // عکس لحظه‌ای هم فقط برای تب باز برقرار می‌شود. تب بسته، هیچ هزینه‌ای ندارد.
 
-import { fmt, faDigits, faAgo, faClock, humanizeUpstreamError, pageTitle } from '/ui/fmt.mjs';
+import { fmt, faDigits, faAgo, faClock, humanizeUpstreamError, pageTitle, normFa } from '/ui/fmt.mjs';
 import { defaults } from '/core/settings.mjs';
 import { CATALOG, GROUPS as SGROUPS } from '/strategies/catalog.mjs';
 
@@ -221,8 +221,6 @@ function dirTone(def) {
   return [null, null];
 }
 
-const norm = (s) => String(s || '').replace(/[ي]/g, 'ی').replace(/[ك]/g, 'ک').replace(/‌/g, ' ').trim();
-
 let railQuery = '';
 let railActiveId = null; // آیتم برجسته با صفحه‌کلید، جدا از تب باز (aria-current)
 
@@ -238,11 +236,11 @@ function setRailActive(id) {
 function buildRail() {
   const list = el('rail-list');
   const sections = [...new Set(TABS.map((t) => t.section))];
-  const q = norm(railQuery).toLowerCase();
+  const q = normFa(railQuery).toLowerCase();
 
   const matches = (t) => {
     if (!q) return true;
-    const hay = norm(`${t.title} ${t.section} ${t.def?.dir || ''} ${t.def?.note || ''}`).toLowerCase();
+    const hay = normFa(`${t.title} ${t.section} ${t.def?.dir || ''} ${t.def?.note || ''}`).toLowerCase();
     return hay.includes(q);
   };
 

@@ -24,7 +24,7 @@ import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
 import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
-import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone, pageTitle } from '../ui/fmt.mjs';
+import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone, pageTitle, normFa } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn, changedIds } from '../ui/table.mjs';
 import { sameUnderlyingCandidates, compareLabel, compareFullLabel, MAX_COMPARE } from '../ui/compare.mjs';
 
@@ -1138,6 +1138,16 @@ group('۲۱. قالب‌بندی عدد فارسی');
   check('رقم عربی هم پذیرفته می‌شود', Number(toEnDigits('٤٢')) === 42, toEnDigits('٤٢'));
   check('رفت و برگشت، عدد را عوض نمی‌کند',
         Number(toEnDigits(uiFmt.money(-9876543))) === -9876543, uiFmt.money(-9876543));
+
+  // جست‌وجوی متنی (فهرست کناری تب‌ها، انتخابگر نماد): حروف عربی رایج در
+  // داده رسمی (ي/ك) باید با معادل فارسی‌شان (ی/ک) یکی حساب شوند، وگرنه
+  // کاربری که یکی از دو شکل را تایپ کند، نماد/تبی را که با شکل دیگر
+  // نوشته شده پیدا نمی‌کند.
+  check('ي عربی با ی فارسی یکی حساب می‌شود', normFa('علي') === normFa('علی'), `${normFa('علي')} vs ${normFa('علی')}`);
+  check('ك عربی با ک فارسی یکی حساب می‌شود', normFa('كامل') === normFa('کامل'), `${normFa('كامل')} vs ${normFa('کامل')}`);
+  check('نیم‌فاصله به فاصله ساده تبدیل می‌شود', normFa('می‌شود') === 'می شود', normFa('می‌شود'));
+  check('فاصله اضافه دو طرف حذف می‌شود', normFa('  متن  ') === 'متن', `"${normFa('  متن  ')}"`);
+  check('ورودی خالی/نامعتبر، رشته خالی می‌دهد', normFa(null) === '' && normFa(undefined) === '');
 
   check('فاصله زمانی خوانا و فارسی', faAgo(4000) === 'همین الان' && faAgo(125000) === '۲ دقیقه پیش',
         faAgo(125000));

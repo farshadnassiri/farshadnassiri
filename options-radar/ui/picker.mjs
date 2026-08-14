@@ -3,7 +3,7 @@
 // انتخاب کاملاً انتخابی است. جعبه جست‌وجو فقط فهرست را کوتاه می‌کند و
 // ورودی محاسبه نیست — چیزی که تایپ می‌کنی هیچ‌وقت مستقیم به موتور نمی‌رود.
 
-import { fmt } from '/ui/fmt.mjs';
+import { fmt, normFa } from '/ui/fmt.mjs';
 
 const KEY = 'picker.selected';
 
@@ -37,8 +37,12 @@ export function makePicker(host, opts = {}) {
   const save = () => localStorage.setItem(KEY, JSON.stringify([...selected]));
 
   function render() {
-    const shown = filter
-      ? list.filter((u) => u.name.includes(filter) || u.ins.includes(filter))
+    // نیم‌فاصله/حرف عربی (ي/ك) رایج در نام رسمی نمادها هم باید پیدا شود،
+    // حتی اگر کاربر شکل دیگرش را تایپ کند — همان قاعده جست‌وجوی فهرست
+    // کناری تب‌ها.
+    const nq = filter ? normFa(filter) : '';
+    const shown = nq
+      ? list.filter((u) => normFa(u.name).includes(nq) || normFa(u.ins).includes(nq))
       : list;
     listHost.innerHTML = '';
     const frag = document.createDocumentFragment();
