@@ -352,6 +352,10 @@ async function open(id) {
     stage.innerHTML = `<div class="card"><h3>تب باز نشد</h3><p class="note">${e.message}</p></div>`;
     console.error(e);
     scrollToStage();
+    // اگر current همین‌جا بماند، گارد بالای این تابع کلیک بعدی روی همین تب
+    // را بی‌اثر می‌کند — تبی که یک‌بار خطا داد، برای همیشه غیرقابل‌بازکردن
+    // می‌ماند تا کاربر خودش تب دیگری را باز و بسته کند
+    current = null;
   }
 }
 
