@@ -390,42 +390,51 @@ export async function mount(root, { tab, state, api }) {
     const tmWrap = root.querySelector('#tm-wrap');
     tmWrap.innerHTML = `<button class="ghost" type="button" id="tm-btn">ماشین زمان — اگر همین ترکیب را چند روز پیش می‌گرفتم</button>
       <div id="tm-out"></div>`;
-    tmWrap.querySelector('#tm-btn').addEventListener('click', () => runTimeMachine(r, tmWrap.querySelector('#tm-out')));
+    tmWrap.querySelector('#tm-btn').addEventListener('click', (e) => runTimeMachine(r, tmWrap.querySelector('#tm-out'), e.currentTarget));
   }
 
-  async function runTimeMachine(r, out) {
+  async function runTimeMachine(r, out, btn) {
     if (!r.uaIns) { out.innerHTML = '<p class="note">نماد پایه این ردیف شناخته نشد.</p>'; return; }
     if (!(r.sigmaUse > 0)) { out.innerHTML = '<p class="note">تلاطم مبنا نامعتبر است؛ شبیه‌سازی ممکن نیست.</p>'; return; }
+    if (btn.disabled) return;
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'در حال محاسبه…';
     out.innerHTML = '<p class="note">در حال دریافت تاریخچه قیمت پایه…</p>';
-    let res;
     try {
-      res = await (await fetch(`/api/daily?ins=${r.uaIns}&n=${s().volDays}`)).json();
-    } catch (e) {
-      out.innerHTML = `<p class="note" style="color:var(--loss)">دریافت تاریخچه ناموفق: ${e.message}</p>`;
-      return;
-    }
-    if (res.error) {
-      out.innerHTML = `<p class="note" style="color:var(--loss)">دریافت تاریخچه ناموفق: ${res.error}</p>`;
-      return;
-    }
-    const closes = (res.rows || []).filter((x) => x.close > 0);
-    if (closes.length < 2) { out.innerHTML = '<p class="note">تاریخچه کافی برای این نماد نیست.</p>'; return; }
+      let res;
+      try {
+        res = await (await fetch(`/api/daily?ins=${r.uaIns}&n=${s().volDays}`)).json();
+      } catch (e) {
+        out.innerHTML = `<p class="note" style="color:var(--loss)">دریافت تاریخچه ناموفق: ${e.message}</p>`;
+        return;
+      }
+      if (res.error) {
+        out.innerHTML = `<p class="note" style="color:var(--loss)">دریافت تاریخچه ناموفق: ${res.error}</p>`;
+        return;
+      }
+      const closes = (res.rows || []).filter((x) => x.close > 0);
+      if (closes.length < 2) { out.innerHTML = '<p class="note">تاریخچه کافی برای این نماد نیست.</p>'; return; }
 
-    const tm = timeMachine(r.__legs, closes, {
-      daysToday: r.days, sigma: r.sigmaUse, rFree: s().rFree, divYield: s().divYield,
-    });
-    const rows2 = tm.map((x) => `
-      <tr><td>${jalaliFromDEven(x.date)}</td><td class="n">${fmt.money(x.S)}</td>
-        <td class="n">${fmt.int(x.daysLeft)}</td>
-        <td class="n" style="color:${x.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(x.pnl)}</td></tr>`).join('');
-    out.innerHTML = `
-      <p class="note" style="color:var(--warn)">شبیه‌سازی بلک-شولز با تلاطم امروز (${fmt.num(r.sigmaUse)})
-        روی قیمت پایانی تاریخی پایه — نه قیمت واقعی اختیار در آن روز. دیده‌بان تاریخچه مظنه ذخیره نمی‌کند،
-        پس این عدد راهنماست، ادعای اجرا ندارد.</p>
-      <table class="mini">
-        <thead><tr><th>تاریخ</th><th>قیمت پایه آن‌روز</th><th>روز تا سررسید آن‌روز</th><th>سود/زیان شبیه‌سازی‌شده</th></tr></thead>
-        <tbody>${rows2}</tbody>
-      </table>`;
+      const tm = timeMachine(r.__legs, closes, {
+        daysToday: r.days, sigma: r.sigmaUse, rFree: s().rFree, divYield: s().divYield,
+      });
+      const rows2 = tm.map((x) => `
+        <tr><td>${jalaliFromDEven(x.date)}</td><td class="n">${fmt.money(x.S)}</td>
+          <td class="n">${fmt.int(x.daysLeft)}</td>
+          <td class="n" style="color:${x.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(x.pnl)}</td></tr>`).join('');
+      out.innerHTML = `
+        <p class="note" style="color:var(--warn)">شبیه‌سازی بلک-شولز با تلاطم امروز (${fmt.num(r.sigmaUse)})
+          روی قیمت پایانی تاریخی پایه — نه قیمت واقعی اختیار در آن روز. دیده‌بان تاریخچه مظنه ذخیره نمی‌کند،
+          پس این عدد راهنماست، ادعای اجرا ندارد.</p>
+        <table class="mini">
+          <thead><tr><th>تاریخ</th><th>قیمت پایه آن‌روز</th><th>روز تا سررسید آن‌روز</th><th>سود/زیان شبیه‌سازی‌شده</th></tr></thead>
+          <tbody>${rows2}</tbody>
+        </table>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
   }
 
   // ——— اجرای اسکن ———
