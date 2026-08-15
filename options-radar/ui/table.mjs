@@ -95,6 +95,26 @@ export function changedIds(prevRows, nextRows, key) {
   return out;
 }
 
+/**
+ * مقایسه دو مقدار سلول برای مرتب‌سازی ستون — عدد یا رشته فارسی.
+ *
+ * NaN/غیرعددی بدترین رتبه می‌گیرد؛ بی‌نهایت واقعی (سود یا زیان نامحدود، از
+ * payoff.mjs/mixed.mjs) دست‌نخورده می‌ماند. قبلاً `Number.isFinite` هر دو
+ * را یکی می‌گرفت، پس +Infinity هم به همان ته لیست NaN می‌افتاد — یعنی
+ * ردیف سود نامحدود در مرتب‌سازی نزولی «بیشترین سود» به‌جای بالا، ته جدول
+ * می‌نشست. تفریق مستقیم دو بی‌نهایت هم‌علامت خودش NaN می‌دهد، پس مقایسه
+ * به‌جای تفریق. تابع خالص است تا بی‌نیاز از مرورگر آزمون شود.
+ */
+export function compareSortValues(x, y, dir = 1) {
+  const xn = typeof x === 'number', yn = typeof y === 'number';
+  if (xn || yn) {
+    const rank = (v) => (typeof v === 'number' && !Number.isNaN(v)) ? v : -Infinity;
+    const xf = rank(x), yf = rank(y);
+    return xf === yf ? 0 : (xf < yf ? -1 : 1) * dir;
+  }
+  return String(x ?? '').localeCompare(String(y ?? ''), 'fa') * dir;
+}
+
 /** انتخاب ستون هر جدول جدا می‌ماند، تا نمای تب سرمایه نمای تب یونانی را عوض نکند. */
 function loadPick(storeKey) {
   if (!storeKey) return null;
@@ -369,16 +389,7 @@ export function makeTable(host, cols, opts = {}) {
   function apply() {
     const dir = sortDir;
     const k = sortKey;
-    view = [...rows].sort((a, b) => {
-      const x = a[k], y = b[k];
-      const xn = typeof x === 'number', yn = typeof y === 'number';
-      if (xn || yn) {
-        const xf = Number.isFinite(x) ? x : -Infinity;
-        const yf = Number.isFinite(y) ? y : -Infinity;
-        return (xf - yf) * dir;
-      }
-      return String(x ?? '').localeCompare(String(y ?? ''), 'fa') * dir;
-    });
+    view = [...rows].sort((a, b) => compareSortValues(a[k], b[k], dir));
     computeRanges();
     if (activeIdx >= view.length) activeIdx = view.length - 1;
     for (const th of headRow.children) {

@@ -25,7 +25,7 @@ import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '
 import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
 import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone, signColor, pageTitle, normFa } from '../ui/fmt.mjs';
-import { moveColumn, insertColumn, changedIds } from '../ui/table.mjs';
+import { moveColumn, insertColumn, changedIds, compareSortValues } from '../ui/table.mjs';
 import { sameUnderlyingCandidates, compareLabel, compareFullLabel, MAX_COMPARE } from '../ui/compare.mjs';
 
 let pass = 0, fail = 0;
@@ -1523,6 +1523,36 @@ group('۲۲. چیدمان ستون');
         changedIds(prev, next, null).size === 0 && changedIds(prev, next, undefined).size === 0);
   check('مقدار غیرعددی در هیچ سمتی، فلش نمی‌گیرد',
         changedIds([{ id: 'x', v: NaN }], [{ id: 'x', v: 10 }], 'v').size === 0);
+
+  // مرتب‌سازی جدول (compareSortValues): باگ واقعی — Number.isFinite هم
+  // NaN را رد می‌کرد هم بی‌نهایت واقعی (سود/زیان نامحدود) را، پس هر دو به
+  // یک رتبه می‌افتادند و ردیف سود نامحدود در مرتب‌سازی نزولی به‌جای بالای
+  // جدول، ته آن می‌نشست.
+  const rowsInf = [{ v: 500 }, { v: Infinity }, { v: 200 }];
+  const descInf = [...rowsInf].sort((a, b) => compareSortValues(a.v, b.v, -1)).map((r) => r.v);
+  check('مرتب‌سازی نزولی، بی‌نهایت واقعی (سود نامحدود) را بالای جدول می‌گذارد',
+        descInf[0] === Infinity, descInf.join(','));
+  const ascInf = [...rowsInf].sort((a, b) => compareSortValues(a.v, b.v, 1)).map((r) => r.v);
+  check('مرتب‌سازی صعودی، بی‌نهایت واقعی را ته جدول می‌گذارد',
+        ascInf[ascInf.length - 1] === Infinity, ascInf.join(','));
+  const rowsNegInf = [{ v: -Infinity }, { v: 500 }, { v: -200 }];
+  const descNegInf = [...rowsNegInf].sort((a, b) => compareSortValues(a.v, b.v, -1)).map((r) => r.v);
+  check('مرتب‌سازی نزولی، منفی‌بی‌نهایت واقعی (زیان نامحدود) را ته جدول می‌گذارد',
+        descNegInf[descNegInf.length - 1] === -Infinity, descNegInf.join(','));
+  // NaN رتبه -Infinity می‌گیرد (بدترین)، پس در نزولی ته جدول می‌نشیند و
+  // در صعودی سر جدول — همان رفتاری که کد قبل از این اصلاح هم برای NaN
+  // داشت؛ این اصلاح فقط +Infinity/-Infinity واقعی را از NaN جدا کرد.
+  const rowsNaN = [{ v: 500 }, { v: NaN }, { v: -200 }];
+  const descNaN = [...rowsNaN].sort((a, b) => compareSortValues(a.v, b.v, -1)).map((r) => r.v);
+  check('NaN در مرتب‌سازی نزولی ته جدول می‌نشیند',
+        Number.isNaN(descNaN[descNaN.length - 1]), descNaN.join(','));
+  const ascNaN = [...rowsNaN].sort((a, b) => compareSortValues(a.v, b.v, 1)).map((r) => r.v);
+  check('NaN در مرتب‌سازی صعودی سر جدول می‌نشیند',
+        Number.isNaN(ascNaN[0]), ascNaN.join(','));
+  check('دو بی‌نهایت هم‌علامت، برابر شمرده می‌شوند نه NaN از تفریق',
+        compareSortValues(Infinity, Infinity, 1) === 0 && compareSortValues(-Infinity, -Infinity, 1) === 0);
+  check('رشته فارسی هنوز طبق قواعد قبلی مرتب می‌شود',
+        compareSortValues('ب', 'آ', 1) > 0);
 }
 
 // ═══════════════ ۲۳. کش سرور: سقف ورودی ═══════════════
