@@ -280,8 +280,8 @@ function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, r
       <div class="chart-tools">
         <span class="chart-read">${hint}</span>
         <span class="sp"></span>
-        <button type="button" class="ghost" data-act="out">−</button>
-        <button type="button" class="ghost" data-act="in">+</button>
+        <button type="button" class="ghost" data-act="out" aria-label="کوچک‌نمایی نمودار">−</button>
+        <button type="button" class="ghost" data-act="in" aria-label="بزرگ‌نمایی نمودار">+</button>
         <button type="button" class="ghost" data-act="home">نمای اول</button>
       </div>
     </div>`;
