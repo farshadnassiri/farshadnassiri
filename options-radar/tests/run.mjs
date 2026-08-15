@@ -24,7 +24,7 @@ import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
 import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
-import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone, signColor, pageTitle, normFa } from '../ui/fmt.mjs';
+import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone, signColor, pageTitle, normFa, dirTone } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn, changedIds, compareSortValues } from '../ui/table.mjs';
 import { sameUnderlyingCandidates, compareLabel, compareFullLabel, MAX_COMPARE } from '../ui/compare.mjs';
 
@@ -1994,6 +1994,29 @@ group('۳۱. مقایسه با موقعیت‌های دیگر هم‌نماد ر
   // منحنی و legend مقایسه‌ای خودشان در chart.mjs رسم می‌شوند (وارد کردن مطلق
   // `/core/...` دارد، پس در Node قابل import نیست) — رسم واقعی با Playwright
   // در پنل جزئیات تب استراتژی/برترین موقعیت‌ها تأیید می‌شود، نه اینجا.
+}
+
+// ═══ ۳۲. برچسب جهت فهرست کناری (قلم پ-۶ بک‌لاگ، دور شصت‌وپنجم) ═══
+group('۳۲. برچسب جهت هر استراتژی در فهرست کناری');
+{
+  // «کولار» تنها استراتژی کاتالوگ با dir='محافظه‌کارانه' بود — هیچ‌کدام از
+  // چهار الگوی dirTone (صعودی/نزولی/خنثی/تلاطم) آن را نمی‌گرفت، پس برچسب
+  // رنگی کنار نامش در فهرست کناری خالی می‌ماند، برخلاف هر ۳۲ استراتژی
+  // دیگر که همه یک برچسب جهت دارند.
+  check('محافظه‌کارانه به برچسب خنثی می‌افتد، نه بی‌رنگ',
+    JSON.stringify(dirTone({ dir: 'محافظه‌کارانه' })) === JSON.stringify(['خنثی', 'flat']));
+
+  check('صعودی ملایم هم صعودی می‌ماند', dirTone({ dir: 'صعودی ملایم' })[1] === 'up');
+  check('نزولی تند هم نزولی می‌ماند', dirTone({ dir: 'نزولی تند' })[1] === 'down');
+  check('تلاطم بالا، تلاطم می‌ماند', dirTone({ dir: 'تلاطم بالا' })[1] === 'vol');
+  check('بی‌جهت هم خنثی حساب می‌شود', dirTone({ dir: 'بی‌جهت' })[1] === 'flat');
+  check('بدون dir، بی‌رنگ می‌ماند', JSON.stringify(dirTone({})) === JSON.stringify([null, null]));
+
+  // کل کاتالوگ واقعی — هیچ استراتژی‌ای نباید بی‌رنگ بماند (این دقیقاً همان
+  // باگی بود که کولار را گرفت)
+  const untoned = CATALOG.filter((s) => dirTone(s)[1] === null);
+  check('هیچ استراتژی کاتالوگ بی‌برچسب جهت نمی‌ماند',
+    untoned.length === 0, untoned.map((s) => s.id).join(','));
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

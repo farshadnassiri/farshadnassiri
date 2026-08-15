@@ -196,6 +196,21 @@ export function signColor(value) {
 }
 
 /**
+ * جهت هر استراتژی، برای برچسب رنگی کنار نامش در فهرست کناری. متن دقیق
+ * هر استراتژی (مثلاً «صعودی ملایم» یا «محافظه‌کارانه») به یکی از چهار
+ * برچسب کوتاه استاندارد می‌افتد؛ استراتژی‌ای که به هیچ‌کدام نخورد بی‌رنگ
+ * می‌ماند، نه اینکه ساکت از قلم بیفتد.
+ */
+export function dirTone(def) {
+  const d = String(def?.dir || '');
+  if (/صعودی/.test(d)) return ['صعودی', 'up'];
+  if (/نزولی/.test(d)) return ['نزولی', 'down'];
+  if (/خنثی|بی‌جهت|محافظه‌کارانه/.test(d)) return ['خنثی', 'flat'];
+  if (/تلاطم/.test(d)) return ['تلاطم', 'vol'];
+  return [null, null];
+}
+
+/**
  * پیام خام `stat.lastError` سرور (server/server.mjs) از `${e.name}: ${e.message}`
  * جاوااسکریپت می‌آید — مثل «TypeError: fetch failed» یا «AbortError: The
  * operation was aborted» — که برای کاربر فارسی‌زبان چیزی نمی‌گوید. این تابع

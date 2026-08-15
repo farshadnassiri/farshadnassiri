@@ -3,7 +3,7 @@
 // قاعده تب تنبل: ماژول هر تب فقط لحظه اولین کلیک وارد می‌شود و اشتراک
 // عکس لحظه‌ای هم فقط برای تب باز برقرار می‌شود. تب بسته، هیچ هزینه‌ای ندارد.
 
-import { fmt, faDigits, faAgo, faClock, humanizeUpstreamError, pageTitle, normFa } from '/ui/fmt.mjs';
+import { fmt, faDigits, faAgo, faClock, humanizeUpstreamError, pageTitle, normFa, dirTone } from '/ui/fmt.mjs';
 import { defaults } from '/core/settings.mjs';
 import { CATALOG, GROUPS as SGROUPS } from '/strategies/catalog.mjs';
 
@@ -210,16 +210,6 @@ const folded = loadFolded();
 const saveFolded = () => {
   try { localStorage.setItem(FOLD_KEY, JSON.stringify([...folded])); } catch { /* بی‌اهمیت */ }
 };
-
-/** جهت هر استراتژی، برای برچسب رنگی کنار نامش. */
-function dirTone(def) {
-  const d = String(def?.dir || '');
-  if (/صعودی/.test(d)) return ['صعودی', 'up'];
-  if (/نزولی/.test(d)) return ['نزولی', 'down'];
-  if (/خنثی|بی‌جهت/.test(d)) return ['خنثی', 'flat'];
-  if (/تلاطم/.test(d)) return ['تلاطم', 'vol'];
-  return [null, null];
-}
 
 let railQuery = '';
 let railActiveId = null; // آیتم برجسته با صفحه‌کلید، جدا از تب باز (aria-current)
