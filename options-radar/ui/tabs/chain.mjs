@@ -59,6 +59,7 @@ export async function mount(root, { state, api }) {
   let list = [];
   let detail = null;
   let expIdx = 0;
+  let received = false; // یک عکس لحظه‌ای واقعی (حتی خالی) رسیده — دیگر «در حال دریافت» نیست
 
   const table = makeTable(root.querySelector('#table'), COLS, {
     sortKey: 'volume',
@@ -68,6 +69,7 @@ export async function mount(root, { state, api }) {
   // اینجا نوار تشخیص اصلاً وجود ندارد، فقط یک عکس لحظه‌ای زنجیره‌ست.
   const LOADING_MSG = 'در حال دریافت داده زنجیره اختیار…';
   const NO_CHAIN_MSG = 'این عکس لحظه‌ای هیچ نمادی ندارد.';
+  const STOPPED_MSG = (why) => `حلقه دریافت متوقف است: ${why}. تا وقتی بازار باز نشود یا «توقف خودکار» در تنظیمات خاموش شود، داده‌ای نمی‌رسد — این «در حال دریافت» نیست.`;
   table.setEmptyMessage(LOADING_MSG);
 
   function drawKpis(stats, at) {
@@ -101,6 +103,11 @@ export async function mount(root, { state, api }) {
       root.querySelector('#gate').textContent = h.market?.open
         ? 'بازار باز است و حلقه دریافت می‌چرخد.'
         : `حلقه متوقف است: ${h.market?.why}. برای دیدن جریان داده بیرون از بازار، در تنظیمات «توقف خودکار» را خاموش کن.`;
+      // جدول تا رسیدن اولین عکس لحظه‌ای «در حال دریافت» نشان می‌دهد — درست
+      // وقتی حلقه واقعاً می‌چرخد. اگر بازار بسته و حلقه متوقف است، همان پیام
+      // با کارت «وضعیت جریان داده» کنارش ناسازگار می‌شود: یکی می‌گوید «متوقف»،
+      // دیگری می‌گوید «در حال دریافت». تا داده‌ای نرسیده همین‌جا هم به هم می‌رسند.
+      if (!received) table.setEmptyMessage(h.market?.open ? LOADING_MSG : STOPPED_MSG(h.market?.why || ''));
     } catch { /* نوار بالا خودش خبر می‌دهد */ }
   }
 
@@ -180,6 +187,7 @@ export async function mount(root, { state, api }) {
   });
 
   const offChain = onChain((cs) => {
+    received = true;
     list = cs.list.map(withDerived);
     table.set(list);
     table.setEmptyMessage(NO_CHAIN_MSG);
@@ -187,6 +195,7 @@ export async function mount(root, { state, api }) {
     drawKpis(cs.stats, cs.at);
   });
   if (chainState.list.length) {
+    received = true;
     list = chainState.list.map(withDerived);
     table.set(list);
     table.setEmptyMessage(NO_CHAIN_MSG);
