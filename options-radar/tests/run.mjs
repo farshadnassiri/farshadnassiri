@@ -1756,6 +1756,18 @@ group('۲۸. غربال روی کل کاتالوگ — برترین موقعیت
 
   check('نوار تشخیص هم روی کل جمع می‌زند', all.funnel.built >= single.funnel.built,
     `کل ${all.funnel.built} ، تک ${single.funnel.built}`);
+
+  // سقف ترکیب یک استراتژی، در نوار تشخیص جمع‌شده کل هم باید دیده شود —
+  // قبلاً scanAll فقط FUNNEL_KEYS را جمع می‌زد و capped/evaluated را گم می‌کرد،
+  // پس تب «برترین موقعیت‌ها» هیچ‌وقت پیام «سقف ترکیب خورد» را نشان نمی‌داد.
+  const sCapped = { ...s4, maxCombosPerExpiry: 1 };
+  const singleCapped = scanFn({ def: byId('naked-call'), chain: chain4, uaKeys: ['1'], settings: sCapped });
+  check('سقف ترکیب تک‌استراتژی واقعاً می‌خورد', singleCapped.funnel.capped === true);
+  const allCapped = scanAll({ defs: feasible, chain: chain4, uaKeys: ['1'], settings: sCapped, limit: 500 });
+  check('سقف ترکیب در نوار تشخیص جمع‌شده کل هم منعکس می‌شود', allCapped.funnel.capped === true);
+  check('تعداد ارزیابی‌شده هم در نوار تشخیص جمع‌شده کل جمع می‌زند',
+    allCapped.funnel.evaluated >= singleCapped.funnel.evaluated,
+    `کل ${allCapped.funnel.evaluated} ، تک ${singleCapped.funnel.evaluated}`);
 }
 
 // ═══════════════ ۲۹. ماشین زمان — شبیه‌سازی بلک-شولز روی تاریخچه ═══════════════

@@ -254,6 +254,8 @@ export function scanAll({ defs, chain, uaKeys, settings, sigmaByUa = {}, qty, li
   for (const def of defs) {
     const res = scan({ def, chain, uaKeys, settings, sigmaByUa, qty });
     for (const k of FUNNEL_KEYS) funnel[k] += res.funnel[k] || 0;
+    funnel.evaluated += res.funnel.evaluated || 0;
+    if (res.funnel.capped) funnel.capped = true;
     rows.push(...res.rows);
   }
 
