@@ -21,8 +21,10 @@ import { defaults, sanitize } from '../core/settings.mjs';
 import { safeJoin } from './safe-path.mjs';
 import { isValidIns } from './validate.mjs';
 import { readBody } from './read-body.mjs';
+import { nextDelaySec } from './backoff.mjs';
 
 const MAX_BODY_BYTES = 512 * 1024;
+const WATCH_MAX_BACKOFF_SEC = 300;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -241,11 +243,12 @@ function broadcast(event, payload) {
   for (const res of clients) { try { res.write(msg); } catch { clients.delete(res); } }
 }
 
+/** خروجی: true موفق، false ناموفق، null بازار بسته — تلاشی نشد. */
 async function watchTick() {
   const gate = marketOpen();
   stat.paused = !gate.open;
   stat.pauseReason = gate.why;
-  if (!gate.open) return;
+  if (!gate.open) return null;
 
   const t0 = Date.now();
   try {
@@ -267,15 +270,20 @@ async function watchTick() {
     stat.lastWatchMs = Date.now() - t0;
     // بار اول کل عکس، بعد فقط ردیف‌های تغییرکرده
     broadcast('watch', { at: watch.at, full: first, count: rows.length, rows: first ? rows : changed });
+    return true;
   } catch (e) {
     broadcast('trouble', { at: Date.now(), message: `${e.name}: ${e.message}` });
+    return false;
   }
 }
 
 async function watchLoop() {
+  let fails = 0;
   for (;;) {
-    await watchTick();
-    await sleep(Math.max(2, S.watchIntervalSec) * 1000);
+    const ok = await watchTick();
+    if (ok === true) fails = 0; else if (ok === false) fails += 1;
+    const base = Math.max(2, S.watchIntervalSec);
+    await sleep(nextDelaySec(fails, base, WATCH_MAX_BACKOFF_SEC) * 1000);
   }
 }
 

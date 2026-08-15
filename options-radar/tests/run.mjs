@@ -23,6 +23,7 @@ import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '
 import { safeJoin } from '../server/safe-path.mjs';
 import { isValidIns } from '../server/validate.mjs';
 import { readBody, BodyTooLargeError } from '../server/read-body.mjs';
+import { nextDelaySec } from '../server/backoff.mjs';
 import path from 'node:path';
 
 let pass = 0, fail = 0;
@@ -860,6 +861,16 @@ group('۲۱. موتور چند-سررسیدی — ناحیه سود زیر کف 
   const popClamped = (() => { const b = { ...a, regions: [[lo, a.regions[0][1]]] }; return probOfProfit(b, spot, T, sigma); })();
   check('احتمال سود واقعی از نسخه بریده‌شده کمتر برآورد نمی‌شود', pop > popClamped + 0.5,
     `${pop.toFixed(2)}٪ در برابر ${popClamped.toFixed(2)}٪`);
+}
+
+// ═══════════════════════════ ۲۲. عقب‌نشینی نمایی حلقه دیده‌بان ═══════════════════════════
+group('۲۲. عقب‌نشینی نمایی حلقه دیده‌بان');
+{
+  check('بدون خطای پیاپی، فاصله همان پایه است', nextDelaySec(0, 5, 300) === 5);
+  check('یک خطا، فاصله دو برابر می‌شود', nextDelaySec(1, 5, 300) === 10);
+  check('خطای پیاپی، فاصله نمایی رشد می‌کند', nextDelaySec(4, 5, 300) === 80);
+  check('فاصله از سقف رد نمی‌شود', nextDelaySec(20, 5, 300) === 300);
+  check('سقف حتی با پایه بزرگ هم نگه داشته می‌شود', nextDelaySec(3, 60, 300) === 300);
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════
