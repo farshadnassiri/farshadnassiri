@@ -278,7 +278,10 @@ function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, r
     <div class="chart-box">
       <div class="chart-canvas" tabindex="0" role="group" aria-label="نمودار تعامل‌پذیر — فلش چپ و راست برای پیمایش، + و − برای زوم، Home برای نمای اول"></div>
       <div class="chart-tools">
-        <span class="chart-read">${hint}</span>
+        <!-- نوشته زیر نمودار با هر حرکت ماوس/فلش کیبورد عوض می‌شود
+             (showCursor/hideCursor) ولی aria-live نداشت — صفحه‌خوان از
+             تغییرش بی‌خبر می‌ماند، همان الگوی دورهای ۱۳/۵۱ (دور ۷۹) -->
+        <span class="chart-read" role="status" aria-live="polite">${hint}</span>
         <span class="sp"></span>
         <button type="button" class="ghost" data-act="out" aria-label="کوچک‌نمایی نمودار">−</button>
         <button type="button" class="ghost" data-act="in" aria-label="بزرگ‌نمایی نمودار">+</button>
@@ -403,6 +406,11 @@ function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, r
   canvas.addEventListener('pointerup', onUp);
   canvas.addEventListener('pointercancel', onUp);
   canvas.addEventListener('pointerleave', hideCursor);
+  // pointerleave معادل کیبوردش را نداشت — کاربری که با Tab وارد نمودار
+  // می‌شود (دور ۷۸، showCursor با فلش) و بعد Tab می‌زند و می‌رود، خط
+  // راهنما/نوشته سود و زیان کهنه روی صفحه می‌ماند، انگار هنوز نشانگری
+  // در کار است (دور ۷۹).
+  canvas.addEventListener('blur', hideCursor);
   canvas.addEventListener('dblclick', reset);
   canvas.addEventListener('keydown', onKey);
   host.querySelector('[data-act="home"]').addEventListener('click', reset);
@@ -419,6 +427,7 @@ function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, r
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointercancel', onUp);
       canvas.removeEventListener('pointerleave', hideCursor);
+      canvas.removeEventListener('blur', hideCursor);
       canvas.removeEventListener('dblclick', reset);
       canvas.removeEventListener('keydown', onKey);
     },
