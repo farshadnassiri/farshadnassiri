@@ -536,6 +536,45 @@ group('۹. ارزیاب ردیف، سرتاسری');
   });
   check('sigmaUse با volSource=HIST همچنان sigmaHist است',
     near(rowSigmaHist.sigmaUse, 0.9, 1e-9), `sigmaUse=${rowSigmaHist.sigmaUse}`);
+
+  // بازده در سررسید ترکیب چند-سررسیدی (تقویمی/مورب، مرحله ۳) هم باید طبق
+  // volSource باشد — قبلاً همیشه sigmaHist می‌گرفت، حتی با volSource='MANUAL'
+  // صریح، چون آن مرحله زودتر از مرحله ۶ (یونانی‌ها) اجرا می‌شود و l.sigma
+  // هنوز ست نشده. با sigmaHist ثابت و volManual جابه‌جا، اگر باگ برگردد این
+  // دو ردیف کاملاً یکسان می‌شوند؛ با اصلاح باید واقعاً فرق کنند، چون پای زنده
+  // تقویمی مستقیماً به تلاطم فرضی حساس است. تقویمی پوت انتخاب شد نه کال:
+  // در تقویمی کال با این فاصله سررسید، دم راست واقعاً زیان نامحدود می‌گیرد
+  // (تحویل سهم پای نزدیک assign‌شده با کارمزد خرید سهم، مستقل از این باگ)
+  // و maxLoss همیشه Infinity می‌ماند؛ پوت این مسیر را ندارد و maxLoss محدود
+  // و قابل مقایسه می‌دهد.
+  const calDef = byId('calendar-put');
+  const legsCal = buildLegs(calDef, { strikes: [100000], size, days: [10, 120] });
+  const qCal = [mkQuote(2000, 2200), mkQuote(6000, 6400)];
+  const evalCal = (volManual) => evaluate({
+    legs: legsCal, quotes: qCal,
+    ctx: {
+      S: 100000, Sclose: 100000, days: 10, size, qty: 1, def: calDef, underlying: 'نمونه',
+      sigmaHist: 0.6, settings: { ...s, volSource: 'MANUAL', volManual },
+    },
+  });
+  const rowManualLow = evalCal(0.15);
+  const rowManualHigh = evalCal(1.2);
+  check('چند-سررسیدی: volManual پایین و بالا، بیشترین زیان واقعاً فرق می‌کند',
+    !near(rowManualLow.maxLoss, rowManualHigh.maxLoss, 1e-6),
+    `کم=${rowManualLow.maxLoss} زیاد=${rowManualHigh.maxLoss}`);
+  check('چند-سررسیدی: سود اگر پایه ثابت بماند هم با volManual عوض می‌شود',
+    !near(rowManualLow.staticPnl, rowManualHigh.staticPnl, 1e-6),
+    `کم=${rowManualLow.staticPnl} زیاد=${rowManualHigh.staticPnl}`);
+
+  // هویت جبری: با volSource='MANUAL'، بازده باید دقیقاً همان analyzeMixed
+  // مستقیم با sigma=volManual باشد — نه فقط «فرق می‌کند»، بلکه دقیقاً درست.
+  const directMixed = analyzeMixed(legsCal, rowManualLow.netCash, {
+    fees: { buyStock: s.feeBuyStock, sellStock: s.feeSellStock, option: s.feeOption, exercise: s.feeExercise },
+    rFree: s.rFree, divYield: s.divYield, spot: 100000, sigma: 0.15,
+  });
+  check('چند-سررسیدی با volSource=MANUAL دقیقاً از analyzeMixed(sigma=volManual) می‌آید',
+    near(rowManualLow.maxLoss, directMixed.maxLoss, 1e-6) && near(rowManualLow.staticPnl, directMixed.at(100000), 1e-6),
+    `evaluate=${rowManualLow.maxLoss} مستقیم=${directMixed.maxLoss}`);
 }
 
 group('۱۰. فهرست استراتژی‌ها');

@@ -106,11 +106,18 @@ export function evaluate({ legs, quotes, ctx }) {
   // اگر سررسید پاها یکی نباشد، موتور تکه‌ای-خطی جواب غلط می‌دهد: فروش و خرید
   // یک قیمت اعمال، ارزش ذاتی همدیگر را صفر می‌کنند و تقویمی بی‌سود درمی‌آید.
   const singleExpiry = isSingleExpiry(priced);
+  // تلاطم اینجا باید طبق volSource باشد، نه بی‌قیدوشرط sigmaHist — مرحله ۶
+  // (یونانی‌ها) دقیقاً همین قاعده را برای ستون «تلاطم مبنا» رعایت می‌کند،
+  // ولی این مرحله زودتر از آن اجرا می‌شود و l.sigma هنوز ست نشده. برای
+  // volSource='MANUAL' هیچ محاسبه‌ای لازم نیست — s.volManual مستقیم همین‌جا
+  // در دسترس است و نباید زیر sigmaHist گم شود؛ برای IV که واقعاً به قیمت هر
+  // پا نیاز دارد (هنوز محاسبه نشده)، sigmaHist همچنان بهترین تقریب ارزان
+  // است، دقیقاً همان تقریبی که مرحله ۶ خودش هنگام شکست impliedVol برمی‌گردد.
   const payoff = singleExpiry
     ? analyzePayoff(priced, netCash, { fees })
     : analyzeMixed(priced, netCash, {
       fees, rFree: s.rFree, divYield: s.divYield, spot: Sclose,
-      sigma: ok(ctx.sigmaHist) ? ctx.sigmaHist : s.volManual,
+      sigma: s.volSource === 'MANUAL' ? s.volManual : (ok(ctx.sigmaHist) ? ctx.sigmaHist : s.volManual),
     });
 
   // ——— ۴. وجه تضمین ———
