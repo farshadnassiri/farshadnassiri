@@ -122,6 +122,12 @@ export function bsGreeks(kind, S, K, T, r, q, sigma) {
  * اگر قیمت بازار زیر کف نظری یا بالای سقف نظری باشد عدد بی‌معنی نمی‌سازد و
  * مقدار نامعتبر برمی‌گرداند. ستون جدول در این حالت خط تیره نشان می‌دهد.
  */
+/**
+ * نیوتن روی وگا با تنصیف به‌عنوان تور ایمنی. در اسکن کامل برای هر پای هر
+ * ترکیب صدا زده می‌شود، پس سرعت مهم است — نیوتن نزدیک ریشه درجه دو همگرا
+ * می‌شود، تنصیف فقط وقتی به کار می‌آید که نیوتن از پرانتز بیرون بزند یا
+ * وگا صفر باشد (نزدیک ارزش ذاتی).
+ */
 export function impliedVol(kind, mktPrice, S, K, T, r, q, opt = {}) {
   let lo = num(opt.lo, 0.01);
   let hi = num(opt.hi, 5.0);
@@ -130,20 +136,25 @@ export function impliedVol(kind, mktPrice, S, K, T, r, q, opt = {}) {
   if (!(mktPrice > 0 && S > 0 && K > 0 && T > 0)) return NaN;
 
   const f = (s) => bsPrice(kind, S, K, T, r, q, s) - mktPrice;
+  const vega = (s) => S * Math.exp(-q * T) * npdf(d1d2(S, K, T, r, q, s)[0]) * Math.sqrt(T);
   const fLo = f(lo);
   const fHi = f(hi);
   if (!ok(fLo) || !ok(fHi)) return NaN;
   if (fLo > 0) return NaN; // زیر کف نظری، ارزش ذاتی نقض شده
   if (fHi < 0) return NaN; // بالای سقف نظری
 
+  let x = 0.5 * (lo + hi);
   for (let i = 0; i < iters; i++) {
-    const mid = 0.5 * (lo + hi);
-    const fm = f(mid);
-    if (Math.abs(fm) < tol * Math.max(1, mktPrice)) return mid;
-    if (fm < 0) lo = mid;
-    else hi = mid;
+    const fx = f(x);
+    if (!ok(fx)) return 0.5 * (lo + hi);
+    if (Math.abs(fx) < tol * Math.max(1, mktPrice)) return x;
+    if (fx < 0) lo = x; else hi = x;
+
+    const v = vega(x);
+    const step = ok(v) && v > 1e-8 ? x - fx / v : NaN;
+    x = step > lo && step < hi ? step : 0.5 * (lo + hi);
   }
-  return 0.5 * (lo + hi);
+  return x;
 }
 
 /**
