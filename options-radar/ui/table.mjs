@@ -219,7 +219,13 @@ export function makeTable(host, cols, opts = {}) {
       th.dataset.key = c.key;
       th.draggable = true;
       th.tabIndex = 0;
-      th.setAttribute('role', 'button');
+      // role="button" اینجا نمی‌آید — دور ۵۰ همراه tabIndex/keydown اضافه‌اش
+      // کرده بود، ولی aria-sort (دور ۳۳، پایین‌تر در apply()) فقط برای
+      // columnheader/rowheader معتبر است، نه button؛ طبق مدل پردازش ARIA،
+      // درخت دسترس‌پذیری با role=button مقدار aria-sort را کنار می‌گذارد —
+      // خودِ ویژگی‌ای که دور ۳۳ اضافه کرده بود بی‌صدا خنثی می‌شد. th زیر
+      // <table role="grid"> همین حالا هم columnheader ضمنی دارد و با
+      // tabIndex/click/keydown موجود کاملاً قابل‌فعال‌سازی می‌ماند (دور ۷۵).
       if (NUM_FMT.has(c.fmt)) th.classList.add('n');
 
       const sortByThis = () => {
