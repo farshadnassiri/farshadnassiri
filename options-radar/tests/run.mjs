@@ -22,6 +22,7 @@ import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
 import { safeJoin } from '../server/safe-path.mjs';
 import { isValidIns } from '../server/validate.mjs';
+import { readBody, BodyTooLargeError } from '../server/read-body.mjs';
 import path from 'node:path';
 
 let pass = 0, fail = 0;
@@ -816,6 +817,26 @@ group('۱۹. صحت‌سنجی پارامتر ins');
   check('مسیر بالادست دیگر رد می‌شود', !isValidIns('../Other/1'));
   check('کد آمیخته با حروف رد می‌شود', !isValidIns('123abc'));
   check('کد با فاصله رد می‌شود', !isValidIns('123 456'));
+}
+
+// ═══════════════════════════ ۲۰. سقف اندازه بدنه درخواست ═══════════════════════════
+group('۲۰. سقف اندازه بدنه درخواست');
+{
+  async function* chunksOf(sizes) {
+    for (const n of sizes) yield Buffer.alloc(n, 'a');
+  }
+
+  const small = await readBody(chunksOf([10, 20, 30]), 1000);
+  check('بدنه زیر سقف کامل خوانده می‌شود', small.length === 60);
+
+  let threw = null;
+  try { await readBody(chunksOf([600, 600]), 1000); }
+  catch (e) { threw = e; }
+  check('بدنه بالای سقف خطا می‌دهد', threw instanceof BodyTooLargeError);
+  check('خطای سقف کد وضعیت ۴۱۳ دارد', threw && threw.status === 413);
+
+  const exact = await readBody(chunksOf([500, 500]), 1000);
+  check('بدنه دقیقاً برابر سقف پذیرفته می‌شود', exact.length === 1000);
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

@@ -20,6 +20,9 @@ import { fileURLToPath } from 'node:url';
 import { defaults, sanitize } from '../core/settings.mjs';
 import { safeJoin } from './safe-path.mjs';
 import { isValidIns } from './validate.mjs';
+import { readBody } from './read-body.mjs';
+
+const MAX_BODY_BYTES = 512 * 1024;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -329,9 +332,8 @@ async function handle(req, res) {
     if (p === '/api/settings') {
       if (req.method === 'GET') return sendJson(res, 200, S);
       if (req.method === 'PUT') {
-        const chunks = [];
-        for await (const c of req) chunks.push(c);
-        const next = await saveSettings(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'));
+        const buf = await readBody(req, MAX_BODY_BYTES);
+        const next = await saveSettings(JSON.parse(buf.toString('utf8') || '{}'));
         tokens = Math.min(tokens, next.burst);
         log('تنظیمات ذخیره شد');
         return sendJson(res, 200, next);
@@ -469,9 +471,8 @@ async function handle(req, res) {
         catch { return sendJson(res, 200, []); }
       }
       if (req.method === 'PUT') {
-        const chunks = [];
-        for await (const c of req) chunks.push(c);
-        const body = Buffer.concat(chunks).toString('utf8') || '[]';
+        const buf = await readBody(req, MAX_BODY_BYTES);
+        const body = buf.toString('utf8') || '[]';
         const list = JSON.parse(body);
         if (!Array.isArray(list)) return sendJson(res, 400, { error: 'فهرست لازم است' });
         await fs.mkdir(path.dirname(file), { recursive: true });
@@ -490,6 +491,7 @@ async function handle(req, res) {
     if (p.startsWith('/api/')) return sendJson(res, 404, { error: 'نقطه پایانی ناشناخته' });
     return serveStatic(res, p);
   } catch (e) {
+    if (e.status) return sendJson(res, e.status, { error: e.message });
     return sendJson(res, 502, { error: `${e.name}: ${e.message}` });
   }
 }
