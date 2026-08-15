@@ -234,6 +234,26 @@ export async function mount(root, { tab, state, api }) {
     // کرده باشد (بدون اسکن دوباره)، با fees بالا ناهم‌خوان می‌شود و
     // بیشترین سود/زیان این پانل با ستون جدول اصلی فرق می‌کند.
     const netCash = grossCash(r.__legs) - entryFees(r.__legs, fees);
+    // همان مشکل netCash بالا، برای سه سطر «اگر ببندی/تسویه کنی» هم بود:
+    // r.instantClosePnl و خواهرهایش کارمزد لحظه اسکن را داشتند. gross بستن
+    // به مظنه بازار نیاز دارد (فقط لحظه اسکن در دسترس است، r.closeGross)،
+    // ولی fee فقط به قیمت بستن همان لحظه (r.closePrices) و نرخ کارمزد زنده
+    // بستگی دارد — بدون نیاز به مظنه تازه بازسازی‌پذیر است.
+    const closePnlLive = (basis) => {
+      const prices = r.closePrices[basis];
+      let fee = 0;
+      r.__legs.forEach((l, i) => {
+        const units = Math.abs(l.ratio * l.size);
+        const px = prices[i];
+        fee += l.kind === 'underlying'
+          ? px * units * (l.side === 'buy' ? fees.sellStock : fees.buyStock)
+          : px * units * fees.option;
+      });
+      return netCash + r.closeGross[basis] - fee;
+    };
+    const instantClosePnl = closePnlLive('BOOK');
+    const settleLastPnl = closePnlLive('LAST');
+    const settleClosePnl = closePnlLive('CLOSE');
     const single = isSingleExpiry(r.__legs);
     const candidates = sameUnderlyingCandidates(rows, r);
     const chartOpt = {
@@ -308,11 +328,11 @@ export async function mount(root, { tab, state, api }) {
           <dt>جهت نقدی</dt><dd>${r.cashLabel}</dd>
           <dt>نقد خالص</dt><dd>${fmt.money(netCash)}</dd>
           <dt>اگر همین حالا ببندی — دفتر سفارش</dt>
-          <dd style="color:${signColor(r.instantClosePnl)}">${fmt.money(r.instantClosePnl)}</dd>
+          <dd style="color:${signColor(instantClosePnl)}">${fmt.money(instantClosePnl)}</dd>
           <dt>اگر با آخرین معامله تسویه کنی <span class="unit">مرجع</span></dt>
-          <dd style="color:${signColor(r.settleLastPnl)}">${fmt.money(r.settleLastPnl)}</dd>
+          <dd style="color:${signColor(settleLastPnl)}">${fmt.money(settleLastPnl)}</dd>
           <dt>اگر با قیمت پایانی تسویه کنی <span class="unit">مرجع</span></dt>
-          <dd style="color:${signColor(r.settleClosePnl)}">${fmt.money(r.settleClosePnl)}</dd>
+          <dd style="color:${signColor(settleClosePnl)}">${fmt.money(settleClosePnl)}</dd>
           <dt>سرمایه درگیر</dt><dd>${fmt.money(r.capital)}</dd>
           <dt>مبنای سرمایه</dt><dd>${r.capitalLabel}</dd>
           <dt>وجه تضمین</dt><dd>${fmt.money(r.margin)}</dd>

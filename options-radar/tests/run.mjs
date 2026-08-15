@@ -455,6 +455,34 @@ group('۹. ارزیاب ردیف، سرتاسری');
     near(freshAn.maxProfit, rowFresh.maxProfit, 1),
     `بازساخته ${Math.round(freshAn.maxProfit).toLocaleString()} ~ اسکن تازه ${Math.round(rowFresh.maxProfit).toLocaleString()}`);
 
+  // همان مشکل، برای سه سطر «اگر ببندی/تسویه کنی» هم بود — بازبینی
+  // بیست‌وهشتم. r.instantClosePnl/settleLastPnl/settleClosePnl هم کارمزد
+  // لحظه اسکن داشتند. اصلاح: closeGross (وابسته به مظنه، فقط لحظه اسکن در
+  // دسترس است) و closePrices (قیمت بستن هر پا، بدون کارمزد) روی ردیف
+  // می‌مانند، پانل جزئیات با آن دو و کارمزد زنده fee را دوباره می‌سازد.
+  const closePnlLive = (basis) => {
+    const prices = row.closePrices[basis];
+    let fee = 0;
+    row.__legs.forEach((l, i) => {
+      const units = Math.abs(l.ratio * l.size);
+      const px = prices[i];
+      fee += l.kind === 'underlying'
+        ? px * units * (l.side === 'buy' ? feesChanged.sellStock : feesChanged.buyStock)
+        : px * units * feesChanged.option;
+    });
+    return freshNetCash + row.closeGross[basis] - fee;
+  };
+  check('instantClosePnl کهنه با کارمزد تازه، با اسکن تازه ناهم‌خوان است',
+    Math.abs(row.instantClosePnl - rowFresh.instantClosePnl) > 1,
+    `کهنه ${Math.round(row.instantClosePnl).toLocaleString()} ≠ اسکن تازه ${Math.round(rowFresh.instantClosePnl).toLocaleString()}`);
+  check('instantClosePnl بازساخته‌شده از fees زنده، دقیقاً با اسکن تازه هم‌خوان است',
+    near(closePnlLive('BOOK'), rowFresh.instantClosePnl, 1),
+    `بازساخته ${Math.round(closePnlLive('BOOK')).toLocaleString()} ~ اسکن تازه ${Math.round(rowFresh.instantClosePnl).toLocaleString()}`);
+  check('settleLastPnl بازساخته‌شده هم دقیقاً با اسکن تازه هم‌خوان است',
+    near(closePnlLive('LAST'), rowFresh.settleLastPnl, 1));
+  check('settleClosePnl بازساخته‌شده هم دقیقاً با اسکن تازه هم‌خوان است',
+    near(closePnlLive('CLOSE'), rowFresh.settleClosePnl, 1));
+
   // اسپرد بستانکار: قاعده وجه تضمین و ریسک لنگ‌زدن
   const bc = byId('bear-call-spread');
   const legs2 = buildLegs(bc, { strikes: [100000, 110000], size, days: [30] });

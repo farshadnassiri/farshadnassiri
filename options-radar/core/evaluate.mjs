@@ -98,9 +98,24 @@ export function evaluate({ legs, quotes, ctx }) {
   // مبنای دفتر سفارش ادعای اجرا دارد (bid/ask واقعی)؛ آخرین و پایانی فقط
   // مرجع‌اند، چون لحظه وقوعشان با لحظه این محاسبه هم‌زمان نیست.
   const quotesForClose = priced.map((l) => l.quote || {});
-  const instantClosePnl = netCash + closeValuation(priced, quotesForClose, 'BOOK', fees).net;
-  const settleLastPnl = netCash + closeValuation(priced, quotesForClose, 'LAST', fees).net;
-  const settleClosePnl = netCash + closeValuation(priced, quotesForClose, 'CLOSE', fees).net;
+  const closeBook = closeValuation(priced, quotesForClose, 'BOOK', fees);
+  const closeLast = closeValuation(priced, quotesForClose, 'LAST', fees);
+  const closeClose = closeValuation(priced, quotesForClose, 'CLOSE', fees);
+  const instantClosePnl = netCash + closeBook.net;
+  const settleLastPnl = netCash + closeLast.net;
+  const settleClosePnl = netCash + closeClose.net;
+  // gross بستن به مظنه بازار وابسته است (اینجا فقط لحظه اسکن در دسترس است)،
+  // ولی fee بستن فقط به قیمت بستن همان لحظه و نرخ کارمزد بستگی دارد — هر دو
+  // بدون نیاز به مظنه تازه، از روی همین قیمت‌ها و کارمزد زنده تنظیمات قابل
+  // بازسازی است. پانل جزئیات (strategy.mjs/top.mjs) از همین دو فیلد برای
+  // هم‌راستا نگه داشتن این سه سطر با «نقد خالص» زنده استفاده می‌کند — همان
+  // مشکلی که بازبینی هجدهم برای netCash حل کرد، اینجا هم بود.
+  const closeGross = { BOOK: closeBook.gross, LAST: closeLast.gross, CLOSE: closeClose.gross };
+  const closePrices = {
+    BOOK: closeBook.perLeg.map((p) => p.price),
+    LAST: closeLast.perLeg.map((p) => p.price),
+    CLOSE: closeClose.perLeg.map((p) => p.price),
+  };
 
   // ——— ۳. بازده در سررسید ———
   // اگر سررسید پاها یکی نباشد، موتور تکه‌ای-خطی جواب غلط می‌دهد: فروش و خرید
@@ -219,7 +234,7 @@ export function evaluate({ legs, quotes, ctx }) {
     // جریان نقد
     grossCash: gross, entryFee, netCash, isCredit,
     cashLabel: isCredit ? 'بستانکار' : 'بدهکار',
-    instantClosePnl, settleLastPnl, settleClosePnl,
+    instantClosePnl, settleLastPnl, settleClosePnl, closeGross, closePrices,
 
     // سود و زیان
     breakevens: payoff.breakevens,
