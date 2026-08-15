@@ -214,13 +214,23 @@ const saveFolded = () => {
 let railQuery = '';
 let railActiveId = null; // آیتم برجسته با صفحه‌کلید، جدا از تب باز (aria-current)
 
-/** برجستگی صفحه‌کلید را روی دکمه‌ی متناظر می‌گذارد و در دید نگه می‌دارد. */
+/**
+ * برجستگی صفحه‌کلید را روی دکمه‌ی متناظر می‌گذارد و در دید نگه می‌دارد.
+ * data-kbd-active فقط یک نشانه بصری بود (رنگ/حاشیه در style.css)؛ صفحه‌خوان
+ * هیچ راهی برای فهمیدن آیتم برجسته نداشت چون aria-activedescendant ورودی
+ * جست‌وجو هیچ‌وقت تنظیم نمی‌شد — رفع در دور ۶۷.
+ */
 function setRailActive(id) {
   railActiveId = id;
+  let activeBtn = null;
   for (const b of el('rail-list').querySelectorAll('.tab-btn')) {
-    b.setAttribute('data-kbd-active', b.dataset.tab === id ? '1' : '0');
+    const active = b.dataset.tab === id;
+    b.setAttribute('data-kbd-active', active ? '1' : '0');
+    b.setAttribute('aria-selected', active ? 'true' : 'false');
+    if (active) activeBtn = b;
   }
-  if (id) el('rail-list').querySelector(`.tab-btn[data-tab="${id}"]`)?.scrollIntoView({ block: 'nearest' });
+  activeBtn?.scrollIntoView({ block: 'nearest' });
+  el('rail-q').setAttribute('aria-activedescendant', activeBtn ? activeBtn.id : '');
 }
 
 function buildRail() {
@@ -268,6 +278,8 @@ function buildRail() {
       const b = document.createElement('button');
       b.className = 'tab-btn';
       b.type = 'button';
+      b.id = `tab-btn-${t.id}`;
+      b.setAttribute('role', 'option');
       b.dataset.tab = t.id;
       b.dataset.locked = t.mod ? '0' : '1';
       b.setAttribute('aria-current', current === t.id ? 'true' : 'false');
