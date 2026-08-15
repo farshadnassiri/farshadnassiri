@@ -15,6 +15,11 @@
 const ROW_H = 27;
 const OVER = 12;
 
+// هر فراخوان makeTable شناسه ردیف مستقل خودش را می‌خواهد — چند تب می‌تواند
+// همین جدول مشترک را جدا نمونه‌سازی کند، و id تکراری بین دو نمونه، مرجع
+// aria-activedescendant را به عنصر غلط می‌برد.
+let tableInstanceSeq = 0;
+
 // قالب‌بندی یک‌جا در ui/fmt.mjs است تا عدد فارسی همه‌جا یک‌شکل باشد. اینجا
 // دوباره صادر می‌شود چون تب‌ها از قدیم آن را از همین‌جا می‌گیرند.
 export { fmt } from './fmt.mjs';
@@ -141,6 +146,7 @@ function clearPick(storeKey) {
  *   opts.storeKey  کلید ماندگاری انتخاب ستون در حافظه مرورگر
  */
 export function makeTable(host, cols, opts = {}) {
+  const rowIdPrefix = `tbl${++tableInstanceSeq}-row-`;
   const all = opts.all && opts.all.length ? opts.all : cols;
   const byKey = new Map(all.map((c) => [c.key, c]));
   const baseKeys = cols.map((c) => c.key);
@@ -418,6 +424,7 @@ export function makeTable(host, cols, opts = {}) {
       const tr = document.createElement('tr');
       tr.className = rowClass(r);
       tr.dataset.i = i;
+      tr.id = `${rowIdPrefix}${i}`;
       tr.setAttribute('data-kbd-active', i === activeIdx ? '1' : '0');
       for (const c of shown) {
         const td = document.createElement('td');
@@ -456,6 +463,11 @@ export function makeTable(host, cols, opts = {}) {
       const msg = emptyMsg || 'ردیفی نمانده. نوار تشخیص بالا می‌گوید ترکیب‌ها کجا افتادند.';
       tbody.innerHTML = `<tr><td colspan="${shown.length}" style="padding:18px;color:var(--muted)">${msg}</td></tr>`;
     }
+    // data-kbd-active از دور ۲۶ فقط بصری بود (box-shadow در style.css) —
+    // صفحه‌خوان هیچ راهی برای فهمیدن ردیف برجسته نداشت. moveActive() قبل
+    // از draw() اسکرول را جابه‌جا می‌کند، پس ردیف فعال همیشه در بازه
+    // first..last رسم‌شده است (دور ۶۹).
+    body.setAttribute('aria-activedescendant', activeIdx >= first && activeIdx < last ? `${rowIdPrefix}${activeIdx}` : '');
   }
 
   body.addEventListener('scroll', () => requestAnimationFrame(draw), { passive: true });
