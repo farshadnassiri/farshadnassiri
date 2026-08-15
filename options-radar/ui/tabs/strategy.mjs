@@ -397,6 +397,12 @@ export async function mount(root, { tab, state, api }) {
     function renderCmpPicker() {
       const box = root.querySelector('#cmp-picker');
       if (!candidates.length) { box.innerHTML = ''; return; }
+      // تیک زدن یک ردیف کل box را از نو می‌سازد (چک‌باکس‌های دیگر با
+      // تیک شدن این یکی disabled/enabled می‌شوند)؛ innerHTML چک‌باکس فوکوس‌دار
+      // را هم نابود می‌کرد — کاربر کیبوردی با هر Space، فوکوس را به body
+      // می‌باخت و نمی‌توانست پشت‌سرهم Tab بزند (دور ۸۰). شناسه فوکوس فعلی
+      // را نگه می‌داریم و بعد از بازسازی همان چک‌باکس را دوباره فوکوس می‌کنیم.
+      const focusedId = box.contains(document.activeElement) ? document.activeElement.dataset.id : null;
       box.innerHTML = `
         <p class="note" style="margin:10px 0 4px">مقایسه با موقعیت‌های دیگر همین نماد — حداکثر ${fmt.int(MAX_COMPARE)} هم‌زمان</p>
         <div class="cmp-list">
@@ -409,6 +415,7 @@ export async function mount(root, { tab, state, api }) {
             </label>`;
           }).join('')}
         </div>`;
+      if (focusedId != null) box.querySelector(`input[data-id="${focusedId}"]`)?.focus();
       box.querySelectorAll('input[type=checkbox]').forEach((cb) => {
         cb.addEventListener('change', (e) => {
           if (e.target.checked) compareIds.add(e.target.dataset.id); else compareIds.delete(e.target.dataset.id);
