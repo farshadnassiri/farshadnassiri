@@ -24,6 +24,7 @@ import { safeJoin } from '../server/safe-path.mjs';
 import { isValidIns } from '../server/validate.mjs';
 import { readBody, BodyTooLargeError } from '../server/read-body.mjs';
 import { nextDelaySec } from '../server/backoff.mjs';
+import { sweepExpired } from '../server/cache-sweep.mjs';
 import path from 'node:path';
 
 let pass = 0, fail = 0;
@@ -871,6 +872,25 @@ group('۲۲. عقب‌نشینی نمایی حلقه دیده‌بان');
   check('خطای پیاپی، فاصله نمایی رشد می‌کند', nextDelaySec(4, 5, 300) === 80);
   check('فاصله از سقف رد نمی‌شود', nextDelaySec(20, 5, 300) === 300);
   check('سقف حتی با پایه بزرگ هم نگه داشته می‌شود', nextDelaySec(3, 60, 300) === 300);
+}
+
+// ═══════════════════════════ ۲۳. پاک‌سازی دوره‌ای کش ═══════════════════════════
+group('۲۳. پاک‌سازی دوره‌ای کش');
+{
+  const now = 1_000_000;
+  const cache = new Map([
+    ['fresh', { at: now - 1000, data: 1, ttlSec: 10 }],
+    ['stale', { at: now - 20_000, data: 2, ttlSec: 10 }],
+    ['edge', { at: now - 10_000, data: 3, ttlSec: 10 }],
+  ]);
+  const removed = sweepExpired(cache, now);
+  check('ورودی منقضی حذف می‌شود', !cache.has('stale'));
+  check('ورودی تازه دست‌نخورده می‌ماند', cache.has('fresh') && cache.get('fresh').data === 1);
+  check('ورودی درست روی مرز نگه داشته می‌شود', cache.has('edge'));
+  check('شمار حذف‌شده درست است', removed === 1);
+
+  const empty = new Map();
+  check('کش خالی خطا نمی‌دهد', sweepExpired(empty, now) === 0);
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

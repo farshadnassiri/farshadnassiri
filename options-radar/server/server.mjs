@@ -22,6 +22,7 @@ import { safeJoin } from './safe-path.mjs';
 import { isValidIns } from './validate.mjs';
 import { readBody } from './read-body.mjs';
 import { nextDelaySec } from './backoff.mjs';
+import { sweepExpired } from './cache-sweep.mjs';
 
 const MAX_BODY_BYTES = 512 * 1024;
 const WATCH_MAX_BACKOFF_SEC = 300;
@@ -126,8 +127,10 @@ async function pump() {
 
 // ————————————————————————————————— کش و ادغام درخواست در پرواز —————————————————————————————————
 
-const cache = new Map();     // url -> { at, data }
+const cache = new Map();     // url -> { at, data, ttlSec }
 const inflight = new Map();  // url -> Promise
+const CACHE_SWEEP_INTERVAL_MS = 60_000;
+setInterval(() => sweepExpired(cache, Date.now()), CACHE_SWEEP_INTERVAL_MS).unref();
 
 async function fetchUpstream(url) {
   const ac = new AbortController();
@@ -162,7 +165,7 @@ async function get(pathname, ttlSec, priority = 5) {
       try {
         stat.requests += 1;
         const data = await schedule(() => fetchUpstream(url), priority);
-        cache.set(url, { at: Date.now(), data });
+        cache.set(url, { at: Date.now(), data, ttlSec });
         return data;
       } catch (e) {
         lastErr = e;
