@@ -3266,13 +3266,17 @@ chain.mjs. بازبینی هجدهم نقد خالص کهنه‌ای که با �
 `core/payoff.mjs`، `core/positions.mjs`، `core/scan.mjs`) یک باگ واقعی
 دیگر پیدا کرد: `scanAll` فیلدهای `capped`/`evaluated` نوار تشخیص را از
 اسکن هر استراتژی جمع نمی‌زد، پس تب «برترین موقعیت‌ها» هیچ‌وقت پیام «سقف
-ترکیب خورد» را نشان نمی‌داد (توضیح در «انجام‌شده» بالا). فهرست باز
-مشخصی از بازبینی کد باقی نمانده؛ دور بعدی باید یک بازبینی هدفمند تازه
-(بیست‌وچهارم — کاندیدهای بازبینی‌نشده باقی‌مانده: `core/settings.mjs`،
-`core/timemachine.mjs`، `server/backoff.mjs`، `server/cache.mjs`،
-`server/guard.mjs`، `server/server.mjs`، `strategies/catalog.mjs`،
-`ui/compare.mjs`، `ui/tabs/soon.mjs`، `worker/scan-worker.mjs`) باشد یا
-قلمی از پ-۶ بالا.
+ترکیب خورد» را نشان نمی‌داد (توضیح در «انجام‌شده» بالا). همان اجرا، در
+ادامه همان بازبینی، بقیه فایل‌های تا آن لحظه بازبینی‌نشده را هم خواند —
+`core/settings.mjs`، `core/timemachine.mjs`، `server/backoff.mjs`،
+`server/cache.mjs`، `server/guard.mjs`، `ui/compare.mjs`،
+`ui/tabs/soon.mjs`، `worker/scan-worker.mjs`، و برای اطمینان دوباره
+`core/evaluate.mjs`، `core/mixed.mjs`، `core/margin.mjs` — هیچ باگ
+دیگری پیدا نشد. با این، هر فایل اصلی پروژه دست‌کم یک‌بار بازبینی هدفمند
+شده. فهرست باز مشخصی از بازبینی کد باقی نمانده؛ دور بعدی یا باید یک
+بازبینی تازه با نگاه تازه روی فایل‌های قبلاً بازبینی‌شده باشد (مخصوصاً
+`core/bs.mjs`، `strategies/catalog.mjs`، `server/server.mjs` که مدت‌هاست
+دوباره دیده نشده‌اند)، یا قلمی از پ-۶ بالا.
 
 ### الف — خواسته‌های کاربر، فهرست ۱۴۰۵/۰۵/۲۲
 
