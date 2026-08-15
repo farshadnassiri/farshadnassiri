@@ -15,7 +15,7 @@
 
 import { num, ok, EPS } from './num.mjs';
 import { grossCash, entryFees, analyzePayoff, pnlAtExpiry, signedQty } from './payoff.mjs';
-import { analyzeMixed } from './mixed.mjs';
+import { analyzeMixed, isSingleExpiry } from './mixed.mjs';
 import { strategyMargin, capitalBase } from './margin.mjs';
 import { daysSinceJalali } from './jalali.mjs';
 
@@ -203,10 +203,25 @@ export function rollAnalysis({ pos, quotes, closeIdx, newLeg, newQuote, opt = {}
   const optDays = (legs) => new Set(legs.filter((l) => l.kind !== 'underlying').map((l) => num(l.days, 0)));
   const singleExpiry = new Set([...optDays(cur), ...optDays(nextLegs)]).size <= 1;
 
+  // تحلیل «خودِ» هر طرف، جدا از تفاضل: با موتور و افق طبیعی خودش — دقیقاً
+  // همان چیزی که یک نمودار مستقل روی فقط همان پاها (mountPayoff در تب رول،
+  // روی p.legs یا nextLegs تنها) هم می‌سازد. اکثریت رول‌های واقعی فقط یک پا
+  // عوض می‌کنند، پس cur و nextLegs هرکدام به‌تنهایی هنوز تک‌سررسیدی‌اند، حتی
+  // وقتی پای تازه سررسید دیگری دارد — یعنی جبر دقیق در سررسید واقعی همان
+  // طرف در دسترس است و نباید زیر افق مشترک «امروز» (که فقط تفاضل لازمش
+  // دارد) گم شود. قبلاً «سربه‌سری فعلی» و «سقف سود فعلی» در همین حالت از
+  // همان تحلیل افق‌مشترک می‌آمدند، پس با نمودار جداگانه هر طرف که پایین‌تر
+  // در تب رول رسم می‌شود ناسازگار بودند.
+  const ownAn = (legs, net) => (isSingleExpiry(legs)
+    ? analyzePayoff(legs, net, { fees })
+    : analyzeMixed(legs, net, { fees, spot, sigma: opt.sigma, rFree: opt.rFree, divYield: opt.divYield }));
+  const curOwn = ownAn(cur, curNet);
+  const nextOwn = ownAn(nextLegs, nextNet);
+
   let curAn, nextAn, crossings;
   if (singleExpiry) {
-    curAn = analyzePayoff(cur, curNet, { fees });
-    nextAn = analyzePayoff(nextLegs, nextNet, { fees });
+    curAn = curOwn;
+    nextAn = nextOwn;
     // مرز تصمیم: ریشه‌های تفاضل. هر دو تابع تکه‌ای-خطی‌اند، پس نقاط شکست
     // اجتماع قیمت‌های اعمال دو موقعیت است و ریشه هر بازه دقیق است.
     const ks = [...new Set([...curAn.strikes, ...nextAn.strikes])].sort((a, b) => a - b);
@@ -223,6 +238,10 @@ export function rollAnalysis({ pos, quotes, closeIdx, newLeg, newQuote, opt = {}
       }
     }
   } else {
+    // این دو (curAn/nextAn) فقط برای تفاضل به کار می‌روند: مقایسه دو
+    // موقعیت با سررسید متفاوت باید روی یک افق مشترک باشد، وگرنه سیب با
+    // پرتقال مقایسه می‌شود. گزارش «فعلی»/«پس از رول» جداگانه از curOwn/
+    // nextOwn بالا می‌آید، نه از این دو.
     const mixOpt = {
       fees, spot, sigma: opt.sigma, rFree: opt.rFree, divYield: opt.divYield,
       horizonDays: Number.isFinite(opt.horizonDays) ? opt.horizonDays : 0,
@@ -241,13 +260,13 @@ export function rollAnalysis({ pos, quotes, closeIdx, newLeg, newQuote, opt = {}
     closePrice: closePx, closeCash, newPrice: newPx, newCash,
     netCashChange: closeCash + newCash,
     curNet, nextNet, nextLegs,
-    curAnalysis: curAn, nextAnalysis: nextAn,
+    curAnalysis: curOwn, nextAnalysis: nextOwn,
     approx: !singleExpiry,
     diff, crossings,
     atSpot, atSpotTotal: atSpot * qty,
-    curMaxProfit: curAn.maxProfit, nextMaxProfit: nextAn.maxProfit,
-    curMaxLoss: curAn.maxLoss, nextMaxLoss: nextAn.maxLoss,
-    curBreakevens: curAn.breakevens, nextBreakevens: nextAn.breakevens,
+    curMaxProfit: curOwn.maxProfit, nextMaxProfit: nextOwn.maxProfit,
+    curMaxLoss: curOwn.maxLoss, nextMaxLoss: nextOwn.maxLoss,
+    curBreakevens: curOwn.breakevens, nextBreakevens: nextOwn.breakevens,
     verdict: atSpot > 0
       ? 'در قیمت فعلی پایه، رول بهتر است'
       : atSpot < 0 ? 'در قیمت فعلی پایه، نگه داشتن موقعیت فعلی بهتر است' : 'در قیمت فعلی، تفاوتی ندارد',

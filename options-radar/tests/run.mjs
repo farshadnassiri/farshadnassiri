@@ -866,6 +866,34 @@ group('۱۳. موقعیت واقعی و تحلیل رول');
     near(roll.diff(identityAt), nextCheck13.at(identityAt) - curCheck13.at(identityAt), 1e-9),
     `${roll.diff(identityAt)} ~ ${nextCheck13.at(identityAt) - curCheck13.at(identityAt)}`);
 
+  // «سربه‌سری فعلی»/«سقف سود فعلی» باید از تحلیل خودِ cur (تک‌سررسیدی،
+  // جبر دقیق در سررسید واقعی‌اش) بیاید، نه از افق مشترک «امروز» که فقط
+  // برای تفاضل ساخته شده — دقیقاً همان تحلیلی که یک نمودار مستقل روی فقط
+  // پاهای cur (mountPayoff در تب رول) هم می‌سازد. قبلاً هر دو (گزارش و
+  // نمودار) روی یک عدد نبودند: گزارش از curCheck13 (افق مشترک، تقریبی)
+  // می‌آمد، نمودار از تحلیل دقیق cur به‌تنهایی — دو سربه‌سری متفاوت برای
+  // یک موقعیت، روی یک صفحه.
+  const curOwnCheck = analyzePayoff(pos.legs, roll.curNet, { fees });
+  const nextOwnCheck = analyzePayoff(roll.nextLegs, roll.nextNet, { fees });
+  check('سربه‌سری «فعلی» گزارش‌شده دقیقاً از analyzePayoff خودِ cur می‌آید',
+    near(roll.curBreakevens[0], curOwnCheck.breakevens[0], 1e-6),
+    `${roll.curBreakevens[0]} ~ ${curOwnCheck.breakevens[0]}`);
+  check('سقف سود «فعلی» گزارش‌شده دقیقاً از analyzePayoff خودِ cur می‌آید',
+    near(roll.curMaxProfit, curOwnCheck.maxProfit, 1e-6),
+    `${roll.curMaxProfit} ~ ${curOwnCheck.maxProfit}`);
+  check('سربه‌سری «پس از رول» گزارش‌شده دقیقاً از analyzePayoff خودِ nextLegs می‌آید',
+    near(roll.nextBreakevens[0], nextOwnCheck.breakevens[0], 1e-6),
+    `${roll.nextBreakevens[0]} ~ ${nextOwnCheck.breakevens[0]}`);
+  check('curAnalysis برگشتی هم همان تحلیل خودِ cur است، نه تحلیل افق‌مشترک تفاضل',
+    near(roll.curAnalysis.maxProfit, curOwnCheck.maxProfit, 1e-6),
+    `${roll.curAnalysis.maxProfit} ~ ${curOwnCheck.maxProfit}`);
+  // این عدد واقعاً باید با تحلیل افق‌مشترک (curCheck13، فقط برای diff) فرق
+  // کند — وگرنه آزمون بالا تصادفاً با هر دو مسیر یکی درمی‌آمد و چیزی
+  // اثبات نمی‌کرد.
+  check('سربه‌سری «فعلی» گزارش‌شده با سربه‌سری افق‌مشترک (فقط برای تفاضل) واقعاً فرق دارد',
+    Math.abs(roll.curBreakevens[0] - curCheck13.breakevens[0]) > 100,
+    `گزارش=${roll.curBreakevens[0]} افق‌مشترک=${curCheck13.breakevens[0]}`);
+
   // رول هم‌سررسید (اکثریت رول‌های واقعی — فقط قیمت اعمال عوض می‌شود، نه
   // سررسید) باید دست‌نخورده از همان موتور دقیق تکه‌ای-خطی قبلی بماند —
   // approx ست نمی‌شود، جبر دقیق است نه تقریب بلک-شولز.
