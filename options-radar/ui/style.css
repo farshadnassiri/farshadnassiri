@@ -62,6 +62,13 @@ body[data-theme="board"] {
 
 * { box-sizing: border-box; }
 
+/* هر کلاسی که display را صریح تعیین می‌کند (مثل .metric یا .health-detail با
+   display:grid/flex) روی [hidden] پیش‌فرض مرورگر می‌نشیند و می‌بردش — چون
+   استایل نویسنده با هر تخصیصی روی استایل عامل کاربر مرورگر برنده است.
+   بدون این قاعده، هر پنلی که با toggleAttribute('hidden', …) بسته می‌شود
+   ولی کلاسش display صریح دارد، هیچ‌وقت واقعاً پنهان نمی‌شود. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0; padding: 0;
   background: var(--ground); color: var(--ink);
