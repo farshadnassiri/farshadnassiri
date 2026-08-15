@@ -839,6 +839,29 @@ group('۲۰. سقف اندازه بدنه درخواست');
   check('بدنه دقیقاً برابر سقف پذیرفته می‌شود', exact.length === 1000);
 }
 
+// ═══════════════════════════ ۲۱. موتور چند-سررسیدی — ناحیه سود زیر کف نمونه‌برداری ═══════════════════════════
+group('۲۱. موتور چند-سررسیدی — ناحیه سود زیر کف نمونه‌برداری');
+{
+  // پوت خریداری‌شده: عمیقاً کمتر از کف نمونه‌برداری (۰٫۳۵×پایه) هم سود
+  // می‌دهد. اگر بازه سود از همان کف بریده شود، probOfProfit ناحیه واقعی زیر
+  // کف را نادیده می‌گیرد و برای ترکیب‌های پوت‌دار احتمال سود کم‌برآورد می‌شود.
+  const spot = 100000, size = 1000;
+  const putLeg = { kind: 'put', side: 'buy', ratio: 1, strike: 95000, price: 1000, size, days: 30, sigma: 0.6 };
+  const netCash = -signedQty(putLeg) * putLeg.price;
+  const a = analyzeMixed([putLeg], netCash, { spot, rFree: 0.3, sigma: 0.6 });
+  const lo = Math.max(spot * 0.35, 1);
+  check('کف نمونه‌برداری هم سود می‌دهد', a.points[0].pnl > 0, `${Math.round(a.points[0].pnl).toLocaleString()}`);
+  check('ناحیه سود از کف نمونه‌برداری نه، از صفر باز است',
+    a.regions.length > 0 && a.regions[0][0] === 0, JSON.stringify(a.regions[0]));
+  // با افق و تلاطم بزرگ‌تر، احتمال رسیدن به زیر کف نمونه‌برداری دیگر ناچیز
+  // نیست — همان‌جایی که بریدن بازه سود واقعاً روی عدد اثر می‌گذارد.
+  const T = 2, sigma = 1.2;
+  const pop = probOfProfit(a, spot, T, sigma);
+  const popClamped = (() => { const b = { ...a, regions: [[lo, a.regions[0][1]]] }; return probOfProfit(b, spot, T, sigma); })();
+  check('احتمال سود واقعی از نسخه بریده‌شده کمتر برآورد نمی‌شود', pop > popClamped + 0.5,
+    `${pop.toFixed(2)}٪ در برابر ${popClamped.toFixed(2)}٪`);
+}
+
 // ═══════════════════════════ گزارش ═══════════════════════════
 const W = 62;
 console.log('\n' + '═'.repeat(W));

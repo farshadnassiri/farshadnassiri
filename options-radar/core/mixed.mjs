@@ -147,6 +147,12 @@ export function analyzeMixed(legs, netCash, opt = {}) {
   if (!unlimitedProfit && !unlimitedLoss) consider(farUp, value(farUp));
 
   // ——— بازه‌های سود، برای احتمال سود ———
+  //
+  // نمونه‌برداری از `lo` شروع می‌شود، نه از صفر. اگر همان اولین نمونه هم سود
+  // بدهد، سود واقعاً تا کجا پایین‌تر ادامه دارد نامعلوم است — نمونه‌برداری
+  // آن‌جا را ندیده. مثل انتهای بالا که با `Infinity` باز گذاشته می‌شود، اینجا
+  // هم باید با ۰ باز گذاشته شود، وگرنه `probOfProfit` ناحیه زیر `lo` را
+  // نادیده می‌گیرد و برای ترکیب‌های پوت‌دار احتمال سود کم‌برآورد می‌شود.
   const regions = [];
   let open = null;
   for (const p of pts) {
@@ -154,6 +160,7 @@ export function analyzeMixed(legs, netCash, opt = {}) {
     if (p.pnl <= 0 && open != null) { regions.push([open, p.S]); open = null; }
   }
   if (open != null) regions.push([open, Infinity]);
+  if (regions.length && regions[0][0] === lo && pts[0].pnl > 0) regions[0][0] = 0;
 
   return {
     approx: true,
