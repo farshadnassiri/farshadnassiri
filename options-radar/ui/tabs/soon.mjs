@@ -4,6 +4,7 @@
 // و چه چیزی از موتور برایش آماده است. اینطور فهرست تب‌ها همان نقشه کار است.
 
 import { byId } from '/strategies/catalog.mjs';
+import { faDigits } from '/ui/fmt.mjs';
 
 const READY = [
   'موتور بازده در سررسید — سربه‌سری و بیشترین سود و زیان',
@@ -17,15 +18,15 @@ const READY = [
 export async function mount(root, { tab }) {
   const def = tab.def || byId(tab.id);
   const legs = def
-    ? def.legs.map((l) => `${l.side === 'sell' ? '−' : '+'}${l.ratio} ${
+    ? faDigits(def.legs.map((l) => `${l.side === 'sell' ? '−' : '+'}${l.ratio} ${
         l.kind === 'underlying' ? 'سهم پایه' : `${l.kind === 'call' ? 'کال' : 'پوت'} K${l.slot}`
-      }${l.exp ? ' سررسید دور' : ''}`).join('   ')
+      }${l.exp ? ' سررسید دور' : ''}`).join('   '))
     : null;
 
   root.innerHTML = `
     <div class="page-head">
       <h2>${tab.title}</h2>
-      <p>این تب در فاز ${tab.phase} ساخته می‌شود. موتورش آماده است؛ چیزی که مانده اتصال به داده و جدول است.</p>
+      <p>این تب در فاز ${faDigits(tab.phase)} ساخته می‌شود. موتورش آماده است؛ چیزی که مانده اتصال به داده و جدول است.</p>
     </div>
 
     ${def ? `<div class="card">
@@ -33,8 +34,8 @@ export async function mount(root, { tab }) {
       <p class="note">${def.feasible ? (def.note || def.dir) : `اجرا در تابلو ممکن نیست: ${def.infeasibleWhy}`}</p>
       <dl class="kv">
         <dt>پاها</dt><dd>${legs}</dd>
-        <dt>قیمت اعمال</dt><dd>${def.strikes}</dd>
-        <dt>سررسید</dt><dd>${def.expiries}</dd>
+        <dt>قیمت اعمال</dt><dd>${faDigits(def.strikes)}</dd>
+        <dt>سررسید</dt><dd>${faDigits(def.expiries)}</dd>
         <dt>جهت</dt><dd>${def.dir}</dd>
         <dt>جریان نقد معمول</dt><dd>${def.expect === 'credit' ? 'بستانکار — وجه تضمین دارد' : def.expect === 'debit' ? 'بدهکار — وجه تضمین ندارد' : 'بستگی به قیمت‌ها دارد'}</dd>
         ${def.risk ? `<dt>ریسک</dt><dd>${def.risk}</dd>` : ''}

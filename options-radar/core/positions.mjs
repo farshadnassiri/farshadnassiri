@@ -15,6 +15,7 @@
 
 import { num, ok, EPS } from './num.mjs';
 import { grossCash, entryFees, analyzePayoff, pnlAtExpiry, signedQty } from './payoff.mjs';
+import { analyzeMixed } from './mixed.mjs';
 import { strategyMargin, capitalBase } from './margin.mjs';
 import { daysSinceJalali } from './jalali.mjs';
 
@@ -25,6 +26,29 @@ export function closePrice(leg, quote, basis = 'BOOK') {
   if (basis === 'LAST') return num(q.last) || num(q.close);
   const px = leg.side === 'buy' ? num(q.bid) : num(q.ask);
   return px > 0 ? px : (num(q.last) || num(q.close));
+}
+
+/**
+ * هزینه/بستانکار بستن هر پا با یک مبنای قیمت مشخص — بدون فرض قبلی درباره
+ * قیمت ورود. markToMarket (موقعیت واقعی، با قیمت ورود ثبت‌شده) و evaluate
+ * (ردیف غربال، «اگر همین حالا بگیرم و ببندم») هر دو از همین یک تابع
+ * می‌آیند، پس رفتار «بستن یعنی معامله در جهت مخالف» یک‌بار نوشته شده.
+ */
+export function closeValuation(legs, quotes, basis, fees) {
+  let gross = 0;
+  let fee = 0;
+  const perLeg = legs.map((l, i) => {
+    const px = closePrice(l, quotes[i], basis);
+    const units = Math.abs(signedQty(l));
+    const proceeds = l.side === 'buy' ? px * units : -px * units;
+    const feeOut = l.kind === 'underlying'
+      ? px * units * (l.side === 'buy' ? num(fees.sellStock) : num(fees.buyStock))
+      : px * units * num(fees.option);
+    gross += proceeds;
+    fee += feeOut;
+    return { price: px, proceeds, fee: feeOut };
+  });
+  return { gross, fee, net: gross - fee, perLeg };
 }
 
 /**
@@ -104,6 +128,27 @@ export function markToMarket(pos, quotes, opt = {}) {
   };
 }
 
+/** ریشه‌های تفاضل با نمونه‌برداری چگال + تنصیف — وقتی تفاضل تکه‌ای-خطی نیست
+ * (حالت چند-سررسیدی)، نقاط شکست الگبری نداریم، پس با شبکه‌ای چگال روی
+ * بازه‌ای که هر دو موقعیت را در بر می‌گیرد ریشه‌یابی می‌کنیم. */
+function sampledCrossings(diff, ks, spot) {
+  const kMax = ks.length ? ks[ks.length - 1] : (spot > 0 ? spot : 1);
+  const lo = 0, hi = Math.max(kMax * 3, spot * 3, 1);
+  const N = 600;
+  const crossings = [];
+  let prevS = lo, prevV = diff(lo + EPS);
+  for (let i = 1; i <= N; i++) {
+    const S = lo + ((hi - lo) * i) / N;
+    const v = diff(S);
+    if (ok(prevV) && ok(v) && ((prevV < 0 && v > 0) || (prevV > 0 && v < 0))) {
+      const t = -prevV / (v - prevV);
+      crossings.push(prevS + t * (S - prevS));
+    }
+    prevS = S; prevV = v;
+  }
+  return crossings;
+}
+
 /**
  * تحلیل رول.
  *
@@ -114,6 +159,14 @@ export function markToMarket(pos, quotes, opt = {}) {
  *   diff(S)     تفاضل بازده دو موقعیت در سررسید
  *   crossings   مرز تصمیم: قیمت‌هایی که رول از سودده به زیان‌ده می‌رود
  *   verdict     جمع‌بندی، بر مبنای قیمت فعلی پایه
+ *
+ * اگر پای تازه از سررسید دیگری باشد (نه فقط قیمت اعمال دیگر)، موقعیت پس از
+ * رول دیگر تک‌سررسیدی نیست — analyzePayoff (بازده در سررسید) دیگر معنا
+ * ندارد چون هر پا سررسید خودش را دارد. آن‌وقت هر دو طرف با analyzeMixed در
+ * یک افق مشترک («امروز»، horizonDays=0 مگر صریح بازنویسی شود) سنجیده
+ * می‌شوند تا مقایسه واقعاً روی یک تاریخ باشد، نه دو سررسید مختلف روی هم.
+ * مسیر تک‌سررسیدی (اکثریت رول‌ها) دست‌نخورده می‌ماند — دقیقاً همان جبر
+ * تکه‌ای-خطی قبلی، بدون تقریب.
  */
 export function rollAnalysis({ pos, quotes, closeIdx, newLeg, newQuote, opt = {} }) {
   const fees = opt.fees || { buyStock: 0, sellStock: 0, option: 0, exercise: 0 };
@@ -145,24 +198,39 @@ export function rollAnalysis({ pos, quotes, closeIdx, newLeg, newQuote, opt = {}
   const nextLegs = cur.map((l, i) => (i === closeIdx ? nl : l));
   const nextNet = curNet + closeCash + newCash;
 
-  const curAn = analyzePayoff(cur, curNet, { fees });
-  const nextAn = analyzePayoff(nextLegs, nextNet, { fees });
-  const diff = (S) => nextAn.at(S) - curAn.at(S);
+  const optDays = (legs) => new Set(legs.filter((l) => l.kind !== 'underlying').map((l) => num(l.days, 0)));
+  const singleExpiry = new Set([...optDays(cur), ...optDays(nextLegs)]).size <= 1;
 
-  // مرز تصمیم: ریشه‌های تفاضل. هر دو تابع تکه‌ای-خطی‌اند، پس نقاط شکست
-  // اجتماع قیمت‌های اعمال دو موقعیت است و ریشه هر بازه دقیق است.
-  const ks = [...new Set([...curAn.strikes, ...nextAn.strikes])].sort((a, b) => a - b);
-  const bounds = [0, ...ks, ks.length ? ks[ks.length - 1] * 3 : spot * 3];
-  const crossings = [];
-  for (let i = 0; i < bounds.length - 1; i++) {
-    const a = bounds[i], b = bounds[i + 1];
-    const ya = diff(a + EPS), yb = diff(b - EPS);
-    if (!ok(ya) || !ok(yb)) continue;
-    if ((ya < 0 && yb > 0) || (ya > 0 && yb < 0)) {
-      const t = -ya / (yb - ya);
-      crossings.push(a + t * (b - a));
+  let curAn, nextAn, crossings;
+  if (singleExpiry) {
+    curAn = analyzePayoff(cur, curNet, { fees });
+    nextAn = analyzePayoff(nextLegs, nextNet, { fees });
+    // مرز تصمیم: ریشه‌های تفاضل. هر دو تابع تکه‌ای-خطی‌اند، پس نقاط شکست
+    // اجتماع قیمت‌های اعمال دو موقعیت است و ریشه هر بازه دقیق است.
+    const ks = [...new Set([...curAn.strikes, ...nextAn.strikes])].sort((a, b) => a - b);
+    const bounds = [0, ...ks, ks.length ? ks[ks.length - 1] * 3 : spot * 3];
+    crossings = [];
+    const diffExact = (S) => nextAn.at(S) - curAn.at(S);
+    for (let i = 0; i < bounds.length - 1; i++) {
+      const a = bounds[i], b = bounds[i + 1];
+      const ya = diffExact(a + EPS), yb = diffExact(b - EPS);
+      if (!ok(ya) || !ok(yb)) continue;
+      if ((ya < 0 && yb > 0) || (ya > 0 && yb < 0)) {
+        const t = -ya / (yb - ya);
+        crossings.push(a + t * (b - a));
+      }
     }
+  } else {
+    const mixOpt = {
+      fees, spot, sigma: opt.sigma, rFree: opt.rFree, divYield: opt.divYield,
+      horizonDays: Number.isFinite(opt.horizonDays) ? opt.horizonDays : 0,
+    };
+    curAn = analyzeMixed(cur, curNet, mixOpt);
+    nextAn = analyzeMixed(nextLegs, nextNet, mixOpt);
+    const ks = [...new Set([...curAn.strikes, ...nextAn.strikes])].sort((a, b) => a - b);
+    crossings = sampledCrossings((S) => nextAn.at(S) - curAn.at(S), ks, spot);
   }
+  const diff = (S) => nextAn.at(S) - curAn.at(S);
 
   const atSpot = diff(spot);
   const qty = Math.max(1, num(pos.qty, 1));
@@ -172,6 +240,7 @@ export function rollAnalysis({ pos, quotes, closeIdx, newLeg, newQuote, opt = {}
     netCashChange: closeCash + newCash,
     curNet, nextNet, nextLegs,
     curAnalysis: curAn, nextAnalysis: nextAn,
+    approx: !singleExpiry,
     diff, crossings,
     atSpot, atSpotTotal: atSpot * qty,
     curMaxProfit: curAn.maxProfit, nextMaxProfit: nextAn.maxProfit,
@@ -180,7 +249,9 @@ export function rollAnalysis({ pos, quotes, closeIdx, newLeg, newQuote, opt = {}
     verdict: atSpot > 0
       ? 'در قیمت فعلی پایه، رول بهتر است'
       : atSpot < 0 ? 'در قیمت فعلی پایه، نگه داشتن موقعیت فعلی بهتر است' : 'در قیمت فعلی، تفاوتی ندارد',
-    note: 'تفاضل، در سررسید سنجیده شده. هزینه بستن از مظنه فعلی آمده و اگر عمق کافی نباشد بدتر تمام می‌شود.',
+    note: singleExpiry
+      ? 'تفاضل، در سررسید سنجیده شده. هزینه بستن از مظنه فعلی آمده و اگر عمق کافی نباشد بدتر تمام می‌شود.'
+      : 'پای تازه سررسید دیگری دارد؛ تفاضل دیگر «در سررسید» معنا ندارد، پس هر دو طرف امروز با بلک-شولز ارزش‌گذاری شدند — تقریبی، نه جبری.',
   };
 }
 

@@ -44,7 +44,10 @@ export function analyzeMixed(legs, netCash, opt = {}) {
   };
 
   const optLegs = legs.filter((l) => l.kind !== 'underlying');
-  const horizon = Math.min(...optLegs.map((l) => num(l.days, 0)));
+  // افق ارزش‌گذاری قابل بازنویسی است: horizonDays=0 یعنی «امروز»، ارزش‌گذاری
+  // بلک-شولز روی هر پای زنده بدون فرض سررسید هیچ‌کدام — دقیقاً همان چیزی که
+  // نمودار «امروز» (نه سررسید) کنار نمودار اصلی لازم دارد.
+  const horizon = Number.isFinite(opt.horizonDays) ? opt.horizonDays : Math.min(...optLegs.map((l) => num(l.days, 0)));
 
   const value = (S) => {
     let v = num(netCash, 0);
@@ -75,30 +78,20 @@ export function analyzeMixed(legs, netCash, opt = {}) {
   };
 
   // ——— نمونه‌برداری روی بازه معنی‌دار قیمت پایه ———
+  //
+  // پنجره رسم باید قیمت اعمال‌ها را هم در بر بگیرد، وگرنه ترکیبی که قیمت
+  // اعمالش دور از قیمت پایه است، شکستگی‌هایش بیرون قاب می‌افتد.
   const ks = [...new Set(optLegs.map((l) => num(l.strike)))].sort((a, b) => a - b);
   const anchor = spot > 0 ? spot : (ks[0] || 1);
-  const lo = Math.max(anchor * 0.35, 1);
-  const hi = anchor * 2.2;
+  const kMin = ks.length ? ks[0] : anchor;
+  const kMax = ks.length ? ks[ks.length - 1] : anchor;
+  const lo = Math.max(Math.min(anchor * 0.35, kMin * 0.9), 1);
+  const hi = Math.max(anchor * 2.2, kMax * 1.1);
   const N = 400;
   const pts = [];
   for (let i = 0; i <= N; i++) {
     const S = lo + ((hi - lo) * i) / N;
     pts.push({ S, pnl: value(S) });
-  }
-
-  // ——— سربه‌سری با تنصیف روی تغییر علامت ———
-  const breakevens = [];
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1], b = pts[i];
-    if (!ok(a.pnl) || !ok(b.pnl)) continue;
-    if ((a.pnl < 0 && b.pnl > 0) || (a.pnl > 0 && b.pnl < 0)) {
-      let x0 = a.S, x1 = b.S;
-      for (let k = 0; k < 60; k++) {
-        const m = (x0 + x1) / 2;
-        if ((value(m) > 0) === (b.pnl > 0)) x1 = m; else x0 = m;
-      }
-      breakevens.push((x0 + x1) / 2);
-    }
   }
 
   // ——— رفتار مجانبی دو انتها ———
@@ -132,8 +125,46 @@ export function analyzeMixed(legs, netCash, opt = {}) {
   const unlimitedProfit = slopeRight > flat;
   const unlimitedLoss = slopeRight < -flat;
 
+  // ——— شبکه جست‌وجو: پنجره رسم به‌علاوه دو دنباله ———
+  //
+  // پنجره رسم برای چشم خوب است، برای احتمال سود نه. یک اسپرد پوت که زیر
+  // ۰٫۳۵ برابر قیمت پایه سود می‌دهد، بازه سودش از لبه پنجره بریده می‌شد و
+  // احتمال سودش کم‌برآورد می‌شد — سربه‌سری بیرون پنجره هم اصلاً دیده نمی‌شد.
+  //
+  // دنباله‌ها هندسی‌اند نه خطی: در محور قیمت، فاصله معنی‌دار نسبی است. با
+  // شصت نقطه از قیمت پایه تا یک‌میلیونیم آن، هر گام حدود ۲۲٪ پایین می‌آید.
+  const TAIL = 60;
+  const geom = (from, to) => {
+    const out = [];
+    for (let i = 1; i <= TAIL; i++) out.push(from * Math.pow(to / from, i / TAIL));
+    return out;
+  };
+  const scan = [
+    ...geom(lo, farDn).reverse(),
+    ...pts.map((p) => p.S),
+    ...geom(hi, farUp),
+  ].map((S) => ({ S, pnl: value(S) }));
+
+  // ——— سربه‌سری با تنصیف روی تغییر علامت ———
+  const breakevens = [];
+  for (let i = 1; i < scan.length; i++) {
+    const a = scan[i - 1], b = scan[i];
+    if (!ok(a.pnl) || !ok(b.pnl)) continue;
+    if ((a.pnl < 0 && b.pnl > 0) || (a.pnl > 0 && b.pnl < 0)) {
+      let x0 = a.S, x1 = b.S;
+      for (let k = 0; k < 60; k++) {
+        const m = (x0 + x1) / 2;
+        if ((value(m) > 0) === (b.pnl > 0)) x1 = m; else x0 = m;
+      }
+      const be = (x0 + x1) / 2;
+      // دو ریشه که در حد دقت شبکه یکی‌اند، یک سربه‌سری‌اند
+      const last = breakevens[breakevens.length - 1];
+      if (last == null || Math.abs(be - last) > Math.max(be, last) * 1e-9) breakevens.push(be);
+    }
+  }
+
   // ——— بیشترین سود و زیان ———
-  // نامزدها: نمونه‌های پنجره رسم، به‌علاوه دو انتهای واقعی. اگر تابع کراندار
+  // نامزدها: کل شبکه جست‌وجو، به‌علاوه دو انتهای واقعی. اگر تابع کراندار
   // باشد، حد دو انتها خودش دست‌یافتنی است و باید دیده شود — پنجره رسم
   // به‌تنهایی آن را از دست می‌دهد.
   let maxProfit = -Infinity, maxLoss = Infinity, atMaxProfit = NaN, atMaxLoss = NaN;
@@ -142,18 +173,33 @@ export function analyzeMixed(legs, netCash, opt = {}) {
     if (v > maxProfit) { maxProfit = v; atMaxProfit = S; }
     if (v < maxLoss) { maxLoss = v; atMaxLoss = S; }
   };
-  for (const p of pts) consider(p.S, p.pnl);
+  for (const p of scan) {
+    // دنباله بالا فقط وقتی نامزد است که تابع از آن سمت کراندار باشد
+    if (p.S > hi && (unlimitedProfit || unlimitedLoss)) continue;
+    consider(p.S, p.pnl);
+  }
   consider(farDn, value(farDn));
   if (!unlimitedProfit && !unlimitedLoss) consider(farUp, value(farUp));
 
   // ——— بازه‌های سود، برای احتمال سود ———
+  //
+  // مرز بازه سود دقیقاً سربه‌سری است، نه نزدیک‌ترین نقطه شبکه. پس بین هر دو
+  // سربه‌سری متوالی یک نقطه آزمایشی می‌گیریم و علامت را همان‌جا می‌خوانیم.
+  // بازه‌ای که به صفر یا بی‌نهایت می‌رسد، همان‌جا بسته می‌شود — نه لبه پنجره.
+  const edges = [0, ...breakevens, Infinity];
   const regions = [];
-  let open = null;
-  for (const p of pts) {
-    if (p.pnl > 0 && open == null) open = p.S;
-    if (p.pnl <= 0 && open != null) { regions.push([open, p.S]); open = null; }
+  for (let i = 0; i < edges.length - 1; i++) {
+    const a = edges[i], b = edges[i + 1];
+    const probe = a === 0
+      ? (b === Infinity ? anchor : b * 0.5)
+      : (b === Infinity ? Math.max(farUp, a * 2) : (a + b) / 2);
+    if (!(probe > 0)) continue;
+    if (value(probe) > 0) {
+      const last = regions[regions.length - 1];
+      if (last && last[1] === a) last[1] = b;
+      else regions.push([a, b]);
+    }
   }
-  if (open != null) regions.push([open, Infinity]);
 
   return {
     approx: true,

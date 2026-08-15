@@ -4,6 +4,7 @@
 // است، کدام نماد و کدام سررسید واقعاً مظنه دارد، و کجای بازار قابل کار است.
 // بدون این تب، خالی بودن تب‌های چندپا گیج‌کننده می‌شود.
 
+import { faNum, faDigits, faAgo } from '/ui/fmt.mjs';
 import { makeTable, fmt } from '/ui/table.mjs';
 import { makePicker } from '/ui/picker.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
@@ -15,8 +16,11 @@ const COLS = [
   { key: 'quoted', label: 'دارای مظنه', fmt: 'int', heat: 'prob' },
   { key: 'quotedPct', label: 'نسبت مظنه ٪', fmt: 'pct', heat: 'prob' },
   { key: 'expiries', label: 'سررسید', fmt: 'int' },
+  { key: 'nearestDays', label: 'نزدیک‌ترین سررسید', fmt: 'int' },
   { key: 'volume', label: 'حجم اختیار', fmt: 'int', heat: 'gain' },
   { key: 'oi', label: 'موقعیت باز', fmt: 'int', heat: 'gain' },
+  { key: 'pcRatio', label: 'نسبت پوت به کال', fmt: 'num' },
+  { key: 'atmIvPct', label: 'تلاطم ضمنی ٪ — نزدیک‌ترین پول', fmt: 'pct' },
 ];
 
 export async function mount(root, { state, api }) {
@@ -60,17 +64,22 @@ export async function mount(root, { state, api }) {
     sortKey: 'volume',
     onPick: (r) => openChain(r.ins),
   });
+  // پیام پیش‌فرض جدول («نوار تشخیص بالا می‌گوید...») برای این تب غلط است —
+  // اینجا نوار تشخیص اصلاً وجود ندارد، فقط یک عکس لحظه‌ای زنجیره‌ست.
+  const LOADING_MSG = 'در حال دریافت داده زنجیره اختیار…';
+  const NO_CHAIN_MSG = 'این عکس لحظه‌ای هیچ نمادی ندارد.';
+  table.setEmptyMessage(LOADING_MSG);
 
   function drawKpis(stats, at) {
     if (!stats) return;
     const items = [
       ['نماد پایه', fmt.int(stats.underlyings), ''],
-      ['قرارداد', fmt.int(stats.contracts), `${stats.expiries} سررسید`],
-      ['دارای مظنه', fmt.int(stats.quoted), `${((stats.quoted / (stats.contracts || 1)) * 100).toFixed(0)}٪ از تابلو`],
+      ['قرارداد', fmt.int(stats.contracts), `${fmt.int(stats.expiries)} سررسید`],
+      ['دارای مظنه', fmt.int(stats.quoted), `${faNum(((stats.quoted / (stats.contracts || 1)) * 100).toFixed(0))}٪ از تابلو`],
       ['حجم امروز', fmt.int(stats.vol), 'قرارداد'],
       ['موقعیت باز', fmt.int(stats.oi), 'قرارداد'],
       ['ارزش معاملات', fmt.int(stats.value), 'ریال'],
-      ['سن عکس لحظه‌ای', at ? `${Math.max(0, Math.round((Date.now() - at) / 1000))}s` : '—', ''],
+      ['سن عکس لحظه‌ای', at ? faAgo(Date.now() - at) : '—', ''],
     ];
     root.querySelector('#kpis').innerHTML = items.map(([k, v, s2]) => `
       <div class="kpi"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s2}</div></div>`).join('');
@@ -81,13 +90,13 @@ export async function mount(root, { state, api }) {
       const h = await (await fetch('/api/health')).json();
       root.querySelector('#flow').innerHTML = `
         <dt>دور دیده‌بان</dt><dd>${fmt.int(h.watchTicks)}</dd>
-        <dt>زمان آخرین دور</dt><dd>${h.lastWatchMs} ms</dd>
+        <dt>زمان آخرین دور</dt><dd>${faDigits(h.lastWatchMs)} میلی‌ثانیه</dd>
         <dt>درخواست کل</dt><dd>${fmt.int(h.requests)}</dd>
         <dt>اصابت کش</dt><dd>${fmt.int(h.cacheHits)}</dd>
         <dt>خطا</dt><dd>${fmt.int(h.errors)}</dd>
         <dt>انتظار سهمیه</dt><dd>${fmt.int(h.rateWaits)}</dd>
         <dt>در صف</dt><dd>${fmt.int(h.queueDepth)}</dd>
-        <dt>میانگین پاسخ</dt><dd>${h.avgUpstreamMs} ms</dd>
+        <dt>میانگین پاسخ</dt><dd>${faDigits(h.avgUpstreamMs)} میلی‌ثانیه</dd>
         <dt>مشترک زنده</dt><dd>${fmt.int(h.clients)}</dd>`;
       root.querySelector('#gate').textContent = h.market?.open
         ? 'بازار باز است و حلقه دریافت می‌چرخد.'
@@ -108,7 +117,7 @@ export async function mount(root, { state, api }) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'chip';
-      b.textContent = `${ex.days} روز`;
+      b.textContent = `${faDigits(ex.days)} روز`;
       b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
       b.addEventListener('click', () => {
         expIdx = i;
@@ -139,7 +148,7 @@ export async function mount(root, { state, api }) {
 
     const body = ex.strikes.map((st) => {
       const near = Math.abs(st.strike - spot) / (spot || 1) < 0.02;
-      return `<tr style="${near ? 'background:var(--accent-soft)' : ''}">
+      return `<tr class="${near ? 'atm' : ''}">
         ${cell(st.call)}
         <td class="n" style="font-weight:700;border-inline:1px solid var(--line)">${fmt.money(st.strike)}</td>
         ${cell(st.put)}
@@ -162,15 +171,25 @@ export async function mount(root, { state, api }) {
       <tbody>${body}</tbody>`;
   }
 
+  // atmIv و pcRatio از موتور خالص فراکشن/نسبت خام برمی‌گردند؛ درصد و برچسب
+  // نمایش، کار همین تب است، نه موتور
+  const withDerived = (u) => ({
+    ...u,
+    quotedPct: (u.quoted / (u.contracts || 1)) * 100,
+    atmIvPct: Number.isFinite(u.atmIv) ? u.atmIv * 100 : NaN,
+  });
+
   const offChain = onChain((cs) => {
-    list = cs.list.map((u) => ({ ...u, quotedPct: (u.quoted / (u.contracts || 1)) * 100 }));
+    list = cs.list.map(withDerived);
     table.set(list);
+    table.setEmptyMessage(NO_CHAIN_MSG);
     picker.setList(cs.list);
     drawKpis(cs.stats, cs.at);
   });
   if (chainState.list.length) {
-    list = chainState.list.map((u) => ({ ...u, quotedPct: (u.quoted / (u.contracts || 1)) * 100 }));
+    list = chainState.list.map(withDerived);
     table.set(list);
+    table.setEmptyMessage(NO_CHAIN_MSG);
     picker.setList(chainState.list);
     drawKpis(chainState.stats, chainState.at);
   }

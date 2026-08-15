@@ -42,10 +42,31 @@ function equalWidth(ks) {
   return true;
 }
 
-const FUNNEL_KEYS = ['built', 'noQuote', 'noDepth', 'filtered', 'kept'];
+const FUNNEL_KEYS = ['built', 'noQuote', 'refBasis', 'noDepth', 'filtered', 'kept'];
+
+/**
+ * چرا ردیف ادعای اجرا ندارد.
+ *
+ * قبلاً هر ردیف غیرقابل‌اجرا در سطل «عمق ناکافی» می‌افتاد. آن برچسب برای دو
+ * حالت پرتکرار دروغ بود:
+ *
+ *   مبنای قیمت مرجع    پایانی و آخرین و کمترین و بیشترین، طبق طراحی ادعای
+ *                      اجرا ندارند. هیچ ربطی به عمق ندارد و «خرابی» هم نیست،
+ *                      ولی کاربر جز یک تب خالی چیزی نمی‌دید.
+ *   حجم مظنه صفر       قیمت هست ولی حجمی پشتش نیست. این بی‌مظنه بودن است،
+ *                      نه کم بودن عمق.
+ *
+ * علت واقعی از کیفیت ماشین‌خوان هر پا می‌آید، نه از متن برچسب.
+ */
+export function unexecutableReason(row) {
+  const q = (row.legPrices || []).map((l) => l.quality);
+  if (q.some((x) => x === 'reference')) return 'refBasis';
+  if (q.some((x) => x === 'none')) return 'noQuote';
+  return 'noDepth';
+}
 
 export function emptyFunnel() {
-  return { built: 0, noQuote: 0, noDepth: 0, filtered: 0, kept: 0, evaluated: 0, capped: false };
+  return { built: 0, noQuote: 0, refBasis: 0, noDepth: 0, filtered: 0, kept: 0, evaluated: 0, capped: false };
 }
 
 /**
@@ -55,6 +76,17 @@ export function emptyFunnel() {
 export function generateCombos(def, ua, s, funnel = emptyFunnel()) {
   const spot = ua.close || ua.last;
   if (!(spot > 0)) return [];
+
+  // نقدشوندگی زنجیره: مجموع ارزش معاملات امروز کل زنجیره همین پایه، نه یک
+  // قرارداد. پایه‌ای که کل زنجیره‌اش خوابیده، حتی اگر یک مظنه تنها زنده
+  // مانده باشد، ارزش اسکن ندارد.
+  if (s.minUaLiquidity > 0) {
+    let uaValue = 0;
+    for (const ex of ua.expiryList) {
+      for (const row of ex.strikeList) uaValue += row.call.value + row.put.value;
+    }
+    if (uaValue < s.minUaLiquidity) return [];
+  }
 
   const win = s.comboWindowPct / 100;
   const lo = spot * (1 - win), hi = spot * (1 + win);
@@ -103,7 +135,8 @@ export function generateCombos(def, ua, s, funnel = emptyFunnel()) {
         // فروش به بهترین تقاضا نیاز دارد، خرید به بهترین عرضه
         const px = t.side === 'sell' ? q.bid : q.ask;
         if (!(px > 0)) missing = true;
-        if (t.side === 'sell' && (q.bidQty < s.minBidQty || q.oi < s.minOpenInt)) missing = missing || false;
+        if (t.side === 'sell' && (q.bidQty < s.minBidQty || q.oi < s.minOpenInt)) missing = true;
+        if (q.vol < s.minLegVol || q.value < s.minLegValue) missing = true;
         legs.push({
           kind: t.kind, side: t.side, ratio: t.ratio, strike: K, size: row.size,
           days: ex.days, price: 0, ins: q.ins, name: q.name, exp: t.exp, slot: t.slot,
@@ -173,7 +206,7 @@ export function scan({ def, chain, uaKeys, settings, sigmaByUa = {}, qty }) {
       } catch { continue; }
       funnel.evaluated += 1;
 
-      if (!row.executable && !s.showUnexecutable) { funnel.noDepth += 1; continue; }
+      if (!row.executable && !s.showUnexecutable) { funnel[unexecutableReason(row)] += 1; continue; }
       if (!passesFilters(row, s)) { funnel.filtered += 1; continue; }
 
       row.uaIns = c.uaIns;
@@ -195,6 +228,36 @@ export function scan({ def, chain, uaKeys, settings, sigmaByUa = {}, qty }) {
   });
 
   return { rows: rows.slice(0, s.topN), funnel, ms: Date.now() - t0, total: rows.length };
+}
+
+/**
+ * غربال روی کل کاتالوگ یک‌جا — «برترین موقعیت‌ها». فقط مرحله یک، بدون عمق
+ * دفتر سفارش؛ برای عدد اجرایی هنوز باید همان تب استراتژی را باز کرد و اسکن
+ * دومرحله‌ای کامل زد. اجرای عمق برای ۳۱ استراتژی یک‌جا یعنی ۳۱ درخواست
+ * دفتر سفارش پیاپی — هزینه‌ای که این نمای کلی اولیه توجیهش نمی‌کند.
+ *
+ * رتبه‌بندی مشترک همان `s.rankBy` است، دقیقاً همان معیاری که هر تب استراتژی
+ * تنها روی خودش اعمال می‌کند؛ اینجا همان معیار روی همه ردیف‌های همه
+ * استراتژی‌ها با هم اعمال می‌شود.
+ */
+export function scanAll({ defs, chain, uaKeys, settings, sigmaByUa = {}, qty, limit = 50 }) {
+  const t0 = Date.now();
+  const funnel = emptyFunnel();
+  const rows = [];
+  for (const def of defs) {
+    const res = scan({ def, chain, uaKeys, settings, sigmaByUa, qty });
+    for (const k of FUNNEL_KEYS) funnel[k] += res.funnel[k] || 0;
+    rows.push(...res.rows);
+  }
+
+  const by = settings.rankBy || 'retMonthPct';
+  rows.sort((a, b) => {
+    const xf = Number.isFinite(a[by]) ? a[by] : -Infinity;
+    const yf = Number.isFinite(b[by]) ? b[by] : -Infinity;
+    return yf - xf;
+  });
+
+  return { rows: rows.slice(0, limit), total: rows.length, funnel, ms: Date.now() - t0 };
 }
 
 export { FUNNEL_KEYS };

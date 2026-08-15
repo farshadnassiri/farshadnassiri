@@ -7,7 +7,7 @@
 // لحظه‌ای را می‌فرستد و ساخت زنجیره اینجا، بیرون از مسیر رسم، انجام می‌شود.
 
 import { buildChain, underlyingList, chainStats } from '../core/chain.mjs';
-import { scan } from '../core/scan.mjs';
+import { scan, scanAll } from '../core/scan.mjs';
 import { byId } from '../strategies/catalog.mjs';
 
 let rowsByKey = new Map();
@@ -47,9 +47,21 @@ function ensureChain() {
   return chain;
 }
 
+// نخ اصلی روی هر پیام یک Promise معلق نگه می‌دارد (ui/scanner.mjs) که فقط
+// resolve دارد، نه reject — پس اگر همین‌جا خطایی بی‌نگهبان پرتاب شود، آن
+// Promise هرگز نمی‌شکند و دکمه اسکن تا آخر عمر «در حال اسکن…» می‌ماند.
+// بلوک try/catch دور کل بدنه، تضمین می‌کند هر پیام همیشه یک جواب می‌گیرد —
+// موفق یا خطا، هرگز بی‌جواب نمی‌ماند.
 self.onmessage = (e) => {
   const m = e.data;
+  try {
+    handleMessage(m);
+  } catch (err) {
+    self.postMessage({ type: 'error', id: m.id, error: String(err?.message || err) });
+  }
+};
 
+function handleMessage(m) {
   if (m.type === 'rows') {
     if (m.full) rowsByKey = new Map(m.rows.map((r) => [rowKey(r), r]));
     else for (const r of m.rows) rowsByKey.set(rowKey(r), r);
@@ -102,6 +114,24 @@ self.onmessage = (e) => {
     return;
   }
 
+  if (m.type === 'scan-all') {
+    const ch = ensureChain();
+    const defs = m.defIds.map((id) => byId(id)).filter(Boolean);
+    const res = scanAll({
+      defs, chain: ch, uaKeys: m.uaKeys, settings: m.settings,
+      sigmaByUa: m.sigmaByUa || {}, qty: m.qty, limit: m.limit,
+    });
+    // شیء payoff تابع دارد و کلون نمی‌شود؛ فقط داده رسم را می‌فرستیم
+    for (const r of res.rows) {
+      r.chart = { legs: r.__legs, netCash: r.netCash };
+      delete r.payoff;
+    }
+    self.postMessage({
+      type: 'scan-all', id: m.id, rows: res.rows, funnel: res.funnel, ms: res.ms, total: res.total,
+    });
+    return;
+  }
+
   if (m.type === 'chain-detail') {
     const ch = ensureChain();
     const ua = ch.get(m.uaIns);
@@ -120,4 +150,4 @@ self.onmessage = (e) => {
     self.postMessage({ type: 'chain-detail', id: m.id, ua: out });
     return;
   }
-};
+}

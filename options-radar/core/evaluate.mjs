@@ -11,6 +11,7 @@ import {
   grossCash, entryFees, analyzePayoff, positionGreeks, signedQty,
 } from './payoff.mjs';
 import { strategyMargin, capitalBase } from './margin.mjs';
+import { closeValuation } from './positions.mjs';
 import {
   priceLegs, executionCost, maxSize, rowQuality, leggingRisk, spreadPct, midOf,
 } from './exec.mjs';
@@ -91,6 +92,15 @@ export function evaluate({ legs, quotes, ctx }) {
   const entryFee = entryFees(priced, fees);
   const netCash = gross - entryFee;
   const isCredit = gross > EPS;
+
+  // اگر همین حالا بگیرم و آفستش کنم چه می‌شود؟ / اگر با آخرین یا پایانی
+  // تسویه کنم چه می‌شود؟ — سه مبنا روی همان مظنه‌های استفاده‌شده برای ورود.
+  // مبنای دفتر سفارش ادعای اجرا دارد (bid/ask واقعی)؛ آخرین و پایانی فقط
+  // مرجع‌اند، چون لحظه وقوعشان با لحظه این محاسبه هم‌زمان نیست.
+  const quotesForClose = priced.map((l) => l.quote || {});
+  const instantClosePnl = netCash + closeValuation(priced, quotesForClose, 'BOOK', fees).net;
+  const settleLastPnl = netCash + closeValuation(priced, quotesForClose, 'LAST', fees).net;
+  const settleClosePnl = netCash + closeValuation(priced, quotesForClose, 'CLOSE', fees).net;
 
   // ——— ۳. بازده در سررسید ———
   // اگر سررسید پاها یکی نباشد، موتور تکه‌ای-خطی جواب غلط می‌دهد: فروش و خرید
@@ -192,7 +202,10 @@ export function evaluate({ legs, quotes, ctx }) {
     priceBasis: s.priceBasis, execMode: s.execMode,
     legPrices: priced.map((l) => ({
       key: l.key || `${l.kind}${l.strike ?? ''}`, side: l.side, kind: l.kind, strike: num(l.strike),
-      price: num(l.price), source: l.exec?.source, slipPct: num(l.exec?.slipPct),
+      // کیفیت ماشین‌خوان، جدا از برچسب فارسی. نوار تشخیص باید بتواند بگوید
+      // ردیف چرا افتاد، و «منبع» متن است نه مقدار قابل شاخه زدن.
+      price: num(l.price), source: l.exec?.source, quality: l.exec?.quality,
+      slipPct: num(l.exec?.slipPct),
       filled: num(l.exec?.filled), short: num(l.exec?.short), levels: num(l.exec?.levels),
       spreadPct: spreadPct(l.quote || {}), mid: midOf(l.quote || {}), sigma: l.sigma,
     })),
@@ -200,6 +213,7 @@ export function evaluate({ legs, quotes, ctx }) {
     // جریان نقد
     grossCash: gross, entryFee, netCash, isCredit,
     cashLabel: isCredit ? 'بستانکار' : 'بدهکار',
+    instantClosePnl, settleLastPnl, settleClosePnl,
 
     // سود و زیان
     breakevens: payoff.breakevens,
@@ -298,6 +312,9 @@ export const COLUMNS = [
   { key: 'grossCash', label: 'نقد ناخالص', fmt: 'money', group: 'جریان نقد' },
   { key: 'entryFee', label: 'کارمزد ورود', fmt: 'money', group: 'جریان نقد' },
   { key: 'netCash', label: 'نقد خالص', fmt: 'money', group: 'جریان نقد' },
+  { key: 'instantClosePnl', label: 'سود/زیان بستن فوری — دفتر سفارش', fmt: 'money', group: 'جریان نقد', heat: 'gain' },
+  { key: 'settleLastPnl', label: 'سود/زیان اگر تسویه با آخرین معامله', fmt: 'money', group: 'جریان نقد' },
+  { key: 'settleClosePnl', label: 'سود/زیان اگر تسویه با قیمت پایانی', fmt: 'money', group: 'جریان نقد' },
   { key: 'S', label: 'قیمت پایه', fmt: 'money', group: 'سود و زیان' },
   { key: 'breakevens', label: 'سربه‌سری', fmt: 'list', group: 'سود و زیان' },
   { key: 'beNear', label: 'نزدیک‌ترین سربه‌سری', fmt: 'money', group: 'سود و زیان' },

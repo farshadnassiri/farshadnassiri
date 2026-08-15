@@ -5,8 +5,9 @@
 
 import { markToMarket, blankPosition } from '/core/positions.mjs';
 import { todayJalali } from '/core/jalali.mjs';
-import { payoffSvg } from '/ui/chart.mjs';
+import { mountPayoff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
+import { faDigits, kpiTone } from '/ui/fmt.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
 const KINDS = [
@@ -17,12 +18,20 @@ const KINDS = [
   ['long-put', 'خرید پوت'],
 ];
 
+const displayName = (name, identifier, fallback) => {
+  const text = String(name || '').trim();
+  return text && text !== String(identifier || '') ? text : fallback;
+};
+
 export async function mount(root, { state, api }) {
   const s = () => state.settings;
   let positions = [];
   let quotesByIns = new Map();
   let uaList = [];
   let expanded = null;
+  let chart = null;
+  let chartRange = null;
+  let chartFor = null;
 
   root.innerHTML = `
     <div class="page-head">
@@ -40,7 +49,7 @@ export async function mount(root, { state, api }) {
       <div class="bar" style="margin-top:12px">
         <button class="btn" id="add">افزودن</button>
         <span class="sp"></span>
-        <span id="msg" class="saved"></span>
+        <span id="msg" class="saved" role="status" aria-live="polite"></span>
       </div>
     </section>
 
@@ -79,7 +88,7 @@ export async function mount(root, { state, api }) {
   function refreshUaOptions() {
     const cur = F.ua.value;
     F.ua.innerHTML = '<option value="">— انتخاب کن —</option>'
-      + uaList.map((u) => `<option value="${u.ins}" ${u.ins === cur ? 'selected' : ''}>${u.name || u.ins}</option>`).join('');
+      + uaList.map((u) => `<option value="${u.ins}" ${u.ins === cur ? 'selected' : ''}>${displayName(u.name, u.ins, 'دارایی پایه بدون نام')}</option>`).join('');
   }
 
   let detail = null;
@@ -88,7 +97,7 @@ export async function mount(root, { state, api }) {
     const res = await chainDetail(F.ua.value);
     if (res.error) return;
     detail = res.ua;
-    F.exp.innerHTML = detail.expiries.map((ex, i) => `<option value="${i}">${ex.days} روز</option>`).join('');
+    F.exp.innerHTML = detail.expiries.map((ex, i) => `<option value="${i}">${faDigits(ex.days)} روز</option>`).join('');
     F.sPrice.value = Math.round(detail.last || detail.close || 0);
     fillOptions();
   });
@@ -105,7 +114,7 @@ export async function mount(root, { state, api }) {
     F.opt.innerHTML = ex.strikes.map((st) => {
       const q = put ? st.put : st.call;
       return `<option value="${q.ins}" data-strike="${st.strike}" data-size="${st.size}" data-days="${ex.days}" data-bid="${q.bid}" data-ask="${q.ask}" data-close="${q.close}">
-        ${q.name || q.ins} — اعمال ${Math.round(st.strike).toLocaleString('en-US')} — تقاضا ${Math.round(q.bid).toLocaleString('en-US')}</option>`;
+        ${displayName(q.name, q.ins, 'قرارداد اختیار بدون نام')} — اعمال ${fmt.money(st.strike)} — تقاضا ${fmt.money(q.bid)}</option>`;
     }).join('');
     const first = F.opt.selectedOptions[0];
     if (first) F.oPrice.value = Math.round(Number(first.dataset.bid) || Number(first.dataset.close) || 0);
@@ -116,41 +125,53 @@ export async function mount(root, { state, api }) {
   });
 
   const msg = root.querySelector('#msg');
+  let flashTimer = null;
   const flash = (t, bad) => {
     msg.textContent = t;
     msg.style.color = bad ? 'var(--loss)' : 'var(--gain)';
-    setTimeout(() => { msg.textContent = ''; }, 3000);
+    // تایمر پیام قبلی لغو می‌شود — وگرنه اگر دو flash نزدیک هم بیایند
+    // (مثلاً افزودن سریع دو موقعیت)، تایمر اولی پیام دومی را زودتر از
+    // موعد پاک می‌کرد.
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { msg.textContent = ''; }, 3000);
   };
 
-  root.querySelector('#add').addEventListener('click', async () => {
+  const addBtn = root.querySelector('#add');
+  addBtn.addEventListener('click', async () => {
+    if (addBtn.disabled) return;
     const o = F.opt.selectedOptions[0];
     if (!o || !F.ua.value) { flash('نماد پایه و قرارداد را انتخاب کن.', true); return; }
-    const strike = Number(o.dataset.strike);
-    const size = Number(o.dataset.size) || 1000;
-    const days = Number(o.dataset.days);
-    const kind = F.kind.value;
-    const put = wantPut();
-    const legs = [];
-    if (kind === 'covered-call') {
-      legs.push({ kind: 'underlying', side: 'buy', ratio: 1, size, price: Number(F.sPrice.value), ins: F.ua.value });
-    }
-    legs.push({
-      kind: put ? 'put' : 'call',
-      side: kind.startsWith('long') ? 'buy' : 'sell',
-      ratio: 1, size, strike, days,
-      price: Number(F.oPrice.value), ins: o.value, name: o.textContent.split('—')[0].trim(),
-    });
+    addBtn.disabled = true;
+    try {
+      const strike = Number(o.dataset.strike);
+      const size = Number(o.dataset.size) || 1000;
+      const days = Number(o.dataset.days);
+      const kind = F.kind.value;
+      const put = wantPut();
+      const legs = [];
+      if (kind === 'covered-call') {
+        legs.push({ kind: 'underlying', side: 'buy', ratio: 1, size, price: Number(F.sPrice.value), ins: F.ua.value });
+      }
+      legs.push({
+        kind: put ? 'put' : 'call',
+        side: kind.startsWith('long') ? 'buy' : 'sell',
+        ratio: 1, size, strike, days,
+        price: Number(F.oPrice.value), ins: o.value, name: o.textContent.split('—')[0].trim(),
+      });
 
-    positions.push({
-      ...blankPosition(),
-      title: `${KINDS.find(([v]) => v === kind)[1].split('—')[0].trim()} ${detail.name}`,
-      uaIns: F.ua.value, uaName: detail.name,
-      entryDate: F.date.value, qty: Math.max(1, Number(F.qty.value) || 1),
-      legs,
-    });
-    await save();
-    flash('موقعیت افزوده شد.');
-    render();
+      positions.push({
+        ...blankPosition(),
+        title: `${KINDS.find(([v]) => v === kind)[1].split('—')[0].trim()} ${detail.name}`,
+        uaIns: F.ua.value, uaName: detail.name,
+        entryDate: F.date.value, qty: Math.max(1, Number(F.qty.value) || 1),
+        legs,
+      });
+      await save();
+      flash('موقعیت افزوده شد.');
+      render();
+    } finally {
+      addBtn.disabled = false;
+    }
   });
 
   async function save() {
@@ -186,13 +207,13 @@ export async function mount(root, { state, api }) {
     const evals = positions.map((p) => ({ p, ...evalPos(p) }));
 
     const rows = evals.map(({ p, m }, i) => `
-      <tr data-i="${i}" style="cursor:pointer">
+      <tr data-i="${i}" style="cursor:pointer" tabindex="0" role="button" aria-label="جزئیات موقعیت ${p.title || '—'}">
         <td>${p.title || '—'}</td>
-        <td>${p.uaName || p.uaIns}</td>
-        <td>${p.legs.map((l) => `${l.side === 'sell' ? '−' : '+'}${l.kind === 'underlying' ? 'سهم' : (l.kind === 'call' ? 'کال' : 'پوت') + ' ' + Math.round(l.strike).toLocaleString('en-US')}`).join(' ')}</td>
-        <td class="n">${p.qty}</td>
-        <td class="n">${p.entryDate || '—'}</td>
-        <td class="n">${m.daysHeld ?? '—'}</td>
+        <td>${displayName(p.uaName, p.uaIns, 'دارایی پایه بدون نام')}</td>
+        <td>${p.legs.map((l) => `${l.side === 'sell' ? '−' : '+'}${l.kind === 'underlying' ? 'سهم' : (l.kind === 'call' ? 'کال' : 'پوت') + ' ' + fmt.money(l.strike)}`).join(' ')}</td>
+        <td class="n">${fmt.int(p.qty)}</td>
+        <td class="n">${p.entryDate ? faDigits(p.entryDate) : '—'}</td>
+        <td class="n">${m.daysHeld == null ? '—' : fmt.int(m.daysHeld)}</td>
         <td class="n">${fmt.money(m.capital * p.qty)}</td>
         <td class="n" style="color:${m.pnlTotal >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(m.pnlTotal)}</td>
         <td class="n">${fmt.pct(m.retPct)}</td>
@@ -211,36 +232,68 @@ export async function mount(root, { state, api }) {
     for (const b of root.querySelectorAll('[data-del]')) {
       b.addEventListener('click', async (e) => {
         e.stopPropagation();
-        positions.splice(Number(b.dataset.del), 1);
+        if (b.disabled) return;
+        const i = Number(b.dataset.del);
+        const p = positions[i];
+        // موقعیت دستی برخلاف کش سرور یا تنظیمات، از بازار بازتولید نمی‌شود
+        // — قیمت ورود و تاریخ فقط همین‌جا ثبت شده‌اند. یک کلیک نباید بی‌درنگ
+        // نابودش کند.
+        if (!confirm(`موقعیت «${p?.title || '—'}» برای همیشه حذف شود؟ این کار بازگشت‌پذیر نیست.`)) return;
+        b.disabled = true;
+        positions.splice(i, 1);
         await save();
         render();
       });
     }
     for (const tr of root.querySelectorAll('#list tbody tr[data-i]')) {
       tr.addEventListener('click', () => { expanded = Number(tr.dataset.i); drawDetail(); });
+      // فقط وقتی خودِ ردیف تمرکز دارد، نه وقتی Enter روی دکمه «حذف» تودرتو
+      // زده می‌شود — آن دکمه رویداد کلیک خودش را دارد، keydown هم بهش بسنده
+      // می‌کند و نباید تا ردیف حباب بزند و جزئیات را هم باز کند.
+      tr.addEventListener('keydown', (e) => {
+        if (e.target !== tr) return;
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        expanded = Number(tr.dataset.i);
+        drawDetail();
+      });
     }
 
     const tot = evals.reduce((a, x) => a + x.m.pnlTotal, 0);
     const cap = evals.reduce((a, x) => a + x.m.capital * x.p.qty, 0);
+    // بدون موقعیت، سود و زیان جاری دقیقاً صفر است ولی چیزی برای «در سود
+    // بودن» وجود ندارد؛ بدون سرمایه درگیر، بازده روی سرمایه هم نامعلوم
+    // است (fmt.pct(NaN) → «—٪»). هر دو باید بی‌رنگ بمانند، نه سبز پیش‌فرض —
+    // قبلاً یک isGain مشترک (tot>=0) به هر دو کارت می‌رسید و صفر موقعیت را
+    // هم «در سود» رنگ می‌کرد.
+    const pnlGain = positions.length ? tot >= 0 : null;
+    const roiGain = cap > 0 ? tot >= 0 : null;
     root.querySelector('#kpis').innerHTML = [
-      ['موقعیت باز', fmt.int(positions.length), ''],
-      ['سرمایه درگیر', fmt.money(cap), 'ریال'],
-      ['سود و زیان جاری', fmt.money(tot), tot >= 0 ? 'در سود' : 'در زیان'],
-      ['بازده روی سرمایه', `${fmt.pct(cap > 0 ? (tot / cap) * 100 : NaN)}٪`, ''],
-      ['قیمت‌گیری', quotesByIns.size ? `${quotesByIns.size} نماد` : 'بی‌قیمت — اسکن نشده', ''],
-    ].map(([k, v, sub]) => `<div class="kpi"><div class="k">${k}</div>
-      <div class="v ${k.includes('سود') ? (tot >= 0 ? 'gain' : 'loss') : ''}">${v}</div><div class="s">${sub}</div></div>`).join('');
+      ['موقعیت باز', fmt.int(positions.length), '', null],
+      ['سرمایه درگیر', fmt.money(cap), 'ریال', null],
+      ['سود و زیان جاری', fmt.money(tot), pnlGain == null ? '' : pnlGain ? 'در سود' : 'در زیان', pnlGain],
+      ['بازده روی سرمایه', `${fmt.pct(cap > 0 ? (tot / cap) * 100 : NaN)}٪`, '', roiGain],
+      ['قیمت‌گیری', quotesByIns.size ? `${fmt.int(quotesByIns.size)} نماد` : 'بی‌قیمت — قیمت‌گیری نشد', '', null],
+    ].map(([k, v, sub, gain]) => `<div class="kpi"><div class="k">${k}</div>
+      <div class="v ${kpiTone(k, gain)}">${v}</div><div class="s">${sub}</div></div>`).join('');
 
     if (expanded != null) drawDetail();
   }
 
   function drawDetail() {
     const p = positions[expanded];
-    if (!p) { root.querySelector('#det-card').style.display = 'none'; return; }
+    if (!p) {
+      root.querySelector('#det-card').style.display = 'none';
+      chart?.destroy(); chart = null; chartFor = null;
+      return;
+    }
     const { m, spot, fees } = evalPos(p);
+    // قیمت‌گیری هر پانزده ثانیه دوباره صدا می‌زند؛ اگر همان موقعیت باز است
+    // نه یک موقعیت دیگر، زوم/پن چارت باید بماند نه هر بار به نمای اول برگردد
+    const sameRow = chartFor === expanded;
+    if (chart) chartRange = chart.view();
     root.querySelector('#det-card').style.display = '';
-    root.querySelector('#det-title').textContent = `${p.title} — ${p.uaName || p.uaIns}`;
-    const { svg } = payoffSvg(p.legs, m.entryNet, { fees, spot, width: 720, height: 250 });
+    root.querySelector('#det-title').textContent = `${p.title} — ${displayName(p.uaName, p.uaIns, 'دارایی پایه بدون نام')}`;
 
     const legRows = m.perLeg.map((l) => `
       <tr>
@@ -254,7 +307,7 @@ export async function mount(root, { state, api }) {
 
     root.querySelector('#det').innerHTML = `
       <div>
-        ${svg}
+        <div id="det-chart"></div>
         <h4 style="margin:14px 0 4px;font-size:12px">تفکیک هر پا — برای یک دست قرارداد</h4>
         <table class="mini">
           <thead><tr><th>پا</th><th>قیمت ورود</th><th>قیمت بستن</th><th>سهم درگیر</th><th>کارمزد رفت و برگشت</th><th>سود و زیان</th></tr></thead>
@@ -272,7 +325,7 @@ export async function mount(root, { state, api }) {
           <dt>مبنای سرمایه</dt><dd>${m.capitalLabel}</dd>
           <dt>وجه تضمین</dt><dd>${fmt.money(m.margin)}</dd>
           <dt>تضمین شرطی</dt><dd>${fmt.money(m.conditionalMargin)}</dd>
-          <dt>روز نگه‌داری</dt><dd>${m.daysHeld ?? '—'}</dd>
+          <dt>روز نگه‌داری</dt><dd>${m.daysHeld == null ? '—' : fmt.int(m.daysHeld)}</dd>
           <dt>بازده</dt><dd>${fmt.pct(m.retPct)}٪</dd>
           <dt>بازده ماهانه</dt><dd>${fmt.pct(m.retMonthPct)}٪</dd>
         </dl>
@@ -281,10 +334,17 @@ export async function mount(root, { state, api }) {
           <dt>در قیمت فعلی پایه</dt><dd>${fmt.money(m.ifHeld.atSpot)}</dd>
           <dt>بیشترین سود</dt><dd>${fmt.money(m.ifHeld.maxProfit)}</dd>
           <dt>بیشترین زیان</dt><dd>${fmt.money(m.ifHeld.maxLoss)}</dd>
-          <dt>سربه‌سری</dt><dd>${m.ifHeld.breakevens.map((b) => Math.round(b).toLocaleString('en-US')).join(' , ') || '—'}</dd>
+          <dt>سربه‌سری</dt><dd>${m.ifHeld.breakevens.map((b) => fmt.money(b)).join(' , ') || '—'}</dd>
         </dl>
         <p class="note" style="margin-top:10px">برای تصمیم رول همین موقعیت، به تب تحلیل رول برو.</p>
       </div>`;
+
+    chart?.destroy();
+    chart = mountPayoff(root.querySelector('#det-chart'), p.legs, m.entryNet, {
+      fees, spot, width: 720, height: 250,
+      ...(sameRow && chartRange ? { initRange: chartRange } : {}),
+    });
+    chartFor = expanded;
   }
 
   // ——————————————— داده ———————————————
@@ -329,5 +389,5 @@ export async function mount(root, { state, api }) {
   await load();
   await priceAll();
   const timer = setInterval(priceAll, 15000);
-  return () => { offChain(); offWatch(); clearInterval(timer); };
+  return () => { offChain(); offWatch(); clearInterval(timer); clearTimeout(flashTimer); chart?.destroy(); };
 }

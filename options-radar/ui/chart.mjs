@@ -16,19 +16,13 @@
 
 import { chartPoints, analyzePayoff } from '/core/payoff.mjs';
 import { analyzeMixed, isSingleExpiry } from '/core/mixed.mjs';
+import { fmt, axisNum } from '/ui/fmt.mjs';
 
-const money = (v) => (Number.isFinite(v) ? Math.round(v).toLocaleString('en-US') : '—');
+const money = fmt.money;
 const MIN_SPAN = 1e-6;
-
-/** عدد کوتاه محور: میلیون و هزار خلاصه می‌شوند تا برچسب‌ها روی هم نیفتند. */
-function axisNum(v) {
-  if (!Number.isFinite(v)) return '—';
-  const a = Math.abs(v);
-  if (a >= 1e9) return `${(v / 1e9).toFixed(a >= 1e10 ? 0 : 1)}G`;
-  if (a >= 1e6) return `${(v / 1e6).toFixed(a >= 1e7 ? 0 : 1)}M`;
-  if (a >= 1e4) return `${Math.round(v / 1e3)}k`;
-  return money(v);
-}
+// سبک منحنی‌های «اضافه» روی هر نموداری که از frame()/diffFrame() می‌گذرد —
+// نامزدهای رول روی نمودار تفاضل، و موقعیت‌های مقایسه‌ای روی نمودار بازده.
+const EXTRA_STYLE = ['extra1', 'extra2', 'extra3', 'extra4'];
 
 /**
  * گام خوانا: ۱ ، ۲ ، ۵ در توان ده.
@@ -70,15 +64,43 @@ function seriesFor(legs, netCash, opt) {
 }
 
 /**
+ * فقط ارزیاب سود و زیان در سررسید یک ترکیب — بدون رسم. برای منحنی‌های
+ * مقایسه‌ای مصرف می‌شود که خودشان روی نمودار موقعیت دیگری سوار می‌شوند و
+ * نیازی به نقاط شکست خودشان (برای پرشدن ناحیه رنگی) ندارند.
+ */
+export function payoffAt(legs, netCash, opt = {}) {
+  return seriesFor(legs, netCash, opt).analysis.at;
+}
+
+/**
+ * منحنی «امروز» — همان موتور بلک-شولز چند-سررسیدی، فقط با افق ارزش‌گذاری
+ * صفر، یعنی هیچ پایی هنوز سررسید نشده فرض می‌شود. برای هر ترکیبی کار
+ * می‌کند (تک‌سررسید یا چندسررسید)، چون فرمولش فقط به «چند روز مانده» هر
+ * پا وابسته است، نه به اینکه سررسیدها با هم یکی‌اند یا نه.
+ *
+ * بدون تلاطم معتبر، قیمت‌گذاری بلک-شولز ممکن نیست، پس چیزی رسم نمی‌شود —
+ * نه یک خط غلط با تلاطم پیش‌فرض حدسی.
+ */
+function todaySeries(legs, netCash, opt) {
+  if (!(opt.sigma > 0)) return null;
+  const today = analyzeMixed(legs, netCash, {
+    fees: opt.fees, spot: opt.spot, sigma: opt.sigma,
+    rFree: opt.rFree, divYield: opt.divYield, horizonDays: 0,
+  });
+  return { points: today.points.filter((_, i) => i % 3 === 0), at: today.at };
+}
+
+/**
  * بدنه رسم. روی یک بازه دلخواه از محور قیمت پایه کار می‌کند، پس هم برای
  * نمای اول و هم برای هر سطح زوم یکی است.
  */
-function frame(points, analysis, opt, xMin, xMax) {
+function frame(points, analysis, opt, xMin, xMax, todayPoints) {
   const spot = opt.spot;
+  const layers = { fill: true, strike: true, be: true, spot: true, ...(opt.layers || {}) };
   const W = opt.width ?? 760, H = opt.height ?? 280;
   // حاشیه چپ جا برای برچسب محور عمودی باز می‌کند و حاشیه پایین برای دو ردیف
   // برچسب: قیمت اعمال بالای محور، و مقیاس قیمت پایه زیر آن.
-  const pad = { t: 20, r: 16, b: 40, l: 54 };
+  const pad = { t: 24, r: 18, b: 54, l: 72 };
 
   // فقط نقاط داخل بازه، به‌علاوه دو نقطه لبه که خط تا لبه قاب برسد
   const at = analysis.at;
@@ -107,6 +129,37 @@ function frame(points, analysis, opt, xMin, xMax) {
 
   const line = seq.map((p, i) => `${i ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(p.pnl).toFixed(1)}`).join(' ');
 
+  // ——— منحنی «امروز» — همان محور، رنگ و خط‌چین جدا، بدون ناحیه رنگی خودش ———
+  // چون تلاطم زمان را صاف می‌کند، این خط معمولاً داخل محدوده منحنی سررسید
+  // می‌ماند؛ مقیاس Y از منحنی سررسید گرفته شده، نه دوباره حساب شده.
+  let todayLine = '';
+  if (todayPoints && Number.isFinite(spot)) {
+    const inRange2 = todayPoints.points.filter((p) => p.S >= xMin && p.S <= xMax);
+    const seq2 = [{ S: xMin, pnl: todayPoints.at(xMin) }, ...inRange2, { S: xMax, pnl: todayPoints.at(xMax) }]
+      .filter((p) => Number.isFinite(p.pnl))
+      .sort((a, b) => a.S - b.S);
+    if (seq2.length >= 2) {
+      todayLine = seq2.map((p, i) => `${i ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(Math.min(Math.max(p.pnl, yMin), yMax)).toFixed(1)}`).join(' ');
+    }
+  }
+
+  // ——— موقعیت‌های مقایسه‌ای — بازده سررسید موقعیت‌های دیگر هم‌نماد ———
+  // همان الگوی نامزدهای رول روی نمودار تفاضل (diffFrame): نمونه‌برداری یکنواخت
+  // روی بازه فعلی، مقیاس Y از منحنی اصلی همین موقعیت، نه دوباره حساب‌شده —
+  // این‌ها هم برای مقایسه شکل‌اند، نه خواندن دقیق عدد.
+  const CMP_N = 120;
+  const cmpLines = (opt.compare || []).slice(0, EXTRA_STYLE.length).map((c, i) => {
+    const raw = [];
+    for (let j = 0; j <= CMP_N; j++) {
+      const S = xMin + ((xMax - xMin) * j) / CMP_N;
+      const v = c.at(S);
+      if (Number.isFinite(v)) raw.push({ S, v });
+    }
+    if (raw.length < 2) return null;
+    const d = raw.map((p, j) => `${j ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(Math.min(Math.max(p.v, yMin), yMax)).toFixed(1)}`).join(' ');
+    return { d, cls: EXTRA_STYLE[i], label: c.label, full: c.full };
+  }).filter(Boolean);
+
   // ——— محور عمودی: گام گرد، برچسب سمت چپ، صفر جدا کشیده می‌شود ———
   const yTicks = ticksFor(yMin, yMax, 4).filter((v) => Math.abs(Y(v) - y0) > 9 || v === 0);
   const grid = yTicks.map((v) => `
@@ -131,18 +184,44 @@ function frame(points, analysis, opt, xMin, xMax) {
 
   const bes = analysis.breakevens.filter((b) => b >= xMin && b <= xMax).map((b) => `
     <circle class="be" cx="${X(b)}" cy="${y0}" r="4"/>
-    <text class="lbl" x="${X(b)}" y="${y0 - 9}" text-anchor="middle">${money(b)}</text>`).join('');
+    <text class="lbl be-lbl" x="${X(b)}" y="${y0 - 9}" text-anchor="middle">${money(b)}</text>`).join('');
 
   const spotLine = Number.isFinite(spot) && spot >= xMin && spot <= xMax
     ? `<line class="spot" x1="${X(spot)}" y1="${pad.t}" x2="${X(spot)}" y2="${H - pad.b}"/>
-       <text class="lbl" x="${X(spot)}" y="${pad.t - 6}" text-anchor="middle" style="fill:var(--warn)">پایه ${money(spot)}</text>` : '';
+       <text class="lbl spot-lbl" x="${X(spot)}" y="${pad.t - 7}" text-anchor="middle" style="fill:var(--warn)">پایه ${money(spot)}</text>` : '';
+  const spotPnl = Number.isFinite(spot) ? analysis.at(spot) : NaN;
+  const spotPoint = Number.isFinite(spotPnl) && spot >= xMin && spot <= xMax
+    ? `<circle class="spot-pnl" cx="${X(spot)}" cy="${Y(Math.min(Math.max(spotPnl, yMin), yMax))}" r="5"><title>سود و زیان سناریویی در قیمت پایه روز: ${money(spotPnl)}</title></circle>` : '';
+
+  // legend فقط وقتی بیش از یک منحنی روی نمودار هست معنا دارد — «امروز» و/یا
+  // هر موقعیت مقایسه‌ای انتخاب‌شده. برچسب‌ها می‌توانند طولانی باشند (نام
+  // موقعیت مقایسه‌ای)، پس عرض جعبه از حالت ثابت دوخطی به فهرست باز شد.
+  const legendItems = [
+    ...(todayLine ? [{ cls: 'curve-today', label: 'امروز' }] : []),
+    ...((todayLine || cmpLines.length) ? [{ cls: 'curve', label: 'سررسید' }] : []),
+    ...cmpLines.map((c) => ({ cls: `curve-${c.cls}`, label: c.label, full: c.full })),
+  ];
+  // برچسب مقایسه‌ای بریده‌شده (پای‌های کامل جا نمی‌شوند)، پس متن کامل به‌عنوان
+  // title روی <text> می‌نشیند تا با هاور مرورگر دیده شود.
+  const legend2 = legendItems.length ? `
+    <g class="curve2-legend">
+      ${legendItems.map((it, i) => `
+      <line x1="${W - pad.r - 92}" y1="${pad.t + 5 + i * 13}" x2="${W - pad.r - 72}" y2="${pad.t + 5 + i * 13}" class="${it.cls}"/>
+      <text x="${W - pad.r - 96}" y="${pad.t + 8 + i * 13}" text-anchor="end" class="lbl">${it.label}${it.full && it.full !== it.label ? `<title>${it.full}</title>` : ''}</text>`).join('')}
+    </g>` : '';
+
+  const cmpPaths = cmpLines.map((c) => `<path class="curve-${c.cls}" d="${c.d}"/>`).join('');
 
   const svg = `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار بازده در سررسید">
-      ${grid}${areas.join('')}${strikes}${spotLine}
+      ${grid}${layers.fill ? areas.join('') : ''}${layers.strike ? strikes : ''}${layers.spot ? spotLine : ''}
       <line class="axis" x1="${pad.l}" y1="${H - pad.b}" x2="${W - pad.r}" y2="${H - pad.b}"/>
       ${xTicks}
+      <text class="lbl axis-title" x="${(pad.l + W - pad.r) / 2}" y="${H - 8}" text-anchor="middle">قیمت سهم پایه</text>
+      <text class="lbl axis-title" transform="translate(14 ${(pad.t + H - pad.b) / 2}) rotate(-90)" text-anchor="middle">سود و زیان</text>
       <line class="zero" x1="${pad.l}" y1="${y0}" x2="${W - pad.r}" y2="${y0}"/>
-      <path class="curve" d="${line}"/>${bes}
+      ${todayLine ? `<path class="curve-today" d="${todayLine}"/>` : ''}
+      ${cmpPaths}
+      <path class="curve" d="${line}"/>${layers.be ? bes : ''}${layers.spot ? spotPoint : ''}${legend2}
       <g class="cursor" hidden>
         <line class="cur-x" y1="${pad.t}" y2="${H - pad.b}"/>
         <circle class="cur-dot" r="3.5"/>
@@ -172,32 +251,33 @@ export function payoffSvg(legs, netCash, opt = {}) {
 }
 
 /**
- * نمودار تعامل‌پذیر.
+ * زیرساخت مشترک نمودار تعامل‌پذیر: زوم با غلتک، کشیدن، خط راهنما، دکمه‌های
+ * زوم و نمای اول. mountPayoff و mountDiff هر دو از همین عبور می‌کنند و فقط
+ * `frameOf` (رسم روی یک بازه) و `valueAt` (مقدار زیر نشانگر) را عوض می‌کنند.
  *
  *   غلتک          زوم حول همان نقطه‌ای که نشانگر رویش است
  *   کشیدن         پیمایش افقی
- *   حرکت نشانگر   خط راهنما و خواندن سود و زیان سر همان قیمت پایه
+ *   حرکت نشانگر   خط راهنما و خواندن مقدار سر همان قیمت پایه
  *   دوبار کلیک    برگشت به نمای اول
  *
- * برمی‌گرداند { analysis, reset, destroy }.
+ * `opt.initRange` بازه شروع را به‌جای نمای اول می‌نشاند — برای وقتی که
+ * نمودار قبلی برای همان موقعیت نابود و از نو ساخته می‌شود (اسکن پیوسته)
+ * و کاربر وسط زوم یا پن بوده.
  */
-export function mountPayoff(host, legs, netCash, opt = {}) {
-  const { points, analysis } = seriesFor(legs, netCash, opt);
-  const ys = points.map((p) => p.pnl).filter(Number.isFinite);
-  if (!ys.length) {
-    host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
-    return { analysis, reset() {}, destroy() {} };
-  }
-
-  const [homeLo, homeHi] = homeRange(points, analysis, opt);
+function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, readLabel, hint, referenceValue = NaN }) {
   let lo = homeLo, hi = homeHi;
+  const [initLo, initHi] = Array.isArray(initRange) ? initRange : [];
+  if (Number.isFinite(initLo) && Number.isFinite(initHi) && initLo >= 0 && initHi - initLo > MIN_SPAN) {
+    lo = initLo; hi = initHi;
+  }
   let geo = null;
 
   host.innerHTML = `
     <div class="chart-box">
-      <div class="chart-canvas"></div>
+      <div class="chart-canvas" tabindex="0" role="group" aria-label="نمودار تعامل‌پذیر — فلش چپ و راست برای پیمایش، + و − برای زوم، Home برای نمای اول"></div>
+      <div class="chart-hover-tooltip" hidden></div>
       <div class="chart-tools">
-        <span class="chart-read">غلتک برای زوم ، کشیدن برای پیمایش ، دوبار کلیک برای نمای اول</span>
+        <span class="chart-read">${hint}</span>
         <span class="sp"></span>
         <button type="button" class="ghost" data-act="out">−</button>
         <button type="button" class="ghost" data-act="in">+</button>
@@ -207,9 +287,10 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
 
   const canvas = host.querySelector('.chart-canvas');
   const read = host.querySelector('.chart-read');
+  const tooltip = host.querySelector('.chart-hover-tooltip');
 
   function render() {
-    geo = frame(points, analysis, opt, lo, hi);
+    geo = frameOf(lo, hi);
     canvas.innerHTML = geo ? geo.svg : '<div class="note">بازه بیش از حد باریک است.</div>';
   }
   render();
@@ -265,7 +346,7 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
       clampRange(drag.lo - dx, drag.hi - dx);
       return;
     }
-    showCursor(priceAt(ev));
+    showCursor(priceAt(ev), ev);
   };
   const onUp = (ev) => {
     drag = null;
@@ -274,28 +355,55 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   };
 
   // ——— خط راهنما ———
-  function showCursor(S) {
+  function showCursor(S, ev = null) {
     const svg = canvas.querySelector('svg');
     const g = svg?.querySelector('.cursor');
     if (!g || !geo || !Number.isFinite(S)) return;
-    const pnl = analysis.at(S);
-    if (!Number.isFinite(pnl)) { g.setAttribute('hidden', ''); return; }
+    const v = valueAt(S);
+    if (!Number.isFinite(v)) { g.setAttribute('hidden', ''); return; }
     const x = geo.X(S);
-    const y = Math.min(Math.max(geo.Y(pnl), geo.pad.t), geo.H - geo.pad.b);
+    const y = Math.min(Math.max(geo.Y(v), geo.pad.t), geo.H - geo.pad.b);
     g.removeAttribute('hidden');
     g.querySelector('.cur-x').setAttribute('x1', x);
     g.querySelector('.cur-x').setAttribute('x2', x);
     g.querySelector('.cur-dot').setAttribute('cx', x);
     g.querySelector('.cur-dot').setAttribute('cy', y);
-    read.innerHTML = `پایه <b>${money(S)}</b> — سود و زیان `
-      + `<b style="color:${pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(pnl)}</b>`;
+    const hasReference = Number.isFinite(referenceValue) && referenceValue > 0;
+    const distance = hasReference ? S - referenceValue : NaN;
+    const distancePct = hasReference ? (distance / referenceValue) * 100 : NaN;
+    const distanceHtml = hasReference
+      ? ` — فاصله از پایه روز <b style="color:${distance >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(distance)} (${fmt.pct(distancePct)})</b>`
+      : '';
+    read.innerHTML = `پایه <b>${money(S)}</b> — ${readLabel} `
+      + `<b style="color:${v >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(v)}</b>${distanceHtml}`;
+    tooltip.hidden = false;
+    tooltip.innerHTML = `<span>قیمت روی نمودار <b>${money(S)}</b></span><span>${readLabel} <b class="${v >= 0 ? 'gain' : 'loss'}">${money(v)}</b></span>`
+      + (hasReference ? `<span>قیمت پایه روز <b>${money(referenceValue)}</b></span><span>فاصله از قیمت پایه <b class="${distance >= 0 ? 'gain' : 'loss'}">${money(distance)} · ${fmt.pct(distancePct)}</b></span>` : '');
+    if (ev) {
+      const box = host.querySelector('.chart-box').getBoundingClientRect();
+      tooltip.style.left = `${Math.min(Math.max(8, ev.clientX - box.left + 14), Math.max(8, box.width - 250))}px`;
+      tooltip.style.top = `${Math.max(8, ev.clientY - box.top - 28)}px`;
+    }
   }
   function hideCursor() {
     canvas.querySelector('.cursor')?.setAttribute('hidden', '');
-    read.textContent = 'غلتک برای زوم ، کشیدن برای پیمایش ، دوبار کلیک برای نمای اول';
+    read.textContent = hint;
+    tooltip.hidden = true;
   }
 
   const reset = () => { lo = homeLo; hi = homeHi; render(); };
+
+  // ——— صفحه‌کلید — همان سه حرکت ماوس (زوم، پیمایش، نمای اول)، برای
+  // کاربری که نمودار را با Tab گرفته، نه با نشانگر. .chart-canvas از قبل
+  // tabindex دارد، فقط keydown کم بود.
+  const onKey = (ev) => {
+    const step = (hi - lo) * 0.1;
+    if (ev.key === 'ArrowRight') { ev.preventDefault(); clampRange(lo + step, hi + step); }
+    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); clampRange(lo - step, hi - step); }
+    else if (ev.key === '+' || ev.key === '=') { ev.preventDefault(); zoomAt(NaN, 1 / 1.3); }
+    else if (ev.key === '-' || ev.key === '_') { ev.preventDefault(); zoomAt(NaN, 1.3); }
+    else if (ev.key === 'Home') { ev.preventDefault(); reset(); }
+  };
 
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('pointerdown', onDown);
@@ -304,12 +412,13 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   canvas.addEventListener('pointercancel', onUp);
   canvas.addEventListener('pointerleave', hideCursor);
   canvas.addEventListener('dblclick', reset);
+  canvas.addEventListener('keydown', onKey);
   host.querySelector('[data-act="home"]').addEventListener('click', reset);
   host.querySelector('[data-act="in"]').addEventListener('click', () => zoomAt(NaN, 1 / 1.3));
   host.querySelector('[data-act="out"]').addEventListener('click', () => zoomAt(NaN, 1.3));
 
   return {
-    analysis,
+    view: () => [lo, hi],
     reset,
     destroy() {
       canvas.removeEventListener('wheel', onWheel);
@@ -319,12 +428,45 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
       canvas.removeEventListener('pointercancel', onUp);
       canvas.removeEventListener('pointerleave', hideCursor);
       canvas.removeEventListener('dblclick', reset);
+      canvas.removeEventListener('keydown', onKey);
     },
   };
 }
 
-/** نمودار تفاضل دو موقعیت — ورودی تصمیم رول. */
-export function diffSvg(fn, xMin, xMax, opt = {}) {
+const PAYOFF_HINT = 'غلتک برای زوم ، کشیدن برای پیمایش ، دوبار کلیک برای نمای اول ، فلش/±/Home با صفحه‌کلید';
+
+/**
+ * نمودار بازده تعامل‌پذیر. برمی‌گرداند { analysis, view, reset, destroy }.
+ * چرا زوم فقط روی محور قیمت پایه است: محور عمودی همیشه از داده همان بازه
+ * دوباره حساب می‌شود، پس بزرگ‌نمایی یک ناحیه باریک، خودش قد نمودار را هم
+ * پر می‌کند. زوم دوبعدی اینجا فقط نمودار را کج می‌کرد.
+ *
+ * `opt.compare` — تا ۴ موقعیت مقایسه‌ای دیگر، `[{ at, label }]`. هر `at`
+ * ارزیاب سود و زیان سررسید همان موقعیت است (از `payoffAt` بگیر)؛ روی همان
+ * محور و همان مقیاس Y منحنی اصلی رسم می‌شوند.
+ */
+export function mountPayoff(host, legs, netCash, opt = {}) {
+  const { points, analysis } = seriesFor(legs, netCash, opt);
+  const ys = points.map((p) => p.pnl).filter(Number.isFinite);
+  if (!ys.length) {
+    host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
+    return { analysis, view: () => null, reset() {}, destroy() {} };
+  }
+  const todayPoints = opt.showToday === false ? null : todaySeries(legs, netCash, opt);
+  const [homeLo, homeHi] = homeRange(points, analysis, opt);
+  const api = mountInteractive(host, {
+    homeLo, homeHi, initRange: opt.initRange,
+    frameOf: (lo, hi) => frame(points, analysis, opt, lo, hi, todayPoints),
+    valueAt: (S) => analysis.at(S),
+    readLabel: 'سود و زیان',
+    hint: PAYOFF_HINT,
+    referenceValue: opt.spot,
+  });
+  return { analysis, ...api };
+}
+
+/** بدنه رسم نمودار تفاضل، روی یک بازه دلخواه — همان نقش frame() برای بازده. */
+function diffFrame(fn, opt, xMin, xMax) {
   const W = opt.width ?? 760, H = opt.height ?? 240;
   const pad = { t: 16, r: 14, b: 30, l: 14 };
   const N = 160;
@@ -334,6 +476,7 @@ export function diffSvg(fn, xMin, xMax, opt = {}) {
     pts.push({ S, v: fn(S) });
   }
   const vs = pts.map((p) => p.v).filter(Number.isFinite);
+  if (vs.length < 2) return null;
   let yMin = Math.min(...vs, 0), yMax = Math.max(...vs, 0);
   const py = (yMax - yMin) * 0.12 || 1;
   yMin -= py; yMax += py;
@@ -349,14 +492,23 @@ export function diffSvg(fn, xMin, xMax, opt = {}) {
   }
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ');
 
+  // ——— نامزدهای دیگر رول، هم‌زمان روی همان محور — نه یکی‌یکی ———
+  // مقیاس Y از نامزد انتخاب‌شده می‌آید، نه دوباره حساب می‌شود؛ چون این‌ها
+  // فقط برای مقایسه شکل کلی‌اند، نه خواندن دقیق مقدار.
+  const extraLines = (opt.extra || []).slice(0, EXTRA_STYLE.length).map((ex, i) => {
+    const exPts = pts.map((p) => ({ S: p.S, v: ex.fn(p.S) })).filter((p) => Number.isFinite(p.v));
+    if (exPts.length < 2) return null;
+    const d = exPts.map((p, j) => `${j ? 'L' : 'M'}${X(p.S).toFixed(1)},${Y(Math.min(Math.max(p.v, yMin), yMax)).toFixed(1)}`).join(' ');
+    return { d, cls: EXTRA_STYLE[i], label: ex.label };
+  }).filter(Boolean);
+
   // نقاط تغییر علامت: مرز تصمیم
   const cross = [];
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1], b = pts[i];
     if ((a.v < 0 && b.v > 0) || (a.v > 0 && b.v < 0)) {
       const t = -a.v / (b.v - a.v);
-      const S = a.S + t * (b.S - a.S);
-      cross.push(S);
+      cross.push(a.S + t * (b.S - a.S));
     }
   }
   const dots = cross.map((S) => `<circle class="be" cx="${X(S)}" cy="${y0}" r="4"/>
@@ -364,12 +516,53 @@ export function diffSvg(fn, xMin, xMax, opt = {}) {
   const spotLine = Number.isFinite(opt.spot) && opt.spot >= xMin && opt.spot <= xMax
     ? `<line class="spot" x1="${X(opt.spot)}" y1="${pad.t}" x2="${X(opt.spot)}" y2="${H - pad.b}"/>` : '';
 
-  return {
-    crossings: cross,
-    svg: `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار تفاضل دو موقعیت">
+  const extraPaths = extraLines.map((ex) => `<path class="curve-${ex.cls}" d="${ex.d}"/>`).join('');
+  const extraLegend = extraLines.length ? `
+    <g class="curve2-legend">
+      <line x1="${W - pad.r - 92}" y1="${pad.t + 5}" x2="${W - pad.r - 72}" y2="${pad.t + 5}" class="curve"/>
+      <text x="${W - pad.r - 96}" y="${pad.t + 8}" text-anchor="end" class="lbl">انتخاب‌شده</text>
+      ${extraLines.map((ex, i) => `
+      <line x1="${W - pad.r - 92}" y1="${pad.t + 18 + i * 13}" x2="${W - pad.r - 72}" y2="${pad.t + 18 + i * 13}" class="curve-${ex.cls}"/>
+      <text x="${W - pad.r - 96}" y="${pad.t + 21 + i * 13}" text-anchor="end" class="lbl">${ex.label}</text>`).join('')}
+    </g>` : '';
+
+  const svg = `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار تفاضل دو موقعیت">
       ${areas.join('')}${spotLine}
       <line class="zero" x1="${pad.l}" y1="${y0}" x2="${W - pad.r}" y2="${y0}"/>
-      <path class="curve" d="${line}"/>${dots}
-    </svg>`,
-  };
+      ${extraPaths}
+      <path class="curve" d="${line}"/>${dots}${extraLegend}
+      <g class="cursor" hidden>
+        <line class="cur-x" y1="${pad.t}" y2="${H - pad.b}"/>
+        <circle class="cur-dot" r="3.5"/>
+      </g>
+    </svg>`;
+
+  return { svg, W, H, pad, X, Y, y0, crossings: cross };
+}
+
+/** نمودار تفاضل دو موقعیت — ورودی تصمیم رول. رشته SVG ایستا. */
+export function diffSvg(fn, xMin, xMax, opt = {}) {
+  const f = diffFrame(fn, opt, xMin, xMax);
+  return f ? { svg: f.svg, crossings: f.crossings } : { svg: '<div class="note">نمودار قابل رسم نیست.</div>', crossings: [] };
+}
+
+/**
+ * نمودار تفاضل تعامل‌پذیر — همان diffSvg با زوم، پیمایش و خط راهنما.
+ * برمی‌گرداند { crossings, view, reset, destroy }. crossings مرز تصمیم را
+ * روی نمای اول می‌دهد؛ اگر بعد از زوم لازم شد، از frame بازگشتی view خواند.
+ */
+export function mountDiff(host, fn, xMin, xMax, opt = {}) {
+  const home = diffFrame(fn, opt, xMin, xMax);
+  if (!home) {
+    host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
+    return { crossings: [], view: () => null, reset() {}, destroy() {} };
+  }
+  const api = mountInteractive(host, {
+    homeLo: xMin, homeHi: xMax, initRange: opt.initRange,
+    frameOf: (lo, hi) => diffFrame(fn, opt, lo, hi),
+    valueAt: fn,
+    readLabel: 'تفاضل',
+    hint: PAYOFF_HINT,
+  });
+  return { crossings: home.crossings, ...api };
 }
