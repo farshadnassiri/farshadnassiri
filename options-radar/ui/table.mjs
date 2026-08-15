@@ -444,7 +444,11 @@ export function makeTable(host, cols, opts = {}) {
         if (c.heat) td.style.cssText = heatStyle(c, v);
         tr.appendChild(td);
       }
-      tr.addEventListener('click', () => { activeIdx = i; opts.onPick?.(r); });
+      // draw() لازم است، نه فقط activeIdx — وگرنه data-kbd-active/aria-selected/
+      // aria-activedescendant (دورهای ۲۶/۶۹/۷۰) روی مقدار قبلی می‌مانند تا
+      // اولین فلش کیبورد بعدی؛ کلیک ماوس همان همگام‌سازی را نداشت (دور ۷۷).
+      // پیش از onPick، چون draw() فقط به وضعیت خودِ همین جدول کار دارد.
+      tr.addEventListener('click', () => { activeIdx = i; draw(); opts.onPick?.(r); });
       frag.appendChild(tr);
     }
     tbody.innerHTML = '';
