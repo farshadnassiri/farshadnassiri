@@ -172,24 +172,18 @@ export function payoffSvg(legs, netCash, opt = {}) {
 }
 
 /**
- * نمودار تعامل‌پذیر.
+ * موتور مشترک نمودار تعامل‌پذیر — زیر هم `mountPayoff` و هم `mountDiff`.
  *
  *   غلتک          زوم حول همان نقطه‌ای که نشانگر رویش است
  *   کشیدن         پیمایش افقی
- *   حرکت نشانگر   خط راهنما و خواندن سود و زیان سر همان قیمت پایه
+ *   حرکت نشانگر   خط راهنما و خواندن مقدار سر همان قیمت پایه
  *   دوبار کلیک    برگشت به نمای اول
  *
- * برمی‌گرداند { analysis, reset, destroy }.
+ * `buildFrame(lo, hi)` هندسه و svg همان بازه را می‌سازد؛ `atFn(S)` مقدار
+ * زیر نشانگر را می‌دهد. `readLabel(S, v)` متن نوار پایین را می‌سازد، چون
+ * بازده و تفاضل برچسب متفاوت می‌خواهند.
  */
-export function mountPayoff(host, legs, netCash, opt = {}) {
-  const { points, analysis } = seriesFor(legs, netCash, opt);
-  const ys = points.map((p) => p.pnl).filter(Number.isFinite);
-  if (!ys.length) {
-    host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
-    return { analysis, reset() {}, destroy() {} };
-  }
-
-  const [homeLo, homeHi] = homeRange(points, analysis, opt);
+function mountInteractive(host, homeLo, homeHi, buildFrame, atFn, readLabel) {
   let lo = homeLo, hi = homeHi;
   let geo = null;
 
@@ -209,7 +203,7 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   const read = host.querySelector('.chart-read');
 
   function render() {
-    geo = frame(points, analysis, opt, lo, hi);
+    geo = buildFrame(lo, hi);
     canvas.innerHTML = geo ? geo.svg : '<div class="note">بازه بیش از حد باریک است.</div>';
   }
   render();
@@ -278,17 +272,16 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
     const svg = canvas.querySelector('svg');
     const g = svg?.querySelector('.cursor');
     if (!g || !geo || !Number.isFinite(S)) return;
-    const pnl = analysis.at(S);
-    if (!Number.isFinite(pnl)) { g.setAttribute('hidden', ''); return; }
+    const v = atFn(S);
+    if (!Number.isFinite(v)) { g.setAttribute('hidden', ''); return; }
     const x = geo.X(S);
-    const y = Math.min(Math.max(geo.Y(pnl), geo.pad.t), geo.H - geo.pad.b);
+    const y = Math.min(Math.max(geo.Y(v), geo.pad.t), geo.H - geo.pad.b);
     g.removeAttribute('hidden');
     g.querySelector('.cur-x').setAttribute('x1', x);
     g.querySelector('.cur-x').setAttribute('x2', x);
     g.querySelector('.cur-dot').setAttribute('cx', x);
     g.querySelector('.cur-dot').setAttribute('cy', y);
-    read.innerHTML = `پایه <b>${money(S)}</b> — سود و زیان `
-      + `<b style="color:${pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(pnl)}</b>`;
+    read.innerHTML = readLabel(S, v);
   }
   function hideCursor() {
     canvas.querySelector('.cursor')?.setAttribute('hidden', '');
@@ -309,7 +302,6 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   host.querySelector('[data-act="out"]').addEventListener('click', () => zoomAt(NaN, 1.3));
 
   return {
-    analysis,
     reset,
     destroy() {
       canvas.removeEventListener('wheel', onWheel);
@@ -323,8 +315,32 @@ export function mountPayoff(host, legs, netCash, opt = {}) {
   };
 }
 
+const payoffReadLabel = (S, pnl) => `پایه <b>${money(S)}</b> — سود و زیان `
+  + `<b style="color:${pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(pnl)}</b>`;
+
+/**
+ * نمودار بازده تعامل‌پذیر. برمی‌گرداند { analysis, reset, destroy }.
+ */
+export function mountPayoff(host, legs, netCash, opt = {}) {
+  const { points, analysis } = seriesFor(legs, netCash, opt);
+  const ys = points.map((p) => p.pnl).filter(Number.isFinite);
+  if (!ys.length) {
+    host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
+    return { analysis, reset() {}, destroy() {} };
+  }
+
+  const [homeLo, homeHi] = homeRange(points, analysis, opt);
+  const ctl = mountInteractive(
+    host, homeLo, homeHi,
+    (lo, hi) => frame(points, analysis, opt, lo, hi),
+    analysis.at, payoffReadLabel,
+  );
+  return { analysis, ...ctl };
+}
+
 /** نمودار تفاضل دو موقعیت — ورودی تصمیم رول. */
-export function diffSvg(fn, xMin, xMax, opt = {}) {
+/** بدنه رسم نمودار تفاضل، روی یک بازه دلخواه — هم برای رشته ایستا هم برای هر سطح زوم. */
+function diffFrame(fn, xMin, xMax, opt) {
   const W = opt.width ?? 760, H = opt.height ?? 240;
   const pad = { t: 16, r: 14, b: 30, l: 14 };
   const N = 160;
@@ -334,6 +350,7 @@ export function diffSvg(fn, xMin, xMax, opt = {}) {
     pts.push({ S, v: fn(S) });
   }
   const vs = pts.map((p) => p.v).filter(Number.isFinite);
+  if (!vs.length) return null;
   let yMin = Math.min(...vs, 0), yMax = Math.max(...vs, 0);
   const py = (yMax - yMin) * 0.12 || 1;
   yMin -= py; yMax += py;
@@ -364,12 +381,38 @@ export function diffSvg(fn, xMin, xMax, opt = {}) {
   const spotLine = Number.isFinite(opt.spot) && opt.spot >= xMin && opt.spot <= xMax
     ? `<line class="spot" x1="${X(opt.spot)}" y1="${pad.t}" x2="${X(opt.spot)}" y2="${H - pad.b}"/>` : '';
 
-  return {
-    crossings: cross,
-    svg: `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار تفاضل دو موقعیت">
+  const svg = `<svg class="payoff" viewBox="0 0 ${W} ${H}" role="img" aria-label="نمودار تفاضل دو موقعیت">
       ${areas.join('')}${spotLine}
       <line class="zero" x1="${pad.l}" y1="${y0}" x2="${W - pad.r}" y2="${y0}"/>
       <path class="curve" d="${line}"/>${dots}
-    </svg>`,
-  };
+      <g class="cursor" hidden>
+        <line class="cur-x" y1="${pad.t}" y2="${H - pad.b}"/>
+        <circle class="cur-dot" r="3.5"/>
+      </g>
+    </svg>`;
+
+  return { svg, crossings: cross, W, H, pad, X, Y, y0, xMin, xMax, yMin, yMax };
+}
+
+/** رشته SVG ایستا. برای جاهایی که تعامل لازم نیست. */
+export function diffSvg(fn, xMin, xMax, opt = {}) {
+  const g = diffFrame(fn, xMin, xMax, opt);
+  return g || { crossings: [], svg: '<div class="note">نمودار قابل رسم نیست.</div>' };
+}
+
+const diffReadLabel = (S, v) => `پایه <b>${money(S)}</b> — تفاضل `
+  + `<b style="color:${v >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(v)}</b>`;
+
+/**
+ * نمودار تفاضل تعامل‌پذیر — همان زوم و پیمایش و خط راهنمای `mountPayoff`.
+ * برمی‌گرداند { crossings, reset, destroy }.
+ */
+export function mountDiff(host, fn, xMin, xMax, opt = {}) {
+  const home = diffFrame(fn, xMin, xMax, opt);
+  if (!home) {
+    host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
+    return { crossings: [], reset() {}, destroy() {} };
+  }
+  const ctl = mountInteractive(host, xMin, xMax, (lo, hi) => diffFrame(fn, lo, hi, opt), fn, diffReadLabel);
+  return { crossings: home.crossings, ...ctl };
 }
