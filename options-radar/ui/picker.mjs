@@ -32,7 +32,10 @@ export function makePicker(host, opts = {}) {
   host.innerHTML = `
     <div class="picker">
       <div class="picker-tools">
-        <input type="search" id="pk-q" placeholder="کوتاه کردن فهرست">
+        <!-- placeholder به‌تنهایی نام دسترس‌پذیر قابل‌اتکا نیست — با شروع تایپ
+             ناپدید می‌شود؛ #rail-q (index.html) از قبل کنار placeholder
+             aria-label هم دارد، این ورودی جا مانده بود (دور ۷۴). -->
+        <input type="search" id="pk-q" placeholder="کوتاه کردن فهرست" aria-label="کوتاه کردن فهرست نمادها">
         <button class="ghost" data-pre="all">همه</button>
         <button class="ghost" data-pre="liquid">پرمعامله</button>
         <button class="ghost" data-pre="quoted">دارای مظنه</button>
