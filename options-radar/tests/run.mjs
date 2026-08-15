@@ -20,6 +20,8 @@ import { buildChain, underlyingList, chainStats } from '../core/chain.mjs';
 import { scan as scanFn, generateCombos } from '../core/scan.mjs';
 import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
+import { safeJoin } from '../server/safe-path.mjs';
+import path from 'node:path';
 
 let pass = 0, fail = 0;
 const results = [];
@@ -788,6 +790,20 @@ group('۱۷. سنجه‌های سربه‌سری');
   // مقدار بی‌معنی در فهرست، دور ریخته می‌شود
   const dirty = breakevenMetrics([NaN, -5, 0, 103000], S);
   check('سربه‌سری بی‌معنی کنار گذاشته شد', dirty.beCount === 1 && dirty.beNear === 103000);
+}
+
+// ═══════════════════════════ ۱۸. سرو فایل ایستا — عبور از ریشه ═══════════════════════════
+group('۱۸. سرو فایل ایستا — عبور از ریشه');
+{
+  const ROOT = '/x/options-radar';
+  check('مسیر عادی داخل ریشه پذیرفته می‌شود',
+    safeJoin(ROOT, '/ui/index.html') === path.join(ROOT, '/ui/index.html'));
+  check('پوشه هم‌نام‌شروع کنار ریشه رد می‌شود',
+    safeJoin(ROOT, '/../options-radar-private/secret.txt') === null);
+  check('عبور مستقیم با .. رد می‌شود',
+    safeJoin(ROOT, '/../../etc/passwd') === null);
+  check('مسیر مطلق دیگر رد می‌شود',
+    safeJoin(ROOT, '/../../x/other') === null);
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

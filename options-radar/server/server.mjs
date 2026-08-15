@@ -18,6 +18,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaults, sanitize } from '../core/settings.mjs';
+import { safeJoin } from './safe-path.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -291,8 +292,8 @@ const sendJson = (res, code, obj) => send(res, code, JSON.stringify(obj));
 
 async function serveStatic(res, pathname) {
   const rel = pathname === '/' ? '/ui/index.html' : pathname;
-  const file = path.join(ROOT, rel);
-  if (!file.startsWith(ROOT)) return send(res, 403, 'forbidden', 'text/plain');
+  const file = safeJoin(ROOT, rel);
+  if (!file) return send(res, 403, 'forbidden', 'text/plain');
   try {
     const buf = await fs.readFile(file);
     send(res, 200, buf, MIME[path.extname(file)] || 'application/octet-stream');
