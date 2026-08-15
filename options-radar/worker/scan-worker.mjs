@@ -17,7 +17,15 @@ let overlay = new Map();     // insCode → { book, low, high, state, staleSec }
 
 const rowKey = (r) => `${r.insCode_C ?? ''}|${r.insCode_P ?? ''}`;
 
-/** عمق و وضعیت مرحله دو را روی مظنه‌های زنجیره می‌نشاند. */
+/**
+ * عمق و وضعیت مرحله دو را روی مظنه‌های زنجیره می‌نشاند — فقط فیلدهایی که
+ * ردیف خام دیده‌بان هرگز ندارد (book/low/high/state/staleSec، همیشه
+ * پیش‌فرض در sideQuote). close/last عمداً اینجا نیستند: از همان رکورد خام
+ * دیده‌بان می‌آیند و هر تیک زنده از نو و تازه ساخته می‌شوند، پس مقدار
+ * یک‌باره overlay (از /api/infos، لحظه اسکن مرحله دو) همیشه کهنه‌تر یا
+ * مساوی است — قبلاً بی‌قیدوشرط رویش می‌نشست و برای همیشه، حتی بعد تیک‌های
+ * تازه بعدی، close/last قرارداد اسکن‌شده را قفل نگه می‌داشت.
+ */
 function applyOverlay(ch) {
   if (!overlay.size) return;
   const put = (q) => {
@@ -28,8 +36,6 @@ function applyOverlay(ch) {
     if (o.high != null) q.high = o.high;
     if (o.state) q.state = o.state;
     if (o.staleSec != null) q.staleSec = o.staleSec;
-    if (o.close) q.close = o.close;
-    if (o.last) q.last = o.last;
   };
   for (const ua of ch.values()) {
     put(ua);

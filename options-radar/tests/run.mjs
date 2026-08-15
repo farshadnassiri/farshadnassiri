@@ -1011,6 +1011,20 @@ group('۱۵. قرارداد پیام‌رسانی ریسه اسکن');
   const cd = out.find((m) => m.type === 'chain-detail');
   check('جزئیات زنجیره برای تب دیده‌بان', cd.ua.expiries.length === 2 && cd.ua.expiries[0].strikes.length === 5);
 
+  // باگ واقعی: applyOverlay قبلاً close/last مرحله دو را همیشگی می‌کرد،
+  // چون clear-overlay هیچ‌جای کد صدا زده نمی‌شود. یک عدد یک‌باره در
+  // overlay همان قرارداد می‌گذاریم، بعد یک پیام rows تازه با قیمت واقعاً
+  // متفاوت می‌فرستیم — نتیجه باید از تیک تازه بیاید، نه overlay کهنه.
+  send({ type: 'overlay', id: 3.5, data: { [optIns]: { close: 9999, last: 9999 } } });
+  const rowsFresh = rows.map((r) => (r.insCode_C === optIns ? { ...r, pDrCotVal_C: 4321, pClosing_C: 4321 } : r));
+  send({ type: 'rows', id: 3.6, full: true, rows: rowsFresh, at: Date.now() });
+  send({ type: 'chain-detail', id: 3.7, uaIns: '1' });
+  const cdFresh = out.filter((m) => m.type === 'chain-detail').at(-1);
+  const freshCall = cdFresh.ua.expiries.flatMap((ex) => ex.strikes).map((s) => s.call).find((c) => c.ins === optIns);
+  check('overlay دیگر close/last قرارداد را برای همیشه قفل نمی‌کند؛ تیک زنده تازه‌تر برنده می‌شود',
+    !!freshCall && freshCall.last === 4321 && freshCall.close === 4321,
+    `last=${freshCall?.last} close=${freshCall?.close}`);
+
   send({ type: 'scan', id: 6, defId: 'ناشناخته', uaKeys: ['1'], settings: st });
   check('استراتژی ناشناخته، خطای تمیز می‌دهد',
     out.filter((m) => m.type === 'scan').some((m) => m.error));
