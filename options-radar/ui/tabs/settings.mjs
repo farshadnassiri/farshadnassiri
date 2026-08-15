@@ -87,7 +87,7 @@ export async function mount(root, { state, api }) {
               step="${f.step ?? 'any'}">
             <button type="button" class="step-btn" data-dir="1" tabindex="-1" aria-label="زیاد کردن یک گام">+</button>
           </div>
-          ${bounded ? `<input type="range" class="num-range" id="${id}-r" tabindex="-1"
+          ${bounded ? `<input type="range" class="num-range" id="${id}-r" tabindex="-1" aria-label="${f.label}"
               min="${f.min}" max="${f.max}" step="${f.step ?? (f.max - f.min) / 100}" value="${s[f.key]}">` : ''}`;
       }
 
