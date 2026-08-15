@@ -609,13 +609,6 @@ dl.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nu
 @keyframes row-flash { 0% { background: var(--accent-soft); } 100% { background: transparent; } }
 .tbl-body tr.flash { animation: row-flash 1.6s ease-out; }
 @media (prefers-reduced-motion: reduce) { .tbl-body tr.flash { animation: none; background: var(--accent-soft); } }
-.tbl-foot {
-  display: flex; align-items: center; gap: 10px; padding: 6px 10px;
-  border-top: 1px solid var(--line); background: var(--panel-2);
-  font-size: 11.5px; color: var(--muted);
-}
-.tbl-foot .sp { flex: 1; }
-
 /* ——— انتخابگر نماد ——— */
 .picker { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .picker-tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
