@@ -303,6 +303,14 @@ function mountInteractive(host, homeLo, homeHi, buildFrame, atFn, readLabel) {
 
   return {
     reset,
+    // داده تازه را بدون پراندن بازه فعلی جا می‌گذارد — برعکس ساخت دوباره، که
+    // زوم و پیمایش کاربر را به نمای اول برمی‌گرداند. `reset` بعدی به نمای اول
+    // تازه می‌رود، نه نمای اول قدیم.
+    setSource(newHomeLo, newHomeHi, newBuildFrame, newAtFn, newReadLabel) {
+      homeLo = newHomeLo; homeHi = newHomeHi;
+      buildFrame = newBuildFrame; atFn = newAtFn; readLabel = newReadLabel;
+      render();
+    },
     destroy() {
       canvas.removeEventListener('wheel', onWheel);
       canvas.removeEventListener('pointerdown', onDown);
@@ -319,26 +327,42 @@ const payoffReadLabel = (S, pnl) => `پایه <b>${money(S)}</b> — سود و �
   + `<b style="color:${pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${money(pnl)}</b>`;
 
 /**
- * نمودار بازده تعامل‌پذیر. برمی‌گرداند { analysis, reset, destroy }.
+ * نمودار بازده تعامل‌پذیر. برمی‌گرداند { analysis, reset, destroy, update }.
+ *
+ * `update(legs2, netCash2, opt2)` داده را جا‌به‌جا می‌کند بدون این‌که زوم و
+ * پیمایش کاربر را بپراند — برخلاف ساخت دوباره (`destroy` + `mountPayoff`ی
+ * تازه) که همیشه از نمای اول شروع می‌کند. برای پانلی که هر چند ثانیه با
+ * داده تازه رفرش می‌شود، همین تفاوت یعنی کاربر هر بار زوم و پیمایش خودش را
+ * از دست نمی‌دهد.
  */
 export function mountPayoff(host, legs, netCash, opt = {}) {
-  const { points, analysis } = seriesFor(legs, netCash, opt);
-  const ys = points.map((p) => p.pnl).filter(Number.isFinite);
-  if (!ys.length) {
+  let { points, analysis } = seriesFor(legs, netCash, opt);
+  const ys0 = points.map((p) => p.pnl).filter(Number.isFinite);
+  if (!ys0.length) {
     host.innerHTML = '<div class="note">نمودار قابل رسم نیست.</div>';
-    return { analysis, reset() {}, destroy() {} };
+    return { analysis, reset() {}, destroy() {}, update() {} };
   }
 
   const [homeLo, homeHi] = homeRange(points, analysis, opt);
   const ctl = mountInteractive(
     host, homeLo, homeHi,
     (lo, hi) => frame(points, analysis, opt, lo, hi),
-    analysis.at, payoffReadLabel,
+    (S) => analysis.at(S), payoffReadLabel,
   );
-  return { analysis, ...ctl };
+
+  const result = { analysis, ...ctl };
+  result.update = (legs2, netCash2, opt2 = opt) => {
+    const next = seriesFor(legs2, netCash2, opt2);
+    const ys = next.points.map((p) => p.pnl).filter(Number.isFinite);
+    if (!ys.length) return;
+    points = next.points; analysis = next.analysis;
+    result.analysis = analysis;
+    const [hLo, hHi] = homeRange(points, analysis, opt2);
+    ctl.setSource(hLo, hHi, (lo, hi) => frame(points, analysis, opt2, lo, hi), (S) => analysis.at(S), payoffReadLabel);
+  };
+  return result;
 }
 
-/** نمودار تفاضل دو موقعیت — ورودی تصمیم رول. */
 /** بدنه رسم نمودار تفاضل، روی یک بازه دلخواه — هم برای رشته ایستا هم برای هر سطح زوم. */
 function diffFrame(fn, xMin, xMax, opt) {
   const W = opt.width ?? 760, H = opt.height ?? 240;

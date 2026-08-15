@@ -187,13 +187,16 @@ export async function mount(root, { tab, state, api }) {
   }
 
   // ——— پانل جزئیات ———
+  //
+  // اسکن پیوسته هر چند ثانیه همین ردیف را با داده تازه دوباره صدا می‌زند.
+  // اگر هر بار کل innerHTML پانل از نو نوشته شود، نمودار هم هر بار destroy
+  // و از نمای اول دوباره mount می‌شود — کاربری که زوم کرده، هر رفرش زومش را
+  // از دست می‌دهد. برای همان ردیف (id یکسان)، فقط مقدارها به‌روز می‌شوند؛
+  // ساختار — و نمودار — دست‌نخورده می‌ماند.
   let chart = null;
-  function showDetail(r) {
-    picked = r;
-    const card = root.querySelector('#detail-card');
-    card.style.display = '';
-    root.querySelector('#detail-title').textContent = `${r.underlying} — ${r.legsText}`;
+  let builtId = null;
 
+  function detailCalc(r) {
     const fees = { buyStock: s().feeBuyStock, sellStock: s().feeSellStock, option: s().feeOption, exercise: s().feeExercise };
     const single = isSingleExpiry(r.__legs);
     const chartOpt = {
@@ -208,87 +211,120 @@ export async function mount(root, { tab, state, api }) {
       const S2 = r.S * (1 + pct / 100);
       return { pct, S: S2, pnl: an.at(S2) };
     });
+    return { chartOpt, an, grid };
+  }
 
-    const legRows = r.legPrices.map((l) => `
-      <tr>
-        <td>${l.side === 'sell' ? 'فروش' : 'خرید'} ${l.kind === 'underlying' ? 'سهم' : (l.kind === 'call' ? 'کال' : 'پوت')}</td>
-        <td class="n">${l.strike ? fmt.money(l.strike) : '—'}</td>
-        <td class="n">${fmt.money(l.price)}</td>
-        <td class="n">${fmt.money(l.mid)}</td>
-        <td class="n">${Number.isFinite(l.spreadPct) ? l.spreadPct.toFixed(1) : '—'}</td>
-        <td class="n">${Number.isFinite(l.slipPct) ? l.slipPct.toFixed(2) : '—'}</td>
-        <td class="n">${fmt.int(l.filled)}</td>
-        <td class="n">${fmt.int(l.short)}</td>
-        <td>${l.source || '—'}</td>
-      </tr>`).join('');
+  const legendHtml = (an) => `
+    ${an.approx ? `<span style="color:var(--warn)">${an.note}</span>` : ''}
+    <span>سربه‌سری: ${an.breakevens.map((b) => Math.round(b).toLocaleString('en-US')).join(' , ') || '—'}</span>
+    <span>بیشترین سود: ${fmt.money(an.maxProfit)}</span>
+    <span>بیشترین زیان: ${fmt.money(an.maxLoss)}</span>`;
 
-    const costRows = r.costRows.map((c) => `
-      <tr><td>${c.leg}</td><td class="n">${fmt.money(c.commission)}</td>
-      <td class="n">${fmt.money(c.crossing)}</td><td class="n">${fmt.money(c.slippage)}</td></tr>`).join('');
+  const legRowsHtml = (r) => r.legPrices.map((l) => `
+    <tr>
+      <td>${l.side === 'sell' ? 'فروش' : 'خرید'} ${l.kind === 'underlying' ? 'سهم' : (l.kind === 'call' ? 'کال' : 'پوت')}</td>
+      <td class="n">${l.strike ? fmt.money(l.strike) : '—'}</td>
+      <td class="n">${fmt.money(l.price)}</td>
+      <td class="n">${fmt.money(l.mid)}</td>
+      <td class="n">${Number.isFinite(l.spreadPct) ? l.spreadPct.toFixed(1) : '—'}</td>
+      <td class="n">${Number.isFinite(l.slipPct) ? l.slipPct.toFixed(2) : '—'}</td>
+      <td class="n">${fmt.int(l.filled)}</td>
+      <td class="n">${fmt.int(l.short)}</td>
+      <td>${l.source || '—'}</td>
+    </tr>`).join('');
 
-    const limitRows = r.sizeLimits.map((l) => `
-      <tr><td>${l.what}</td><td class="n">${fmt.int(l.max)}</td>
-      <td>${l.what === r.binding ? '<span class="tag warn">مقیدکننده</span>' : ''}</td></tr>`).join('');
+  const kvHtml = (r) => `
+    <dt>جهت نقدی</dt><dd>${r.cashLabel}</dd>
+    <dt>نقد خالص</dt><dd>${fmt.money(r.netCash)}</dd>
+    <dt>سرمایه درگیر</dt><dd>${fmt.money(r.capital)}</dd>
+    <dt>مبنای سرمایه</dt><dd>${r.capitalLabel}</dd>
+    <dt>وجه تضمین</dt><dd>${fmt.money(r.margin)}</dd>
+    <dt>تضمین شرطی</dt><dd>${fmt.money(r.conditionalMargin)}</dd>
+    <dt>پوشش</dt><dd>${r.coverage}</dd>
+    <dt>بازده دوره</dt><dd>${fmt.pct(r.retMaxPct)}٪</dd>
+    <dt>بازده ماهانه</dt><dd>${fmt.pct(r.retMonthPct)}٪</dd>
+    <dt>احتمال سود</dt><dd>${fmt.pct(r.popPct)}٪</dd>
+    <dt>دلتا</dt><dd>${fmt.num(r.delta)}</dd>
+    <dt>تتا روزانه</dt><dd>${fmt.money(r.theta)}</dd>
+    <dt>تلاطم مبنا</dt><dd>${fmt.num(r.sigmaUse)}</dd>
+    <dt>کیفیت داده</dt><dd>${r.qualityLabel}</dd>`;
 
-    const scenRows = grid.map((g) => `
-      <tr><td class="n">${g.pct.toFixed(0)}٪</td><td class="n">${fmt.money(g.S)}</td>
-      <td class="n" style="color:${g.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(g.pnl)}</td></tr>`).join('');
+  const leggingRiskHtml = (r) => (r.leggingRisk
+    ? `<p class="note" style="color:var(--warn)">ریسک لنگ‌زدن: سفارش ترکیبی در تابلو نیست. اگر پای فروش پر شود و پای خرید نه، وجه تضمین ${fmt.money(r.conditionalMargin)} همان لحظه مطالبه می‌شود${r.leggingUnlimited ? ' و موقعیت باقی‌مانده زیان نامحدود دارد' : ''}.</p>`
+    : '');
 
+  const costRowsHtml = (r) => r.costRows.map((c) => `
+    <tr><td>${c.leg}</td><td class="n">${fmt.money(c.commission)}</td>
+    <td class="n">${fmt.money(c.crossing)}</td><td class="n">${fmt.money(c.slippage)}</td></tr>`).join('')
+    + `<tr><td>هزینه فرصت وجه تضمین</td><td class="n" colspan="3">${fmt.money(r.costFunding)}</td></tr>`;
+
+  const limitRowsHtml = (r) => r.sizeLimits.map((l) => `
+    <tr><td>${l.what}</td><td class="n">${fmt.int(l.max)}</td>
+    <td>${l.what === r.binding ? '<span class="tag warn">مقیدکننده</span>' : ''}</td></tr>`).join('');
+
+  const scenRowsHtml = (grid) => grid.map((g) => `
+    <tr><td class="n">${g.pct.toFixed(0)}٪</td><td class="n">${fmt.money(g.S)}</td>
+    <td class="n" style="color:${g.pnl >= 0 ? 'var(--gain)' : 'var(--loss)'}">${fmt.money(g.pnl)}</td></tr>`).join('');
+
+  function buildDetail(r) {
+    const { chartOpt, an, grid } = detailCalc(r);
     root.querySelector('#detail').innerHTML = `
       <div>
         <div id="chart"></div>
-        <div class="legend">
-          ${an.approx ? `<span style="color:var(--warn)">${an.note}</span>` : ''}
-          <span>سربه‌سری: ${an.breakevens.map((b) => Math.round(b).toLocaleString('en-US')).join(' , ') || '—'}</span>
-          <span>بیشترین سود: ${fmt.money(an.maxProfit)}</span>
-          <span>بیشترین زیان: ${fmt.money(an.maxLoss)}</span>
-        </div>
+        <div class="legend" id="d-legend">${legendHtml(an)}</div>
         <h4 style="margin:14px 0 4px;font-size:12px">قیمت و عمق هر پا</h4>
         <table class="mini">
           <thead><tr><th>پا</th><th>اعمال</th><th>قیمت اجرا</th><th>میانه</th><th>اسپرد ٪</th><th>افت ٪</th><th>پرشده</th><th>کمبود</th><th>منبع</th></tr></thead>
-          <tbody>${legRows}</tbody>
+          <tbody id="d-legs">${legRowsHtml(r)}</tbody>
         </table>
       </div>
       <div>
-        <dl class="kv">
-          <dt>جهت نقدی</dt><dd>${r.cashLabel}</dd>
-          <dt>نقد خالص</dt><dd>${fmt.money(r.netCash)}</dd>
-          <dt>سرمایه درگیر</dt><dd>${fmt.money(r.capital)}</dd>
-          <dt>مبنای سرمایه</dt><dd>${r.capitalLabel}</dd>
-          <dt>وجه تضمین</dt><dd>${fmt.money(r.margin)}</dd>
-          <dt>تضمین شرطی</dt><dd>${fmt.money(r.conditionalMargin)}</dd>
-          <dt>پوشش</dt><dd>${r.coverage}</dd>
-          <dt>بازده دوره</dt><dd>${fmt.pct(r.retMaxPct)}٪</dd>
-          <dt>بازده ماهانه</dt><dd>${fmt.pct(r.retMonthPct)}٪</dd>
-          <dt>احتمال سود</dt><dd>${fmt.pct(r.popPct)}٪</dd>
-          <dt>دلتا</dt><dd>${fmt.num(r.delta)}</dd>
-          <dt>تتا روزانه</dt><dd>${fmt.money(r.theta)}</dd>
-          <dt>تلاطم مبنا</dt><dd>${fmt.num(r.sigmaUse)}</dd>
-          <dt>کیفیت داده</dt><dd>${r.qualityLabel}</dd>
-        </dl>
-        <p class="note" style="margin:10px 0 2px">${r.marginNote}</p>
-        ${r.leggingRisk ? `<p class="note" style="color:var(--warn)">ریسک لنگ‌زدن: سفارش ترکیبی در تابلو نیست. اگر پای فروش پر شود و پای خرید نه، وجه تضمین ${fmt.money(r.conditionalMargin)} همان لحظه مطالبه می‌شود${r.leggingUnlimited ? ' و موقعیت باقی‌مانده زیان نامحدود دارد' : ''}.</p>` : ''}
+        <dl class="kv" id="d-kv">${kvHtml(r)}</dl>
+        <p class="note" id="d-margin-note" style="margin:10px 0 2px">${r.marginNote}</p>
+        <div id="d-legging">${leggingRiskHtml(r)}</div>
 
-        <h4 style="margin:14px 0 4px;font-size:12px">تفکیک هزینه اجرا — جمع ${fmt.money(r.execCost)}</h4>
+        <h4 style="margin:14px 0 4px;font-size:12px">تفکیک هزینه اجرا — جمع <span id="d-exec-cost">${fmt.money(r.execCost)}</span></h4>
         <table class="mini">
           <thead><tr><th>پا</th><th>کارمزد</th><th>عبور از اسپرد</th><th>افت مظنه</th></tr></thead>
-          <tbody>${costRows}
-            <tr><td>هزینه فرصت وجه تضمین</td><td class="n" colspan="3">${fmt.money(r.costFunding)}</td></tr></tbody>
+          <tbody id="d-costs">${costRowsHtml(r)}</tbody>
         </table>
 
-        <h4 style="margin:14px 0 4px;font-size:12px">سقف حجم — مقید به ${r.binding}</h4>
-        <table class="mini"><tbody>${limitRows}</tbody></table>
+        <h4 style="margin:14px 0 4px;font-size:12px">سقف حجم — مقید به <span id="d-binding">${r.binding}</span></h4>
+        <table class="mini"><tbody id="d-limits">${limitRowsHtml(r)}</tbody></table>
 
         <h4 style="margin:14px 0 4px;font-size:12px">سناریو در سررسید</h4>
         <table class="mini">
           <thead><tr><th>تغییر پایه</th><th>قیمت پایه</th><th>سود و زیان</th></tr></thead>
-          <tbody>${scenRows}</tbody>
+          <tbody id="d-scen">${scenRowsHtml(grid)}</tbody>
         </table>
       </div>`;
 
     // نمودار بعد از نشستن قالب سوار می‌شود، چون به اندازه واقعی قاب نیاز دارد
     chart?.destroy();
     chart = mountPayoff(root.querySelector('#chart'), r.__legs, r.netCash, chartOpt);
+    builtId = r.id;
+  }
+
+  function updateDetail(r) {
+    const { chartOpt, an, grid } = detailCalc(r);
+    root.querySelector('#d-legend').innerHTML = legendHtml(an);
+    root.querySelector('#d-legs').innerHTML = legRowsHtml(r);
+    root.querySelector('#d-kv').innerHTML = kvHtml(r);
+    root.querySelector('#d-margin-note').textContent = r.marginNote;
+    root.querySelector('#d-legging').innerHTML = leggingRiskHtml(r);
+    root.querySelector('#d-exec-cost').textContent = fmt.money(r.execCost);
+    root.querySelector('#d-costs').innerHTML = costRowsHtml(r);
+    root.querySelector('#d-binding').textContent = r.binding;
+    root.querySelector('#d-limits').innerHTML = limitRowsHtml(r);
+    root.querySelector('#d-scen').innerHTML = scenRowsHtml(grid);
+    chart?.update(r.__legs, r.netCash, chartOpt);
+  }
+
+  function showDetail(r) {
+    picked = r;
+    root.querySelector('#detail-card').style.display = '';
+    root.querySelector('#detail-title').textContent = `${r.underlying} — ${r.legsText}`;
+    if (builtId === r.id) updateDetail(r); else buildDetail(r);
   }
 
   // ——— اجرای اسکن ———
