@@ -388,6 +388,13 @@ function mountInteractive(host, { homeLo, homeHi, initRange, frameOf, valueAt, r
     else if (ev.key === '+' || ev.key === '=') { ev.preventDefault(); zoomAt(NaN, 1 / 1.3); }
     else if (ev.key === '-' || ev.key === '_') { ev.preventDefault(); zoomAt(NaN, 1.3); }
     else if (ev.key === 'Home') { ev.preventDefault(); reset(); }
+    else return;
+    // onMove (ماوس) بعد از هر جابه‌جایی showCursor را صدا می‌زند — اینجا
+    // نمی‌زد. render() هر بار svg را از نو می‌سازد (گروه cursor تازه،
+    // hidden پیش‌فرض)، پس کاربر کیبوردی نه خط راهنما می‌دید نه نوشته
+    // پایه/سود-زیان به‌روز می‌شد؛ اگر ماوس قبلش لمس کرده بود، نوشته کهنه
+    // (جداشده از خط راهنمای دیگر نامرئی) روی صفحه می‌ماند (دور ۷۸).
+    showCursor((lo + hi) / 2);
   };
 
   canvas.addEventListener('wheel', onWheel, { passive: false });
