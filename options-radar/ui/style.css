@@ -513,7 +513,12 @@ table.data td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; 
 
 dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0; font-size: 12.5px; }
 dl.kv dt { color: var(--muted); }
-dl.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; direction: ltr; text-align: start; }
+/* ستون dd عرض 1fr دارد و اغلب رقم است، ولی جاهای زیادی (جهت، نام
+   استراتژی، مبنای سرمایه، «بستانکار — وجه تضمین دارد») جمله فارسی خالص
+   می‌نشیند. direction:ltr بدون کمک اضافه با text-align:start (که برای
+   dd همان چپ می‌شود) آن جمله را از برچسبش دور می‌انداخت — دقیقاً همان
+   مشکل «.kpi .v»، این‌بار روی فاصله نه شکست خط. همان راه‌حل plaintext. */
+dl.kv dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; direction: ltr; text-align: start; unicode-bidi: plaintext; }
 
 /* ——— جدول مجازی‌سازی‌شده ———
    سرستون باید روی لبه بالای همین قاب پیمایش بچسبد. قاعده عمومی
