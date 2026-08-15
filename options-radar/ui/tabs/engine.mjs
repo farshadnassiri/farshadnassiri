@@ -168,30 +168,35 @@ export async function mount(root, { state }) {
 
   function drawRow(row) {
     const groupsOrder = ['هویت', 'جریان نقد', 'سود و زیان', 'سرمایه', 'بازده', 'احتمال', 'یونانی', 'اجرا', 'سلامت'];
+    // آرگومان سوم true یعنی سلول عددی است (کلاس n، برای direction:ltr و
+    // ارقام هم‌عرض — همان قرارداد table.mjs). قبلاً با رجکس روی رشته
+    // فارسی‌شده حدس زده می‌شد: /^[\d,.\-∞ ]+$/ فقط رقم انگلیسی می‌شناخت،
+    // اما fmt.money/pct/num/int رقم فارسی برمی‌گردانند (fmt.mjs) — رجکس
+    // هیچ‌وقت match نمی‌شد و کل جدول همیشه بی‌کلاس می‌ماند (دور ۷۲).
     const cells = {
-      'هویت': [['استراتژی', row.strategy], ['پاها', faDigits(row.legsText)], ['روز', fmt.int(row.days)],
-        ['قیمت پایه', fmt.money(row.S)], ['مبنای قیمت', row.priceBasis], ['حالت اجرا', row.execMode]],
-      'جریان نقد': [['جهت', row.cashLabel], ['نقد ناخالص', fmt.money(row.grossCash)],
-        ['کارمزد ورود', fmt.money(row.entryFee)], ['نقد خالص', fmt.money(row.netCash)],
-        ['بستن فوری — دفتر سفارش', fmt.money(row.instantClosePnl)],
-        ['اگر با آخرین معامله تسویه', fmt.money(row.settleLastPnl)],
-        ['اگر با قیمت پایانی تسویه', fmt.money(row.settleClosePnl)]],
-      'سود و زیان': [['سربه‌سری', row.breakevens.map((b) => fmt.money(b)).join('  ,  ') || '—'],
-        ['بیشترین سود', fmt.money(row.maxProfit)], ['بیشترین زیان', fmt.money(row.maxLoss)],
-        ['سود اگر پایه ثابت بماند', fmt.money(row.staticPnl)]],
-      'سرمایه': [['سرمایه درگیر', fmt.money(row.capital)], ['مبنای سرمایه', row.capitalLabel],
-        ['وجه تضمین', fmt.money(row.margin)], ['تضمین به زیان', fmt.num(row.marginToMaxLoss)],
-        ['تضمین شرطی', fmt.money(row.conditionalMargin)], ['پوشش', row.coverage],
+      'هویت': [['استراتژی', row.strategy], ['پاها', faDigits(row.legsText)], ['روز', fmt.int(row.days), true],
+        ['قیمت پایه', fmt.money(row.S), true], ['مبنای قیمت', row.priceBasis], ['حالت اجرا', row.execMode]],
+      'جریان نقد': [['جهت', row.cashLabel], ['نقد ناخالص', fmt.money(row.grossCash), true],
+        ['کارمزد ورود', fmt.money(row.entryFee), true], ['نقد خالص', fmt.money(row.netCash), true],
+        ['بستن فوری — دفتر سفارش', fmt.money(row.instantClosePnl), true],
+        ['اگر با آخرین معامله تسویه', fmt.money(row.settleLastPnl), true],
+        ['اگر با قیمت پایانی تسویه', fmt.money(row.settleClosePnl), true]],
+      'سود و زیان': [['سربه‌سری', row.breakevens.map((b) => fmt.money(b)).join('  ,  ') || '—', true],
+        ['بیشترین سود', fmt.money(row.maxProfit), true], ['بیشترین زیان', fmt.money(row.maxLoss), true],
+        ['سود اگر پایه ثابت بماند', fmt.money(row.staticPnl), true]],
+      'سرمایه': [['سرمایه درگیر', fmt.money(row.capital), true], ['مبنای سرمایه', row.capitalLabel],
+        ['وجه تضمین', fmt.money(row.margin), true], ['تضمین به زیان', fmt.num(row.marginToMaxLoss), true],
+        ['تضمین شرطی', fmt.money(row.conditionalMargin), true], ['پوشش', row.coverage],
         ['یادداشت تضمین', row.marginNote]],
-      'بازده': [['بازده دوره ٪', fmt.pct(row.retMaxPct)], ['بازده ایستا ٪', fmt.pct(row.retStaticPct)],
-        ['بازده ماهانه ٪', fmt.pct(row.retMonthPct)], ['بازده سالانه ٪', fmt.pct(row.retAnnPct)],
-        ['سالانه مرکب ٪', fmt.pct(row.retAnnCompPct)]],
-      'احتمال': [['احتمال سود ٪', fmt.pct(row.popPct)], ['تلاطم مبنا', fmt.num(row.sigmaUse)]],
-      'یونانی': [['دلتا', fmt.num(row.delta)], ['گاما', fmt.num(row.gamma)], ['وگا', fmt.money(row.vega)],
-        ['تتا روزانه', fmt.money(row.theta)], ['تتا به سرمایه ٪', fmt.pct(row.thetaToCapitalPct)]],
-      'اجرا': [['هزینه اجرا', fmt.money(row.execCost)], ['کارمزد', fmt.money(row.costCommission)],
-        ['عبور از اسپرد', fmt.money(row.costCrossing)], ['افت مظنه', fmt.money(row.costSlippage)],
-        ['هزینه فرصت تضمین', fmt.money(row.costFunding)], ['سقف قرارداد', fmt.int(row.maxQty)],
+      'بازده': [['بازده دوره ٪', fmt.pct(row.retMaxPct), true], ['بازده ایستا ٪', fmt.pct(row.retStaticPct), true],
+        ['بازده ماهانه ٪', fmt.pct(row.retMonthPct), true], ['بازده سالانه ٪', fmt.pct(row.retAnnPct), true],
+        ['سالانه مرکب ٪', fmt.pct(row.retAnnCompPct), true]],
+      'احتمال': [['احتمال سود ٪', fmt.pct(row.popPct), true], ['تلاطم مبنا', fmt.num(row.sigmaUse), true]],
+      'یونانی': [['دلتا', fmt.num(row.delta), true], ['گاما', fmt.num(row.gamma), true], ['وگا', fmt.money(row.vega), true],
+        ['تتا روزانه', fmt.money(row.theta), true], ['تتا به سرمایه ٪', fmt.pct(row.thetaToCapitalPct), true]],
+      'اجرا': [['هزینه اجرا', fmt.money(row.execCost), true], ['کارمزد', fmt.money(row.costCommission), true],
+        ['عبور از اسپرد', fmt.money(row.costCrossing), true], ['افت مظنه', fmt.money(row.costSlippage), true],
+        ['هزینه فرصت تضمین', fmt.money(row.costFunding), true], ['سقف قرارداد', fmt.int(row.maxQty), true],
         ['قید مقیدکننده', row.binding], ['ریسک لنگ‌زدن', row.leggingRisk ? 'دارد' : 'ندارد']],
       'سلامت': [['کیفیت داده', row.qualityLabel],
         ['هشدار', row.warn.length ? row.warn.join('  ,  ') : 'بی‌هشدار']],
@@ -199,8 +204,7 @@ export async function mount(root, { state }) {
     let html = '<tbody>';
     for (const g of groupsOrder) {
       html += `<tr><th colspan="2" style="background:var(--panel-2);color:var(--accent)">${g}</th></tr>`;
-      for (const [k, v] of cells[g]) {
-        const isNum = typeof v === 'string' && /^[\d,.\-∞ ]+$/.test(v);
+      for (const [k, v, isNum] of cells[g]) {
         html += `<tr><td style="color:var(--muted)">${k}</td><td class="${isNum ? 'n' : ''}">${v}</td></tr>`;
       }
     }
