@@ -169,12 +169,13 @@ export function makeTable(host, cols, opts = {}) {
         <span class="tbl-count"></span>
       </div>
       <div class="col-panel" hidden></div>
-      <div class="tbl-body" tabindex="0"><table class="data"><thead><tr></tr></thead><tbody></tbody></table></div>
+      <div class="tbl-body"><table class="data" role="grid" tabindex="0"><thead><tr></tr></thead><tbody></tbody></table></div>
     </div>`;
 
   const wrap = host.querySelector('.tbl-wrap');
   const headRow = host.querySelector('thead tr');
   const body = host.querySelector('.tbl-body');
+  const grid = host.querySelector('table.data');
   const tbody = host.querySelector('tbody');
   const countLbl = host.querySelector('.tbl-count');
   const sortLbl = host.querySelector('.tbl-sort');
@@ -190,8 +191,8 @@ export function makeTable(host, cols, opts = {}) {
   let sortDir = -1;
   const ranges = new Map();
   // ردیف برجسته صفحه‌کلید — قبلاً جدول فقط با کلیک ماوس باز می‌شد؛ کاربر
-  // صفحه‌کلیدی که با Tab به تب‌ها.tbl-body می‌رسید (از قبل tabindex="0" دارد)
-  // هیچ راهی برای باز کردن جزئیات یک ردیف نداشت. اندیس، نه شناسه ردیف، چون
+  // صفحه‌کلیدی که با Tab به خودِ <table> می‌رسید (tabindex="0" دارد) هیچ
+  // راهی برای باز کردن جزئیات یک ردیف نداشت. اندیس، نه شناسه ردیف، چون
   // با هر مرتب‌سازی/اسکن تازه لیست از نو می‌چیند.
   let activeIdx = -1;
 
@@ -426,6 +427,7 @@ export function makeTable(host, cols, opts = {}) {
       tr.dataset.i = i;
       tr.id = `${rowIdPrefix}${i}`;
       tr.setAttribute('data-kbd-active', i === activeIdx ? '1' : '0');
+      tr.setAttribute('aria-selected', i === activeIdx ? 'true' : 'false');
       for (const c of shown) {
         const td = document.createElement('td');
         const v = r[c.key];
@@ -466,8 +468,11 @@ export function makeTable(host, cols, opts = {}) {
     // data-kbd-active از دور ۲۶ فقط بصری بود (box-shadow در style.css) —
     // صفحه‌خوان هیچ راهی برای فهمیدن ردیف برجسته نداشت. moveActive() قبل
     // از draw() اسکرول را جابه‌جا می‌کند، پس ردیف فعال همیشه در بازه
-    // first..last رسم‌شده است (دور ۶۹).
-    body.setAttribute('aria-activedescendant', activeIdx >= first && activeIdx < last ? `${rowIdPrefix}${activeIdx}` : '');
+    // first..last رسم‌شده است (دور ۶۹). aria-activedescendant باید روی
+    // همان عنصری بنشیند که role مرکب و tabindex دارد — دور ۶۹ آن را روی
+    // body (بی‌نقش) گذاشته بود، بی‌اثر برای صفحه‌خوان؛ حالا روی grid
+    // (خودِ <table role="grid" tabindex="0">) می‌نشیند (دور ۷۰).
+    grid.setAttribute('aria-activedescendant', activeIdx >= first && activeIdx < last ? `${rowIdPrefix}${activeIdx}` : '');
   }
 
   body.addEventListener('scroll', () => requestAnimationFrame(draw), { passive: true });
