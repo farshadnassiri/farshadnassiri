@@ -21,6 +21,7 @@ import { scan as scanFn, generateCombos } from '../core/scan.mjs';
 import { markToMarket, rollAnalysis } from '../core/positions.mjs';
 import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '../core/jalali.mjs';
 import { safeJoin } from '../server/safe-path.mjs';
+import { isValidIns } from '../server/validate.mjs';
 import path from 'node:path';
 
 let pass = 0, fail = 0;
@@ -804,6 +805,17 @@ group('۱۸. سرو فایل ایستا — عبور از ریشه');
     safeJoin(ROOT, '/../../etc/passwd') === null);
   check('مسیر مطلق دیگر رد می‌شود',
     safeJoin(ROOT, '/../../x/other') === null);
+}
+
+// ═══════════════════════════ ۱۹. صحت‌سنجی پارامتر ins ═══════════════════════════
+group('۱۹. صحت‌سنجی پارامتر ins');
+{
+  check('کد ابزار عددی پذیرفته می‌شود', isValidIns('12345678901234567'));
+  check('رشته خالی رد می‌شود', !isValidIns(''));
+  check('مقدار نامعین رد می‌شود', !isValidIns(null) && !isValidIns(undefined));
+  check('مسیر بالادست دیگر رد می‌شود', !isValidIns('../Other/1'));
+  check('کد آمیخته با حروف رد می‌شود', !isValidIns('123abc'));
+  check('کد با فاصله رد می‌شود', !isValidIns('123 456'));
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════

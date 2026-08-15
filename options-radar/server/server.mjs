@@ -19,6 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defaults, sanitize } from '../core/settings.mjs';
 import { safeJoin } from './safe-path.mjs';
+import { isValidIns } from './validate.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -290,6 +291,8 @@ function send(res, code, body, type = 'application/json; charset=utf-8') {
 }
 const sendJson = (res, code, obj) => send(res, code, JSON.stringify(obj));
 
+const INS_PATHS = new Set(['/api/book', '/api/info', '/api/optionmeta', '/api/daily', '/api/clienttype']);
+
 async function serveStatic(res, pathname) {
   const rel = pathname === '/' ? '/ui/index.html' : pathname;
   const file = safeJoin(ROOT, rel);
@@ -308,6 +311,10 @@ async function handle(req, res) {
   const ins = u.searchParams.get('ins');
 
   try {
+    if (INS_PATHS.has(p) && !isValidIns(ins)) {
+      return sendJson(res, 400, { error: 'کد ابزار نامعتبر' });
+    }
+
     if (p === '/api/health') {
       const gate = marketOpen();
       return sendJson(res, 200, {
@@ -416,7 +423,7 @@ async function handle(req, res) {
 
     // ——— دریافت دسته‌ای: یک رفت و برگشت به‌جای چند ده تا ———
     if (p === '/api/books' || p === '/api/infos') {
-      const codes = String(u.searchParams.get('ins') || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 200);
+      const codes = String(u.searchParams.get('ins') || '').split(',').map((x) => x.trim()).filter(isValidIns).slice(0, 200);
       const wantBook = p === '/api/books';
       const one = async (code) => {
         try {
