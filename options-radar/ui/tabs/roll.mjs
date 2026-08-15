@@ -253,13 +253,16 @@ export async function mount(root, { state, api }) {
     // «خبر خوب» را می‌گرفت. signTone همان تابعی است که کارت‌های KPI
     // تب‌های استراتژی/برترین موقعیت‌ها (دور ۱۷) برای همین منظور دارند.
     const bestTone = signTone(best.r.atSpot);
+    // role="button" روی این <tr> نقش ضمنی row را می‌شکست، درست همان‌طور
+    // که دور ۷۵ در سرستون جدول مشترک رفع کرد — پنج/شش <td> این ردیف
+    // برای صفحه‌خوان به یک aria-label خلاصه می‌افتاد. حذف role کافی است.
     root.querySelector('#cand').innerHTML = `
       <thead><tr>
         <th>اعمال</th>${multiExpiry ? '<th>سررسید</th>' : ''}<th>خالص نقدی رول</th><th>تفاضل در قیمت فعلی</th>
         <th>سقف سود پس از رول</th><th>سربه‌سری پس از رول</th><th></th>
       </tr></thead>
       <tbody>${candRows.map((x) => `
-        <tr data-i="${x.i}" style="cursor:pointer" class="${x.i === candIdx ? 'picked' : ''}" tabindex="0" role="button" aria-label="نامزد رول به اعمال ${fmt.money(x.strike)}">
+        <tr data-i="${x.i}" style="cursor:pointer" class="${x.i === candIdx ? 'picked' : ''}" tabindex="0" aria-label="نامزد رول به اعمال ${fmt.money(x.strike)}">
           <td class="n">${fmt.money(x.strike)}</td>${multiExpiry ? `<td class="n">${faDigits(x.days)} روز</td>` : ''}
           <td class="n">${fmt.money(x.r.netCashChange)}</td>
           <td class="n" style="color:${signColor(x.r.atSpot)}">${fmt.money(x.r.atSpotTotal)}</td>

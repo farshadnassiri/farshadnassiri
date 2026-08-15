@@ -202,8 +202,13 @@ export async function mount(root, { state, api }) {
   function render() {
     const evals = positions.map((p) => ({ p, ...evalPos(p) }));
 
+    // role="button" روی این <tr> نقش ضمنی row را می‌شکست — یازده <td> این
+    // ردیف برای صفحه‌خوان به یک aria-label خلاصه فروکاسته می‌شد، بدون
+    // امکان پیمایش سلول‌به‌سلول (عنوان، پایه، پاها، سود/زیان، …). دقیقاً
+    // همان الگویی که دور ۷۵ در سرستون جدول مشترک رفع کرد؛ حذف role کافی
+    // است — tabindex/click/keydown به نقش وابسته نیستند (دور ۷۶).
     const rows = evals.map(({ p, m }, i) => `
-      <tr data-i="${i}" style="cursor:pointer" tabindex="0" role="button" aria-label="جزئیات موقعیت ${p.title || '—'}">
+      <tr data-i="${i}" style="cursor:pointer" tabindex="0" aria-label="جزئیات موقعیت ${p.title || '—'}">
         <td>${p.title || '—'}</td>
         <td>${p.uaName || p.uaIns}</td>
         <td>${p.legs.map((l) => `${l.side === 'sell' ? '−' : '+'}${l.kind === 'underlying' ? 'سهم' : (l.kind === 'call' ? 'کال' : 'پوت') + ' ' + fmt.money(l.strike)}`).join(' ')}</td>
