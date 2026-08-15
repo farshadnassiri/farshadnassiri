@@ -142,7 +142,7 @@ export function generateCombos(def, ua, s, funnel = emptyFunnel()) {
         // فروش به بهترین تقاضا نیاز دارد، خرید به بهترین عرضه
         const px = t.side === 'sell' ? q.bid : q.ask;
         if (!(px > 0)) missing = true;
-        if (t.side === 'sell' && (q.bidQty < s.minBidQty || q.oi < s.minOpenInt)) missing = true;
+        if (t.side === 'sell' && (q.bid < s.minBid || q.bidQty < s.minBidQty || q.oi < s.minOpenInt)) missing = true;
         if (q.vol < s.minLegVol || q.value < s.minLegValue) missing = true;
         legs.push({
           kind: t.kind, side: t.side, ratio: t.ratio, strike: K, size: row.size,

@@ -1746,6 +1746,15 @@ group('۲۶. فیلترهای نقدشوندگی غربال');
   const byBidQty = scanFn({ def: byId('naked-call'), chain: chainL, uaKeys: ['L'], settings: { ...s0, minBidQty: 100 } });
   check('حداقل حجم مظنه هم روی همان مسیر واقعاً اعمال می‌شود', byBidQty.rows.length === 0);
 
+  // قیمت تقاضای فروش ۳۰۰۰ است؛ منبع minBid تنظیمات کاربر بود ولی هیچ‌جای
+  // اسکنر خوانده نمی‌شد — کاربر می‌توانست حداقل قیمت تقاضا را بالا ببرد و
+  // هیچ ردیفی هرگز حذف نمی‌شد
+  const byMinBid = scanFn({ def: byId('naked-call'), chain: chainL, uaKeys: ['L'], settings: { ...s0, minBid: 3500 } });
+  check('حداقل قیمت تقاضا (باگ قبلی: هیچ‌وقت خوانده نمی‌شد) واقعاً اعمال می‌شود',
+    byMinBid.rows.length === 0, `${base.rows.length} → ${byMinBid.rows.length}`);
+  const byMinBidOk = scanFn({ def: byId('naked-call'), chain: chainL, uaKeys: ['L'], settings: { ...s0, minBid: 2500 } });
+  check('حداقل قیمت تقاضا زیر واقعی، ردیف را نمی‌اندازد', byMinBidOk.rows.length === base.rows.length);
+
   // حجم معاملات امروز هر پا ۱۰۰۰ است؛ فیلتر تازه
   const byVol = scanFn({ def: byId('naked-call'), chain: chainL, uaKeys: ['L'], settings: { ...s0, minLegVol: 1500 } });
   check('حداقل حجم معاملات هر پا (فیلتر تازه) رعایت می‌شود', byVol.rows.length === 0);
