@@ -162,17 +162,22 @@ export async function mount(root, { state, api }) {
       </tr>`;
     }).join('');
 
+    // سرستون دو سطحی: برچسب سطر دوم («تقاضا»، «حجم»، …) عیناً بین کال و
+    // پوت تکرار می‌شود؛ تنها چیزی که جداشان می‌کند سرستونِ ردیفِ اول است.
+    // بدون scope، صفحه‌خوانی که روی یک سلول تقاضای پوت می‌ایستد فقط
+    // «تقاضا» می‌شنود، بدون اینکه بداند کال است یا پوت — برای ابزار
+    // معاملاتی، خواندن اشتباه بازار می‌تواند تصمیم غلط بسازد (دور ۷۳).
     root.querySelector('#chain').innerHTML = `
       <thead>
         <tr>
-          <th colspan="6" style="text-align:center;color:var(--gain)">اختیار خرید</th>
-          <th style="text-align:center">اعمال</th>
-          <th colspan="6" style="text-align:center;color:var(--loss)">اختیار فروش</th>
+          <th colspan="6" scope="colgroup" style="text-align:center;color:var(--gain)">اختیار خرید</th>
+          <th scope="col" style="text-align:center">اعمال</th>
+          <th colspan="6" scope="colgroup" style="text-align:center;color:var(--loss)">اختیار فروش</th>
         </tr>
         <tr>
-          <th>تقاضا</th><th>حجم</th><th>عرضه</th><th>آخرین</th><th>حجم روز</th><th>موقعیت باز</th>
-          <th>—</th>
-          <th>تقاضا</th><th>حجم</th><th>عرضه</th><th>آخرین</th><th>حجم روز</th><th>موقعیت باز</th>
+          <th scope="col">تقاضا</th><th scope="col">حجم</th><th scope="col">عرضه</th><th scope="col">آخرین</th><th scope="col">حجم روز</th><th scope="col">موقعیت باز</th>
+          <th scope="col">—</th>
+          <th scope="col">تقاضا</th><th scope="col">حجم</th><th scope="col">عرضه</th><th scope="col">آخرین</th><th scope="col">حجم روز</th><th scope="col">موقعیت باز</th>
         </tr>
       </thead>
       <tbody>${body}</tbody>`;
