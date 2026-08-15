@@ -10,8 +10,8 @@
 
 import { fmt, faNum, faDigits, signTone } from '/ui/fmt.mjs';
 import { CATALOG, byId, buildLegs } from '/strategies/catalog.mjs';
-import { grossCash, entryFees, analyzePayoff, chartPoints } from '/core/payoff.mjs';
-import { mountPayoff } from '/ui/chart.mjs';
+import { grossCash, entryFees } from '/core/payoff.mjs';
+import { mountPayoff, seriesFor } from '/ui/chart.mjs';
 import { evaluate, profitRegions } from '/core/evaluate.mjs';
 
 export async function mount(root, { state }) {
@@ -139,6 +139,14 @@ export async function mount(root, { state }) {
 
   // ——— جدول‌ها ———
   function drawSegments(an) {
+    // ترکیب چند-سررسیدی (تقویمی/مورب) تکه‌ای-خطی نیست، پس این مفهوم اصلاً
+    // برایش معنی ندارد — analyzeMixed خودش segments را null برمی‌گرداند،
+    // نه خالی. جدول را با یادداشت همان تقریب پنهان می‌کنیم، نه با کرش.
+    if (!an.segments) {
+      root.querySelector('#segs').innerHTML = `
+        <tbody><tr><td class="note">این ترکیب چند-سررسیدی است — بازده تکه‌ای-خطی نیست، پس این جدول برایش معنی ندارد. نمودار بالا از موتور تقریبی (${an.note || 'ارزش‌گذاری بلک-شولز روی پای زنده'}) می‌آید.</td></tr></tbody>`;
+      return;
+    }
     const rows = an.segments.map((g, i) => `
       <tr>
         <td class="n">${faDigits(i + 1)}</td>
@@ -225,7 +233,14 @@ export async function mount(root, { state }) {
     const s = state.settings;
     const fees = { buyStock: s.feeBuyStock, sellStock: s.feeSellStock, option: s.feeOption, exercise: s.feeExercise };
     const net = grossCash(legs) - entryFees(legs, fees);
-    const { points, analysis } = chartPoints(legs, net, { fees, padPct: 0.4 });
+    // همان انتخاب موتور که خودِ نمودار (mountPayoff) می‌کند — قبلاً اینجا
+    // بی‌قیدوشرط تک‌سررسیدی (analyzePayoff) صدا زده می‌شد، پس برای تقویمی/
+    // مورب متن عنوان و «دفتر بازه‌ها» با نمودار واقعی زیرش (که درست
+    // isSingleExpiry را چک می‌کند) ناسازگار بود — یکی می‌گفت صفر سربه‌سری،
+    // دیگری منحنی واقعی چادری را می‌کشید.
+    const { analysis } = seriesFor(legs, net, {
+      fees, spot, sigma: 0.6, rFree: s.rFree, divYield: s.divYield, padPct: 0.4,
+    });
 
     // مظنه مصنوعی از قیمت دستی، تا ارزیاب همان مسیر واقعی را طی کند. بدون
     // اسپرد مصنوعی: عرضه و تقاضا هر دو دقیقاً همان قیمت تایپ‌شده‌اند، وگرنه

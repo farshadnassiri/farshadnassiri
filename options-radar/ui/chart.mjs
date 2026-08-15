@@ -50,8 +50,16 @@ function ticksFor(lo, hi, count) {
   return out;
 }
 
-/** موتور درست را انتخاب می‌کند و نقاط رسم را می‌دهد. */
-function seriesFor(legs, netCash, opt) {
+/**
+ * موتور درست را انتخاب می‌کند و نقاط رسم را می‌دهد.
+ *
+ * Export شده تا هر جای دیگری که به تحلیل خام (نه فقط SVG) نیاز دارد —
+ * مثل تب موتور برای «دفتر بازه‌ها» و متن عنوان نمودار — همین یک انتخاب
+ * تک‌سررسیدی/چند-سررسیدی را دوباره ننویسد. تکرارش دقیقاً همان باگی بود که
+ * تب موتور داشت: خودش مستقیم analyzePayoff (تک‌سررسیدی) صدا می‌زد و برای
+ * تقویمی/مورب با خودِ نمودار (که از همین‌جا درست انتخاب می‌کند) ناسازگار می‌شد.
+ */
+export function seriesFor(legs, netCash, opt) {
   if (isSingleExpiry(legs)) {
     const { points, analysis } = chartPoints(legs, netCash, { fees: opt.fees, padPct: opt.padPct ?? 0.35 });
     return { points, analysis };
