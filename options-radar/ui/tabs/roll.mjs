@@ -12,7 +12,7 @@ import { marginParamsOf } from '/core/settings.mjs';
 import { impliedVol } from '/core/bs.mjs';
 import { mountPayoff, mountDiff } from '/ui/chart.mjs';
 import { fmt } from '/ui/table.mjs';
-import { faDigits, signTone, signColor } from '/ui/fmt.mjs';
+import { faDigits, signTone, signColor, rollVerdictLabel } from '/ui/fmt.mjs';
 import { onChain, chainState, pushRows, chainDetail } from '/ui/scanner.mjs';
 
 export async function mount(root, { state, api }) {
@@ -225,9 +225,8 @@ export async function mount(root, { state, api }) {
     el('#newnote').textContent =
       `هزینه بستن پای فعلی از عرضه: ${fmt.money(-r.closeCash)} — بستانکار پای تازه از تقاضا: ${fmt.money(r.newCash)}`;
 
-    const better = r.atSpot > 0;
     el('#kpis').innerHTML = [
-      ['تفاضل در قیمت فعلی', fmt.money(r.atSpotTotal), better ? 'رول بهتر است' : 'نگه داشتن بهتر است', better ? 'gain' : 'loss'],
+      ['تفاضل در قیمت فعلی', fmt.money(r.atSpotTotal), rollVerdictLabel(r.atSpot), signTone(r.atSpot)],
       ['خالص نقدی رول', fmt.money(r.netCashChange), r.netCashChange >= 0 ? 'بستانکار' : 'بدهکار', r.netCashChange >= 0 ? 'gain' : 'loss'],
       ['سقف سود فعلی', fmt.money(r.curMaxProfit), '', ''],
       ['سقف سود پس از رول', fmt.money(r.nextMaxProfit), '', ''],

@@ -24,7 +24,7 @@ import { jalaliToGregorian, gregorianToJalali, parseJalali, todayJalali } from '
 import { validIns, parseInsList, safeStaticPath, readBody, BodyTooLarge } from '../server/guard.mjs';
 import { evictOldest } from '../server/cache.mjs';
 import { watchBackoffSec } from '../server/backoff.mjs';
-import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone, signColor, pageTitle, normFa, dirTone } from '../ui/fmt.mjs';
+import { fmt as uiFmt, axisNum, toEnDigits, faAgo, faClock, humanizeUpstreamError, coverageInfo, kpiTone, signTone, signColor, pageTitle, normFa, dirTone, rollVerdictLabel } from '../ui/fmt.mjs';
 import { moveColumn, insertColumn, changedIds, compareSortValues } from '../ui/table.mjs';
 import { sameUnderlyingCandidates, compareLabel, compareFullLabel, MAX_COMPARE } from '../ui/compare.mjs';
 
@@ -2017,6 +2017,26 @@ group('۳۲. برچسب جهت هر استراتژی در فهرست کناری'
   const untoned = CATALOG.filter((s) => dirTone(s)[1] === null);
   check('هیچ استراتژی کاتالوگ بی‌برچسب جهت نمی‌ماند',
     untoned.length === 0, untoned.map((s) => s.id).join(','));
+}
+
+// ═══ ۳۳. برچسب تفاضل رول در قیمت فعلی (قلم پ-۶ بک‌لاگ، دور شصت‌وششم) ═══
+group('۳۳. برچسب سه‌راهه «تفاضل در قیمت فعلی» تب رول');
+{
+  // کارت KPI با `r.atSpot > 0` دوراهه حساب می‌کرد؛ تساوی دقیق (رول بدون
+  // تفاوت) و NaN (تحلیل ناقص) هر دو در شاخه «نگه داشتن بهتر است» می‌افتادند
+  // و قرمز می‌شدند — نتیجه‌گیری کاذب، نه خنثی. core/positions.mjs همین
+  // سه‌راهه را در rollAnalysis().verdict درست حساب می‌کند؛ rollVerdictLabel
+  // همان سه‌راهه را برای کارت کوتاه‌شده تکرار می‌کند، نه دوراهه ساده.
+  check('رول بهتر (atSpot مثبت)', rollVerdictLabel(1500) === 'رول بهتر است');
+  check('نگه داشتن بهتر (atSpot منفی)', rollVerdictLabel(-1500) === 'نگه داشتن بهتر است');
+  check('تساوی دقیق صفر، نه «نگه داشتن بهتر است»', rollVerdictLabel(0) === 'تفاوتی ندارد');
+  check('NaN (تحلیل ناقص) هم خنثی می‌ماند', rollVerdictLabel(NaN) === 'تفاوتی ندارد');
+
+  // رنگ کارت هم به signTone وصل شد، نه شرط دستی: تساوی دقیق طبق قرارداد
+  // سرتاسری «≥۰ یعنی gain» سبز می‌ماند (نه قرمز نادرست قبلی)، و NaN
+  // (تحلیل ناقص) بی‌رنگ می‌ماند، نه سبز/قرمز کاذب
+  check('تساوی دقیق، سبز می‌ماند نه قرمز', signTone(0) === 'gain');
+  check('NaN، بی‌رنگ می‌ماند نه سبز/قرمز', signTone(NaN) === '');
 }
 
 // ═══════════════════════════ گزارش ═══════════════════════════
