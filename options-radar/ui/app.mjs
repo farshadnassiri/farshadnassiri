@@ -310,8 +310,11 @@ function buildRail() {
     ? `${faDigits(shown)} از ${faDigits(TABS.length)}`
     : `${faDigits(TABS.length)} تب`;
 
-  // اگر آیتم برجسته با فیلتر تازه دیگر دیده نیست، برجستگی به اولی برمی‌گردد
-  const visibleIds = [...list.querySelectorAll('.tab-btn')].map((b) => b.dataset.tab);
+  // اگر آیتم برجسته با فیلتر تازه دیگر دیده نیست، برجستگی به اولی برمی‌گردد.
+  // querySelectorAll('.tab-btn') دکمه‌های داخل بخش‌های تاشده را هم می‌گرفت —
+  // display:none بصری‌اند ولی در DOM می‌مانند، پس بدون :not([data-folded])
+  // برجستگی می‌توانست روی دکمه‌ای بنشیند که هیچ‌جا دیده نمی‌شود (دور ۷۱).
+  const visibleIds = [...list.querySelectorAll('.rail-group:not([data-folded="1"]) .tab-btn')].map((b) => b.dataset.tab);
   if (!visibleIds.includes(railActiveId)) railActiveId = visibleIds[0] || null;
   setRailActive(railActiveId);
 }
@@ -406,9 +409,11 @@ el('rail-q').addEventListener('input', (e) => {
 
 // میان‌بر صفحه‌کلید: بالا و پایین بین تب‌های فیلترشده، اینتر همان یکی را باز
 // می‌کند. آیتم برجسته با شناسه نگه داشته می‌شود نه اندیس، چون فهرست با هر
-// تایپ از نو ساخته می‌شود.
+// تایپ از نو ساخته می‌شود. فقط دکمه‌های بخش‌های بازشده — همان رفع دور ۷۱
+// در buildRail، وگرنه فلش‌ها می‌توانستند تب پنهانِ داخل بخش تاشده را
+// برجسته/باز کنند بی‌آنکه چیزی روی صفحه حرکت کند.
 el('rail-q').addEventListener('keydown', (e) => {
-  const visible = [...el('rail-list').querySelectorAll('.tab-btn')];
+  const visible = [...el('rail-list').querySelectorAll('.rail-group:not([data-folded="1"]) .tab-btn')];
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     e.preventDefault();
     if (!visible.length) return;
