@@ -190,7 +190,7 @@ export function buildLegs(def, { strikes, size = 1000, days = [], prices = {} })
     return {
       kind: t.kind, side: t.side, ratio: t.ratio,
       strike: K,
-      size: t.kind === 'underlying' ? size : size,
+      size,
       days: t.kind === 'underlying' ? undefined : (days[t.exp] ?? days[0] ?? 0),
       price: prices[key] ?? 0,
       slot: t.slot, exp: t.exp, key,
