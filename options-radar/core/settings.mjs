@@ -26,8 +26,6 @@ export const SCHEMA = [
     def: 3, min: 1, max: 60, step: 1, unit: 'ثانیه', label: 'عمر کش قیمت جاری' },
   { key: 'ttlDailySec', group: 'data', kind: 'num', scope: 'server',
     def: 900, min: 60, max: 86400, step: 60, unit: 'ثانیه', label: 'عمر کش داده روزانه' },
-  { key: 'ttlMetaSec', group: 'data', kind: 'num', scope: 'server',
-    def: 3600, min: 60, max: 86400, step: 60, unit: 'ثانیه', label: 'عمر کش مشخصات قرارداد' },
 
   // ——— سهمیه و فشار روی سرور بازار ———
   { key: 'ratePerSec', group: 'quota', kind: 'num', scope: 'server',

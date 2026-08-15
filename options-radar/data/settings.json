@@ -5,7 +5,6 @@
   "ttlBookSec": 3,
   "ttlInfoSec": 3,
   "ttlDailySec": 900,
-  "ttlMetaSec": 3600,
   "ratePerSec": 12,
   "burst": 20,
   "concurrency": 6,

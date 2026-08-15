@@ -373,7 +373,7 @@ async function handle(req, res) {
     // ——— غنی‌سازی، فقط بر اساس تقاضا ———
     // کد ابزار مستقیم داخل مسیر بالادست می‌نشیند. بدون صحت‌سنجی، یک «..»
     // درخواست را به نقطه پایانی دیگری می‌برد.
-    if (p === '/api/book' || p === '/api/info' || p === '/api/optionmeta'
+    if (p === '/api/book' || p === '/api/info'
       || p === '/api/daily' || p === '/api/clienttype') {
       if (!validIns(ins)) return sendJson(res, 400, { error: 'کد ابزار باید فقط رقم باشد' });
     }
@@ -404,19 +404,6 @@ async function handle(req, res) {
         value: Number(d.qTotCap) || 0,
         hEven: Number(d.hEven) || 0, lastHEven: Number(d.lastHEven) || 0,
         state: String(st.cEtaval || '').trim(), stateTitle: String(st.cEtavalTitle || '').trim(),
-      });
-    }
-
-    if (p === '/api/optionmeta') {
-      const info = firstDict(await get(`/Instrument/GetInstrumentInfo/${ins}`, S.ttlMetaSec, 4));
-      const iid = info.instrumentID;
-      if (!iid) return sendJson(res, 200, { ins, found: false });
-      const d = firstDict(await get(`/Instrument/GetInstrumentOptionByInstrumentID/${iid}`, S.ttlMetaSec, 4));
-      return sendJson(res, 200, {
-        ins, found: true, instrumentID: iid,
-        A: Number(d.aFactor), B: Number(d.bFactor), C: Number(d.cFactor),
-        contractSize: Number(d.contractSize) || 0, strike: Number(d.strikePrice) || 0,
-        buyOP: Number(d.buyOP) || 0, sellOP: Number(d.sellOP) || 0,
       });
     }
 
