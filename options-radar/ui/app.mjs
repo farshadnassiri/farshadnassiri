@@ -269,9 +269,43 @@ el('rail-q').addEventListener('input', (e) => {
 });
 // در فهرست فیلترشده، اینتر یعنی «همان یکی که مانده را باز کن»
 el('rail-q').addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter') return;
-  const first = el('rail-list').querySelector('.tab-btn');
-  if (first) open(first.dataset.tab);
+  if (e.key === 'Enter') {
+    const first = el('rail-list').querySelector('.tab-btn');
+    if (first) open(first.dataset.tab);
+    return;
+  }
+  // پیکان پایین از جعبه جست‌وجو، نشانگر را داخل فهرست تب‌ها می‌برد
+  if (e.key === 'ArrowDown') {
+    const first = el('rail-list').querySelector('.tab-btn');
+    if (first) { e.preventDefault(); first.focus(); }
+  }
+});
+
+// پیکان بالا و پایین بین تب‌های فیلترشده حرکت می‌کند؛ از اولین تب یک پیکان
+// بالا به جعبه جست‌وجو برمی‌گردد
+el('rail-list').addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const items = [...el('rail-list').querySelectorAll('.tab-btn')];
+  const i = items.indexOf(document.activeElement);
+  if (i === -1) return;
+  e.preventDefault();
+  if (e.key === 'ArrowDown') { if (i < items.length - 1) items[i + 1].focus(); }
+  else if (i > 0) items[i - 1].focus(); else el('rail-q').focus();
+});
+
+// «/» یا Ctrl+K نشانگر را به جعبه جست‌وجو می‌برد، از هر جای صفحه — مگر
+// وسط تایپ در یک ورودی دیگر باشی
+document.addEventListener('keydown', (e) => {
+  const ctrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
+  const slash = e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey;
+  if (!ctrlK && !slash) return;
+  const t = document.activeElement;
+  const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+  if (slash && typing) return; // در حال تایپ در ورودی دیگر، «/» را عادی بگذار
+  e.preventDefault();
+  const q = el('rail-q');
+  q.focus();
+  q.select();
 });
 
 // ————————————————————————————————— شروع —————————————————————————————————
