@@ -784,6 +784,22 @@ group('۱۳. موقعیت واقعی و تحلیل رول');
   check('اگر تا سررسید نگه داری، سود در قیمت فعلی', Number.isFinite(mtm.ifHeld.atSpot));
   check('روز نگه‌داری از تاریخ شمسی خوانده شد', mtm.daysHeld === 0, `${mtm.daysHeld}`);
 
+  // باگ واقعی: closePrice فقط CLOSE/LAST را ویژه می‌گرفت؛ basis های
+  // LOW/HIGH (که resolvePrice در exec.mjs از قبل درست می‌فهمید) بی‌سروصدا
+  // از شاخه دفتر سفارش (bid/ask) رد می‌شدند — یعنی رفتارشان دقیقاً همان
+  // BOOK بود، بدون هیچ نشانه‌ای برای کاربر.
+  const qLH = (bid, ask, low, high) => (
+    { bid, bidQty: 1000, ask, askQty: 1000, last: (bid + ask) / 2, close: (bid + ask) / 2, low, high });
+  const quotesLH = [qLH(104000, 105000, 98000, 108000), qLH(7000, 7400, 6000, 9000)];
+  const mtmLow = markToMarket(pos, quotesLH, { fees, spot: 104500, spotClose: 104500, basis: 'LOW' });
+  const mtmHigh = markToMarket(pos, quotesLH, { fees, spot: 104500, spotClose: 104500, basis: 'HIGH' });
+  check('basis=LOW قیمت بستن را از کمترین قیمت روز می‌گیرد، نه دفتر سفارش',
+    mtmLow.perLeg[0].markPrice === 98000 && mtmLow.perLeg[1].markPrice === 6000,
+    `سهم ${mtmLow.perLeg[0].markPrice} , کال ${mtmLow.perLeg[1].markPrice}`);
+  check('basis=HIGH قیمت بستن را از بیشترین قیمت روز می‌گیرد، نه دفتر سفارش',
+    mtmHigh.perLeg[0].markPrice === 108000 && mtmHigh.perLeg[1].markPrice === 9000,
+    `سهم ${mtmHigh.perLeg[0].markPrice} , کال ${mtmHigh.perLeg[1].markPrice}`);
+
   // وجه تضمین باید از قیمت پایانی روز مظنه فعلی بیاید، نه قیمت ورودی
   // ثبت‌شده روزها قبل — قبلاً markToMarket همیشه closes:{} خالی به
   // strategyMargin می‌داد، که بی‌سروصدا به l.price (قیمت ورود) برمی‌گشت.

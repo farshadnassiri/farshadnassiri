@@ -24,6 +24,8 @@ export function closePrice(leg, quote, basis = 'BOOK') {
   const q = quote || {};
   if (basis === 'CLOSE') return num(q.close);
   if (basis === 'LAST') return num(q.last) || num(q.close);
+  if (basis === 'LOW') return num(q.low) || num(q.close);
+  if (basis === 'HIGH') return num(q.high) || num(q.close);
   const px = leg.side === 'buy' ? num(q.bid) : num(q.ask);
   return px > 0 ? px : (num(q.last) || num(q.close));
 }
